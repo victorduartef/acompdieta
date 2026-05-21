@@ -46,6 +46,18 @@ const MEALS = [
   { id: 'extra', label: 'Refeição Extra', short: 'Extra', icon: '⚡', color: '#8b5cf6' },
 ]
 
+const ACTIVITIES = [
+  { id: 'musculacao', label: 'Musculação', icon: '🏋️', color: '#6366f1', type: 'strength' },
+  { id: 'futsal', label: 'Futsal', icon: '⚽', color: '#10b981', type: 'cardio' },
+  { id: 'futebol', label: 'Futebol', icon: '⚽', color: '#10b981', type: 'cardio' },
+  { id: 'tenis', label: 'Tênis', icon: '🎾', color: '#f59e0b', type: 'cardio' },
+  { id: 'volei', label: 'Vôlei', icon: '🏐', color: '#ec4899', type: 'cardio' },
+  { id: 'corrida', label: 'Corrida', icon: '🏃', color: '#ef4444', type: 'cardio' },
+  { id: 'natacao', label: 'Natação', icon: '🏊', color: '#0ea5e9', type: 'cardio' },
+  { id: 'ciclismo', label: 'Ciclismo', icon: '🚴', color: '#8b5cf6', type: 'cardio' },
+  { id: 'outro', label: 'Outro', icon: '🏃', color: '#6b7280', type: 'other' },
+]
+
 const DEFAULT_TARGETS = {
   cal: 1562, prot: 150, carb: 151, fat: 43,
   min: 1460, max: 1680, protMin: 138, protMax: 163, fatMax: 52,
@@ -106,6 +118,9 @@ export default function App() {
   const [editingDay, setEditingDay] = useState(null)
   const [showTargets, setShowTargets] = useState(false)
   const [newFood, setNewFood] = useState({ name: '', cal: '', prot: '', carb: '', fat: '', unit: 'g', def: '100', fav: [] })
+  const [weights, setWeights] = useState({})
+  const [showWeightModal, setShowWeightModal] = useState(false)
+  const [newWeight, setNewWeight] = useState('')
 
   // Merge: customFoods overrides DEFAULT_FOODS by id
   const allFoods = DEFAULT_FOODS.map(f => {
@@ -124,6 +139,7 @@ export default function App() {
             if (data.days) setDays(data.days)
             if (data.targets) setTargets(t => ({ ...t, ...data.targets }))
             if (data.customFoods) setCustomFoods(data.customFoods)
+            if (data.weights) setWeights(data.weights)
           }
           setLoaded(true)
         })
@@ -135,14 +151,35 @@ export default function App() {
     })
   }, [])
 
-  const persist = useCallback((newDays, newTargets, newCustomFoods) => {
+  const persist = useCallback((newDays, newTargets, newCustomFoods, newWeights) => {
     if (!uid) return
-    saveToFirebase(uid, { days: newDays, targets: newTargets, customFoods: newCustomFoods })
+    saveToFirebase(uid, { days: newDays, targets: newTargets, customFoods: newCustomFoods, weights: newWeights })
   }, [uid])
 
-  const updateDays = (newDays) => { setDays(newDays); persist(newDays, targets, customFoods) }
-  const updateTargets = (t) => { setTargets(t); persist(days, t, customFoods) }
-  const updateCustomFoods = (cf) => { setCustomFoods(cf); persist(days, targets, cf) }
+  const updateDays = (newDays) => { setDays(newDays); persist(newDays, targets, customFoods, weights) }
+  const updateTargets = (t) => { setTargets(t); persist(days, t, customFoods, weights) }
+  const updateCustomFoods = (cf) => { setCustomFoods(cf); persist(days, targets, cf, weights) }
+  const updateWeights = (w) => { setWeights(w); persist(days, targets, customFoods, w) }
+
+  function addActivityToDay(activityId) {
+    const day = getDay(activeKey)
+    const current = day.activities || []
+    if (current.includes(activityId)) return
+    const updated = { ...day, activities: [...current, activityId] }
+    updateDays({ ...days, [activeKey]: updated })
+  }
+
+  function removeActivityFromDay(activityId) {
+    const day = days[activeKey]
+    if (!day) return
+    const updated = { ...day, activities: (day.activities || []).filter(a => a !== activityId) }
+    updateDays({ ...days, [activeKey]: updated })
+  }
+
+  function saveWeight(dateKey, value) {
+    const updated = { ...weights, [dateKey]: parseFloat(value) }
+    updateWeights(updated)
+  }
 
   const activeKey = editingDay || todayKey()
 
@@ -210,7 +247,7 @@ export default function App() {
         <div style={{ background: '#13131f', borderBottom: '1px solid #1e1e30', padding: '20px 16px 0', flexShrink: 0 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
             <div>
-              <div style={{ fontSize: 10, letterSpacing: 2, color: '#55557a', fontFamily: 'JetBrains Mono, monospace', textTransform: 'uppercase' }}>MACRO TRACKER</div>
+              <div style={{ fontSize: 10, letterSpacing: 2, color: '#55557a', fontFamily: 'JetBrains Mono, monospace', textTransform: 'uppercase' }}>EVOSHAPE</div>
               <div style={{ fontSize: 18, fontWeight: 800, marginTop: 3 }}>{headerDate}</div>
               <div style={{ display: 'inline-block', marginTop: 5, padding: '2px 10px', borderRadius: 20, fontSize: 11, fontWeight: 500, background: !isToday ? '#92400e22' : over ? '#ef444422' : inRange && hasData ? '#10b98122' : '#1e1e30', color: !isToday ? '#f59e0b' : over ? '#ef4444' : inRange && hasData ? '#10b981' : '#8888aa' }}>
                 {!isToday ? 'Editando dia anterior' : over ? 'Excesso' : inRange && hasData ? '✓ Na meta' : '—'}
@@ -259,7 +296,7 @@ export default function App() {
             </div>
           </div>
           <div style={{ display: 'flex', marginTop: 14, gap: 2 }}>
-            {[{ id: 'today', label: 'Hoje' }, { id: 'history', label: 'Histórico' }, { id: 'analysis', label: 'Análise' }, { id: 'foods', label: 'Alimentos' }].map(t => (
+            {[{ id: 'today', label: 'Hoje' }, { id: 'history', label: 'Histórico' }, { id: 'analysis', label: 'Análise' }, { id: 'treino', label: 'Treino' }, { id: 'foods', label: 'Alimentos' }].map(t => (
               <button key={t.id} onClick={() => { setTab(t.id); setEditingDay(null); setAddingFood(false); setSearch(''); setRegisterMode(false) }}
                 style={{ flex: 1, padding: '10px 0', border: 'none', background: 'transparent', color: tab === t.id ? '#ededf5' : '#55557a', fontWeight: tab === t.id ? 700 : 500, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', borderBottom: `2px solid ${tab === t.id ? '#6366f1' : 'transparent'}`, transition: 'all .2s' }}>
                 {t.label}
@@ -272,10 +309,12 @@ export default function App() {
           {(tab === 'today' || editingDay) && renderDayEditor()}
           {tab === 'history' && !editingDay && renderHistory()}
           {tab === 'analysis' && !editingDay && renderAnalysis()}
+          {tab === 'treino' && !editingDay && renderTreino()}
           {tab === 'foods' && !editingDay && renderFoods()}
         </div>
       </div>
       {showTargets && <TargetsModal targets={targets} onSave={t => { updateTargets(t); setShowTargets(false) }} onClose={() => setShowTargets(false)} />}
+      {showWeightModal && <WeightModal onSave={(date, val) => { saveWeight(date, val); setShowWeightModal(false) }} onClose={() => setShowWeightModal(false)} />}
     </div>
   )
 
@@ -468,6 +507,198 @@ export default function App() {
             )
           })}
         </div>
+
+        {/* Weight evolution */}
+        {Object.keys(weights).length >= 2 && (() => {
+          const wEntries = Object.entries(weights).sort(([a], [b]) => a.localeCompare(b))
+          const firstW = wEntries[0][1]
+          const lastW = wEntries[wEntries.length - 1][1]
+          const totalDiff = (lastW - firstW).toFixed(1)
+          const wVals = wEntries.map(([,v]) => v)
+          const wMax = Math.max(...wVals) + 1
+          const wMin = Math.min(...wVals) - 1
+          const W2 = 340, H2 = 80, PL2 = 8, PR2 = 8, PT2 = 8, PB2 = 16
+          const cx2 = i => PL2 + (i / Math.max(wVals.length - 1, 1)) * (W2 - PL2 - PR2)
+          const cy2 = v => PT2 + (1 - (v - wMin) / (wMax - wMin)) * (H2 - PT2 - PB2)
+          const pts2 = wVals.map((v, i) => `${cx2(i)},${cy2(v)}`).join(' ')
+          return (
+            <div style={{ background: '#13131f', borderRadius: 14, padding: 14, marginBottom: 12, border: '0.5px solid #1e1e30' }}>
+              <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 4 }}>⚖️ Evolução do peso</div>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 10 }}>
+                <span style={{ fontSize: 24, fontWeight: 800, fontFamily: 'JetBrains Mono, monospace' }}>{lastW} kg</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: parseFloat(totalDiff) < 0 ? '#10b981' : parseFloat(totalDiff) > 0 ? '#ef4444' : '#55557a' }}>
+                  {parseFloat(totalDiff) > 0 ? '+' : ''}{totalDiff} kg total
+                </span>
+              </div>
+              <svg viewBox={`0 0 ${W2} ${H2}`} style={{ width: '100%', height: H2 }}>
+                <polyline points={pts2} fill="none" stroke="#6366f1" strokeWidth="2" strokeLinejoin="round" />
+                {wVals.map((v, i) => <circle key={i} cx={cx2(i)} cy={cy2(v)} r="4" fill="#6366f1" />)}
+              </svg>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#55557a', fontFamily: 'JetBrains Mono, monospace', marginTop: 4 }}>
+                <span>{wEntries[0][0]}</span><span>{wEntries[wEntries.length-1][0]}</span>
+              </div>
+            </div>
+          )
+        })()}
+
+        {/* Activity vs Diet correlation */}
+        {entries.length >= 3 && (() => {
+          const activeDays = entries.filter(([d]) => (days[d]?.activities || []).length > 0)
+          const inactiveDays = entries.filter(([d]) => (days[d]?.activities || []).length === 0)
+          const avgCal = arr => arr.length ? Math.round(arr.reduce((s, [,d]) => s + calcMacros(Object.values(d.meals||{}).flat(), allFoods).cal, 0) / arr.length) : 0
+          const activeAvg = avgCal(activeDays)
+          const inactiveAvg = avgCal(inactiveDays)
+          if (activeDays.length === 0) return null
+          return (
+            <div style={{ background: '#13131f', borderRadius: 14, padding: 14, marginBottom: 12, border: '0.5px solid #1e1e30' }}>
+              <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 12 }}>💡 Insights — Treino vs Dieta</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
+                <div style={{ background: '#0c0c10', borderRadius: 10, padding: 10, textAlign: 'center' }}>
+                  <div style={{ fontSize: 10, color: '#6366f1', marginBottom: 4 }}>Dias com treino</div>
+                  <div style={{ fontSize: 20, fontWeight: 800, fontFamily: 'JetBrains Mono, monospace', color: '#ededf5' }}>{activeAvg}</div>
+                  <div style={{ fontSize: 9, color: '#55557a' }}>kcal médio ({activeDays.length}d)</div>
+                </div>
+                <div style={{ background: '#0c0c10', borderRadius: 10, padding: 10, textAlign: 'center' }}>
+                  <div style={{ fontSize: 10, color: '#8888aa', marginBottom: 4 }}>Dias sem treino</div>
+                  <div style={{ fontSize: 20, fontWeight: 800, fontFamily: 'JetBrains Mono, monospace', color: '#ededf5' }}>{inactiveAvg}</div>
+                  <div style={{ fontSize: 9, color: '#55557a' }}>kcal médio ({inactiveDays.length}d)</div>
+                </div>
+              </div>
+              {activeAvg > 0 && inactiveAvg > 0 && (
+                <div style={{ background: '#0c0c10', borderRadius: 10, padding: '10px 12px', fontSize: 12, color: '#8888aa', lineHeight: 1.5 }}>
+                  {activeAvg > inactiveAvg
+                    ? `📊 Nos dias de treino você come em média ${activeAvg - inactiveAvg} kcal a mais`
+                    : `📊 Nos dias de treino você come em média ${inactiveAvg - activeAvg} kcal a menos`}
+                </div>
+              )}
+            </div>
+          )
+        })()}
+      </div>
+    )
+  }
+
+  function renderTreino() {
+    const todayActivities = currentDay.activities || []
+    const mondayKey = (() => {
+      const d = new Date()
+      const day = d.getDay()
+      const diff = day === 0 ? -6 : 1 - day
+      d.setDate(d.getDate() + diff)
+      return d.toISOString().slice(0, 10)
+    })()
+
+    // Week activity stats
+    const weekDays = []
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(mondayKey + 'T12:00:00')
+      d.setDate(d.getDate() + i)
+      weekDays.push(d.toISOString().slice(0, 10))
+    }
+    const weekStrength = weekDays.filter(d => (days[d]?.activities || []).some(a => ACTIVITIES.find(x => x.id === a)?.type === 'strength')).length
+    const weekCardio = weekDays.filter(d => (days[d]?.activities || []).some(a => ACTIVITIES.find(x => x.id === a)?.type === 'cardio')).length
+
+    const strengthFarol = weekStrength >= 4 ? '#10b981' : weekStrength === 3 ? '#f59e0b' : '#ef4444'
+    const cardioFarol = weekCardio >= 1 ? '#10b981' : '#ef4444'
+
+    // Weight history
+    const weightEntries = Object.entries(weights).sort(([a], [b]) => b.localeCompare(a)).slice(0, 8)
+    const latestWeight = weightEntries[0]?.[1] || null
+    const prevWeight = weightEntries[1]?.[1] || null
+    const weightDiff = latestWeight && prevWeight ? (latestWeight - prevWeight).toFixed(1) : null
+
+    return (
+      <div>
+        {/* Weekly summary */}
+        <div style={{ background: '#13131f', borderRadius: 14, padding: 14, marginBottom: 14, border: '0.5px solid #1e1e30' }}>
+          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12 }}>📅 Semana atual</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <div style={{ background: '#0c0c10', borderRadius: 10, padding: '10px 12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                <span style={{ width: 8, height: 8, borderRadius: '50%', background: strengthFarol, display: 'inline-block' }} />
+                <span style={{ fontSize: 11, color: '#8888aa' }}>Musculação</span>
+              </div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: strengthFarol, fontFamily: 'JetBrains Mono, monospace' }}>{weekStrength}<span style={{ fontSize: 12, color: '#55557a', fontWeight: 400 }}>/4x</span></div>
+              <div style={{ fontSize: 10, color: '#55557a', marginTop: 2 }}>{weekStrength >= 4 ? 'Meta atingida! ✓' : weekStrength === 3 ? 'Quase lá!' : 'Abaixo da meta'}</div>
+            </div>
+            <div style={{ background: '#0c0c10', borderRadius: 10, padding: '10px 12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                <span style={{ width: 8, height: 8, borderRadius: '50%', background: cardioFarol, display: 'inline-block' }} />
+                <span style={{ fontSize: 11, color: '#8888aa' }}>Cardio</span>
+              </div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: cardioFarol, fontFamily: 'JetBrains Mono, monospace' }}>{weekCardio}<span style={{ fontSize: 12, color: '#55557a', fontWeight: 400 }}>/1x</span></div>
+              <div style={{ fontSize: 10, color: '#55557a', marginTop: 2 }}>{weekCardio >= 1 ? 'Meta atingida! ✓' : 'Sem cardio essa semana'}</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Today activities */}
+        <div style={{ background: '#13131f', borderRadius: 14, padding: 14, marginBottom: 14, border: '0.5px solid #1e1e30' }}>
+          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12 }}>🏋️ Atividades de hoje</div>
+          {todayActivities.length === 0 && (
+            <div style={{ textAlign: 'center', padding: '12px 0', color: '#3a3a5a', fontSize: 13 }}>Nenhuma atividade registrada</div>
+          )}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+            {todayActivities.map(actId => {
+              const act = ACTIVITIES.find(a => a.id === actId)
+              if (!act) return null
+              return (
+                <div key={actId} style={{ display: 'flex', alignItems: 'center', gap: 6, background: act.color + '20', border: `1px solid ${act.color}40`, borderRadius: 20, padding: '6px 12px' }}>
+                  <span style={{ fontSize: 14 }}>{act.icon}</span>
+                  <span style={{ fontSize: 12, color: act.color, fontWeight: 600 }}>{act.label}</span>
+                  <button onClick={() => removeActivityFromDay(actId)} style={{ background: 'none', border: 'none', color: act.color, cursor: 'pointer', fontSize: 14, padding: 0, lineHeight: 1 }}>×</button>
+                </div>
+              )
+            })}
+          </div>
+          <div style={{ fontSize: 11, color: '#55557a', marginBottom: 8, fontWeight: 600 }}>Adicionar atividade:</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {ACTIVITIES.map(act => {
+              const done = todayActivities.includes(act.id)
+              return (
+                <button key={act.id} onClick={() => addActivityToDay(act.id)} disabled={done}
+                  style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', border: `1px solid ${done ? act.color : '#2a2a40'}`, borderRadius: 20, background: done ? act.color + '20' : 'transparent', cursor: done ? 'default' : 'pointer', fontFamily: 'inherit' }}>
+                  <span style={{ fontSize: 13 }}>{act.icon}</span>
+                  <span style={{ fontSize: 11, color: done ? act.color : '#8888aa', fontWeight: done ? 700 : 400 }}>{act.label}</span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* Weight section */}
+        <div style={{ background: '#13131f', borderRadius: 14, padding: 14, marginBottom: 14, border: '0.5px solid #1e1e30' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <div style={{ fontSize: 13, fontWeight: 700 }}>⚖️ Peso corporal</div>
+            <button onClick={() => setShowWeightModal(true)}
+              style={{ background: '#6366f1', border: 'none', borderRadius: 10, padding: '6px 12px', color: '#fff', fontSize: 11, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700 }}>
+              + Registrar
+            </button>
+          </div>
+          {latestWeight ? (
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 12 }}>
+              <span style={{ fontSize: 32, fontWeight: 800, fontFamily: 'JetBrains Mono, monospace', color: '#ededf5' }}>{latestWeight}</span>
+              <span style={{ fontSize: 13, color: '#55557a' }}>kg</span>
+              {weightDiff !== null && (
+                <span style={{ fontSize: 12, fontWeight: 700, color: parseFloat(weightDiff) < 0 ? '#10b981' : parseFloat(weightDiff) > 0 ? '#ef4444' : '#55557a' }}>
+                  {parseFloat(weightDiff) > 0 ? '+' : ''}{weightDiff} kg vs anterior
+                </span>
+              )}
+            </div>
+          ) : (
+            <div style={{ textAlign: 'center', padding: '12px 0', color: '#3a3a5a', fontSize: 13 }}>Nenhum peso registrado ainda</div>
+          )}
+          {weightEntries.length > 0 && (
+            <div>
+              {weightEntries.slice(0, 5).map(([date, val]) => (
+                <div key={date} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: '0.5px solid #1e1e30' }}>
+                  <span style={{ fontSize: 12, color: '#8888aa' }}>{formatDateFull(date)}</span>
+                  <span style={{ fontSize: 13, fontWeight: 600, fontFamily: 'JetBrains Mono, monospace' }}>{val} kg</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     )
   }
@@ -649,12 +880,12 @@ function LoginScreen() {
     <div style={{ minHeight: '100vh', background: '#0c0c10', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, fontFamily: "'Syne', system-ui, sans-serif" }}>
       <div style={{ maxWidth: 360, width: '100%', textAlign: 'center' }}>
         <div style={{ marginBottom: 40 }}>
-          <div style={{ fontSize: 11, letterSpacing: 3, color: '#55557a', fontFamily: 'JetBrains Mono, monospace', textTransform: 'uppercase', marginBottom: 12 }}>MACRO TRACKER</div>
-          <div style={{ fontSize: 32, fontWeight: 800, color: '#ededf5', lineHeight: 1.2, marginBottom: 8 }}>Acompanhe sua dieta</div>
-          <div style={{ fontSize: 14, color: '#55557a', lineHeight: 1.5 }}>Registre seus macros diários e acompanhe sua evolução</div>
+          <div style={{ fontSize: 11, letterSpacing: 3, color: '#55557a', fontFamily: 'JetBrains Mono, monospace', textTransform: 'uppercase', marginBottom: 12 }}>EVOSHAPE</div>
+          <div style={{ fontSize: 32, fontWeight: 800, color: '#ededf5', lineHeight: 1.2, marginBottom: 8 }}>EvoShape</div>
+          <div style={{ fontSize: 14, color: '#55557a', lineHeight: 1.5 }}>Dieta · Treino · Peso · Evolução</div>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 40 }}>
-          {[{ label: 'Calorias', color: '#6366f1', icon: '⚡' }, { label: 'Proteína', color: '#10b981', icon: '💪' }, { label: 'Evolução', color: '#f59e0b', icon: '📈' }].map(s => (
+          {[{ label: 'Dieta', color: '#6366f1', icon: '🥗' }, { label: 'Treino', color: '#10b981', icon: '💪' }, { label: 'Evolução', color: '#f59e0b', icon: '📈' }].map(s => (
             <div key={s.label} style={{ background: '#13131f', borderRadius: 12, padding: '14px 8px', border: '0.5px solid #1e1e30' }}>
               <div style={{ fontSize: 22, marginBottom: 4 }}>{s.icon}</div>
               <div style={{ fontSize: 11, color: s.color, fontWeight: 600 }}>{s.label}</div>
@@ -676,6 +907,33 @@ function LoginScreen() {
         {error && <div style={{ marginTop: 12, fontSize: 12, color: '#ef4444' }}>{error}</div>}
         <div style={{ marginTop: 20, fontSize: 11, color: '#3a3a5a', lineHeight: 1.5 }}>
           Seus dados ficam salvos na nuvem e sincronizados entre todos os seus dispositivos
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function WeightModal({ onSave, onClose }) {
+  const [date, setDate] = useState(new Date().toISOString().slice(0, 10))
+  const [weight, setWeight] = useState('')
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 200 }} onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={{ background: '#13131f', borderRadius: '16px 16px 0 0', padding: 24, width: '100%', maxWidth: 480, border: '0.5px solid #2a2a40' }}>
+        <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 20 }}>⚖️ Registrar Peso</div>
+        <div style={{ marginBottom: 14 }}>
+          <label style={{ fontSize: 11, color: '#8888aa', fontWeight: 500, marginBottom: 4, display: 'block' }}>Data</label>
+          <input type="date" value={date} onChange={e => setDate(e.target.value)}
+            style={{ width: '100%', background: '#1e1e30', border: '0.5px solid #2a2a40', borderRadius: 10, padding: '10px 14px', color: '#ededf5', fontSize: 14, fontFamily: 'JetBrains Mono, monospace' }} />
+        </div>
+        <div style={{ marginBottom: 20 }}>
+          <label style={{ fontSize: 11, color: '#10b981', fontWeight: 500, marginBottom: 4, display: 'block' }}>Peso (kg)</label>
+          <input type="number" step="0.1" placeholder="Ex: 76.5" value={weight} onChange={e => setWeight(e.target.value)} autoFocus
+            style={{ width: '100%', background: '#1e1e30', border: '0.5px solid #10b98140', borderRadius: 10, padding: '10px 14px', color: '#ededf5', fontSize: 18, fontFamily: 'JetBrains Mono, monospace', textAlign: 'center' }} />
+        </div>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button onClick={onClose} style={{ flex: 1, padding: 12, background: '#1e1e30', border: 'none', borderRadius: 12, color: '#8888aa', cursor: 'pointer', fontFamily: 'inherit' }}>Cancelar</button>
+          <button onClick={() => { if (weight) { onSave(date, weight); } }} style={{ flex: 2, padding: 12, background: '#6366f1', border: 'none', borderRadius: 12, color: '#fff', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700, fontSize: 14 }}>Salvar</button>
         </div>
       </div>
     </div>
