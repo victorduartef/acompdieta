@@ -335,7 +335,7 @@ export default function App() {
                 <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{f.name}</div>
                 <div style={{ fontSize: 11, color: '#55557a', fontFamily: 'JetBrains Mono, monospace', marginTop: 2 }}>{r0(f.cal * m)} kcal · P:{r(f.prot * m)}g · C:{r(f.carb * m)}g · G:{r(f.fat * m)}g</div>
               </div>
-              <input type="number" defaultValue={it.qty} onBlur={e => updateQty(activeMeal, idx, e.target.value)}
+              <input type="number" value={it.qty} onChange={e => updateQty(activeMeal, idx, e.target.value)}
                 style={{ width: 52, textAlign: 'center', fontFamily: 'JetBrains Mono, monospace', fontSize: 12, padding: '5px 4px', border: '0.5px solid #2a2a40', borderRadius: 8, background: '#1e1e30', color: '#ededf5' }} />
               <span style={{ fontSize: 10, color: '#55557a', minWidth: 26 }}>{f.unit}</span>
               <button onClick={() => removeFood(activeMeal, idx)} style={{ background: '#ef444420', border: 'none', borderRadius: 8, width: 28, height: 28, color: '#ef4444', cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>×</button>
