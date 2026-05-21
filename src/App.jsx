@@ -181,14 +181,6 @@ export default function App() {
     updateDays({ ...days, [activeKey]: { ...day, meals } })
   }
 
-  if (!loaded) {
-    return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0c0c10', color: '#6366f1', fontFamily: 'JetBrains Mono, monospace', fontSize: 13 }}>
-        Carregando...
-      </div>
-    )
-  }
-
   const today = todayKey()
   const currentDay = getDay(activeKey)
   const allItems = Object.values(currentDay.meals).flat()
@@ -207,6 +199,18 @@ export default function App() {
   const calBarColor = over ? '#ef4444' : inRange ? '#10b981' : '#6366f1'
   const calDiff = targets.cal - dayMacros.cal
   const hasData = dayMacros.cal > 0
+
+  if (!loaded) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0c0c10', color: '#6366f1', fontFamily: 'JetBrains Mono, monospace', fontSize: 13 }}>
+        Carregando...
+      </div>
+    )
+  }
+
+  if (!uid) {
+    return <LoginScreen />
+  }
 
   return (
     <div style={{ background: '#0c0c10', minHeight: '100vh', fontFamily: "'Syne', system-ui, sans-serif", color: '#ededf5' }}>
