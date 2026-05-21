@@ -5,7 +5,7 @@ import { db, initAuth, loginWithGoogle, handleRedirectResult, logout } from './f
 const DEFAULT_FOODS = [
   { id: 'bready_ovo', name: 'Bready + Ovo', fav: ['cafe_manha'], cal: 135, prot: 14.2, carb: 5.9, fat: 6.1, unit: 'unid', def: 1, note: '20g Bready Dux + 1 ovo preparado' },
   { id: 'supercoffee', name: 'SuperCoffee', fav: ['cafe_manha'], cal: 49, prot: 1.6, carb: 2.1, fat: 3.8, unit: 'dose', def: 1, note: '1 dose = 10g' },
-  { id: 'queijo_minas', name: 'Queijo Minas Light Verde Mar', fav: ['cafe_manha'], cal: 197, prot: 19, carb: 3.1, fat: 12.3, unit: 'g', def: 20, note: '20g por porção' },
+  { id: 'queijo_minas', name: 'Queijo Minas Light Verde Mar', fav: ['cafe_manha'], cal: 296, prot: 28.3, carb: 4.7, fat: 18.3, unit: 'g', def: 25, note: '25g por porção' },
   { id: 'whey_meia', name: '½ Whey Fresh Dux', fav: ['cafe_manha'], cal: 60, prot: 10, carb: 0.9, fat: 1.9, unit: 'dose', def: 1, note: 'meia dose = 15g' },
   { id: 'whey_full', name: 'Whey Fresh Dux (dose cheia)', fav: ['lanche'], cal: 120, prot: 20, carb: 1.8, fat: 3.8, unit: 'dose', def: 1, note: 'dose cheia = 30g' },
   { id: 'banana', name: 'Banana', fav: ['cafe_manha', 'lanche'], cal: 89, prot: 1.1, carb: 23, fat: 0.3, unit: 'g', def: 100 },
@@ -21,6 +21,11 @@ const DEFAULT_FOODS = [
   { id: 'acai', name: 'Polpa de Açaí (pura)', fav: ['lanche'], cal: 58, prot: 0.3, carb: 2.1, fat: 1.3, unit: 'g', def: 100, note: 'De Marchi, sem adoçar' },
   { id: 'pao_pullman', name: 'Pão Pullman Ferm. Natural', fav: ['lanche'], cal: 256, prot: 8.8, carb: 49, fat: 2.7, unit: 'g', def: 50, note: '2 fatias = ~50g' },
   { id: 'frango_desfiado', name: 'Frango Desfiado', fav: ['lanche', 'almoco'], cal: 165, prot: 31, carb: 0, fat: 3.6, unit: 'g', def: 50 },
+  { id: 'tilapia', name: 'Tilápia Grelhada', fav: ['almoco', 'janta'], cal: 132, prot: 26.9, carb: 0, fat: 2.2, unit: 'g', def: 160, note: 'peso já pronto' },
+  { id: 'mandioca', name: 'Mandioca Cozida', fav: ['almoco', 'janta'], cal: 132, prot: 1.1, carb: 31.7, fat: 0.2, unit: 'g', def: 120 },
+  { id: 'abobora_moranga', name: 'Abóbora Moranga Cozida', fav: ['almoco', 'janta'], cal: 27, prot: 1.2, carb: 5.5, fat: 0.1, unit: 'g', def: 200 },
+  { id: 'batata_baroa', name: 'Batata Baroa Cozida', fav: ['janta'], cal: 96, prot: 1.4, carb: 22.0, fat: 0.1, unit: 'g', def: 100 },
+  { id: 'ovo_inteiro', name: 'Ovo Inteiro (extra)', fav: ['cafe_manha'], cal: 78, prot: 6.0, carb: 0.6, fat: 5.3, unit: 'unid', def: 1, note: 'ovo extra além do bready' },
   { id: 'ricota_light', name: 'Creme de Ricota Light', fav: ['lanche'], cal: 108, prot: 6.7, carb: 5.1, fat: 6.8, unit: 'g', def: 20 },
   { id: 'tortinha', name: 'Tortinha de Frango (3 porções)', fav: ['lanche'], cal: 276, prot: 37.7, carb: 1.4, fat: 11.8, unit: 'porção', def: 1, note: 'frango+ovos+cottage ÷12' },
   { id: 'patinho', name: 'Patinho Moído (pronto)', fav: ['janta'], cal: 152, prot: 24, carb: 0, fat: 6, unit: 'g', def: 150, note: 'peso já pronto' },
@@ -28,6 +33,9 @@ const DEFAULT_FOODS = [
   { id: 'batata_doce_j', name: 'Batata Doce (janta)', fav: ['janta'], cal: 86, prot: 1.6, carb: 20, fat: 0.1, unit: 'g', def: 100 },
   { id: 'batata_ing_j', name: 'Batata Inglesa (janta)', fav: ['janta'], cal: 77, prot: 2, carb: 17.5, fat: 0.1, unit: 'g', def: 150 },
   { id: 'arroz_j', name: 'Arroz Branco (janta)', fav: ['janta'], cal: 130, prot: 2.7, carb: 28, fat: 0.3, unit: 'g', def: 80, note: '~equiv batata doce 100g' },
+  { id: 'batata_baroa_j', name: 'Batata Baroa (janta)', fav: ['janta'], cal: 96, prot: 1.4, carb: 22.0, fat: 0.1, unit: 'g', def: 100 },
+  { id: 'abobora_j', name: 'Abóbora Moranga (janta)', fav: ['janta'], cal: 27, prot: 1.2, carb: 5.5, fat: 0.1, unit: 'g', def: 150 },
+  { id: 'tilapia_j', name: 'Tilápia Grelhada (janta)', fav: ['janta'], cal: 132, prot: 26.9, carb: 0, fat: 2.2, unit: 'g', def: 150, note: 'peso já pronto' },
 ]
 
 const MEALS = [
@@ -39,8 +47,8 @@ const MEALS = [
 ]
 
 const DEFAULT_TARGETS = {
-  cal: 1566, prot: 153, carb: 132, fat: 42,
-  min: 1484, max: 1636, protMin: 140, protMax: 170, fatMax: 52,
+  cal: 1562, prot: 150, carb: 151, fat: 43,
+  min: 1460, max: 1680, protMin: 138, protMax: 163, fatMax: 52,
 }
 
 function todayKey() { return new Date().toISOString().slice(0, 10) }
@@ -697,7 +705,7 @@ function TargetsModal({ targets, onSave, onClose }) {
           <button onClick={() => onSave(t)} style={{ flex: 2, padding: 12, background: '#6366f1', border: 'none', borderRadius: 12, color: '#fff', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700, fontSize: 14 }}>Salvar</button>
         </div>
         <div style={{ marginTop: 12, padding: '8px 12px', background: '#0c0c10', borderRadius: 10, fontSize: 10, color: '#55557a', fontFamily: 'JetBrains Mono, monospace' }}>
-          Padrão: 1566 kcal · min 1484 · max 1636 · P:153g · C:132g · G:42g
+          Padrão: 1562 kcal · min 1460 · max 1680 · P:150g · C:151g · G:43g
         </div>
       </div>
     </div>
