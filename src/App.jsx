@@ -142,13 +142,12 @@ export default function App() {
     return d
   }
 
-  function addFoodToMeal(foodId) {
+  function addFoodToMeal(foodId, qty) {
     const f = allFoods.find(x => x.id === foodId)
     if (!f) return
-    const qtyEl = document.getElementById('qty_' + foodId)
-    const qty = qtyEl ? parseFloat(qtyEl.value) || f.def : f.def
+    const finalQty = qty ?? f.def
     const day = getDay(activeKey)
-    const updated = { ...day, meals: { ...day.meals, [activeMeal]: [...(day.meals[activeMeal] || []), { id: foodId, qty }] } }
+    const updated = { ...day, meals: { ...day.meals, [activeMeal]: [...(day.meals[activeMeal] || []), { id: foodId, qty: finalQty }] } }
     updateDays({ ...days, [activeKey]: updated })
     setAddingFood(false)
     setSearch('')
@@ -360,14 +359,14 @@ export default function App() {
               {!search && favFoods.length > 0 && (
                 <>
                   <div style={{ fontSize: 10, fontWeight: 700, color: '#55557a', textTransform: 'uppercase', letterSpacing: 1, margin: '4px 0 8px', fontFamily: 'JetBrains Mono, monospace' }}>⭐ Favoritos desta refeição</div>
-                  {favFoods.map(f => <FoodRow key={f.id} food={f} allFoods={allFoods} onAdd={addFoodToMeal} />)}
+                  {favFoods.map(f => <FoodRow key={f.id} food={f} onAdd={addFoodToMeal} mealId={activeMeal} />)}
                   <div style={{ fontSize: 10, fontWeight: 700, color: '#55557a', textTransform: 'uppercase', letterSpacing: 1, margin: '12px 0 8px', fontFamily: 'JetBrains Mono, monospace' }}>Todos os alimentos</div>
-                  {otherFoods.map(f => <FoodRow key={f.id} food={f} allFoods={allFoods} onAdd={addFoodToMeal} />)}
+                  {otherFoods.map(f => <FoodRow key={f.id} food={f} onAdd={addFoodToMeal} mealId={activeMeal} />)}
                 </>
               )}
-              {!search && favFoods.length === 0 && allFoods.map(f => <FoodRow key={f.id} food={f} allFoods={allFoods} onAdd={addFoodToMeal} />)}
+              {!search && favFoods.length === 0 && allFoods.map(f => <FoodRow key={f.id} food={f} onAdd={addFoodToMeal} mealId={activeMeal} />)}
               {search && (filtered.length > 0
-                ? filtered.map(f => <FoodRow key={f.id} food={f} allFoods={allFoods} onAdd={addFoodToMeal} />)
+                ? filtered.map(f => <FoodRow key={f.id} food={f} onAdd={addFoodToMeal} mealId={activeMeal} />)
                 : <div style={{ padding: '20px', textAlign: 'center', color: '#3a3a5a', fontSize: 13 }}>Nenhum resultado</div>
               )}
             </div>
@@ -597,8 +596,14 @@ export default function App() {
 }
 
 // ── FOOD ROW COMPONENT ──
-function FoodRow({ food: f, allFoods, onAdd }) {
+function FoodRow({ food: f, onAdd, mealId }) {
   const [qty, setQty] = useState(f.def)
+
+  // Reseta a quantidade para o padrão sempre que a refeição mudar
+  useEffect(() => {
+    setQty(f.def)
+  }, [mealId, f.id, f.def])
+
   const fixed = ['unid','dose','porção'].includes(f.unit)
   const m = fixed ? qty : qty / 100
   return (
@@ -612,9 +617,8 @@ function FoodRow({ food: f, allFoods, onAdd }) {
         <input type="number" value={qty} onChange={e => setQty(parseFloat(e.target.value) || 0)}
           style={{ width: 52, textAlign: 'center', fontFamily: 'JetBrains Mono, monospace', fontSize: 13, padding: '5px 4px', border: '0.5px solid #2a2a40', borderRadius: 8, background: '#1e1e30', color: '#ededf5' }} />
         <span style={{ fontSize: 10, color: '#55557a', minWidth: 26 }}>{f.unit}</span>
-        <button onClick={() => onAdd(f.id)} id={'qty_' + f.id} data-qty={qty}
-          style={{ background: '#6366f1', border: 'none', borderRadius: 10, padding: '7px 14px', color: '#fff', fontSize: 12, cursor: 'pointer', fontWeight: 700, fontFamily: 'inherit', flexShrink: 0 }}
-          ref={el => { if (el) el.onclick = () => { document.getElementById('qty_' + f.id) && (document.getElementById('qty_' + f.id).value = qty); onAdd(f.id) } }}>
+        <button onClick={() => onAdd(f.id, qty)}
+          style={{ background: '#6366f1', border: 'none', borderRadius: 10, padding: '7px 14px', color: '#fff', fontSize: 12, cursor: 'pointer', fontWeight: 700, fontFamily: 'inherit', flexShrink: 0 }}>
           Add
         </button>
       </div>
