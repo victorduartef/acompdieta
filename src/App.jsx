@@ -94,6 +94,7 @@ export default function App() {
   const [addingFood, setAddingFood] = useState(false)
   const [search, setSearch] = useState('')
   const [registerMode, setRegisterMode] = useState(false)
+  const [editingFoodIdx, setEditingFoodIdx] = useState(null)
   const [editingDay, setEditingDay] = useState(null)
   const [showTargets, setShowTargets] = useState(false)
   const [newFood, setNewFood] = useState({ name: '', cal: '', prot: '', carb: '', fat: '', unit: 'g', def: '100', fav: [] })
@@ -464,8 +465,8 @@ export default function App() {
       return (
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-            <div style={{ fontSize: 15, fontWeight: 700 }}>Novo Alimento</div>
-            <button onClick={() => setRegisterMode(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#8888aa', fontSize: 20 }}>×</button>
+            <div style={{ fontSize: 15, fontWeight: 700 }}>{editingFoodIdx !== null ? 'Editar Alimento' : 'Novo Alimento'}</div>
+            <button onClick={() => { setRegisterMode(false); setEditingFoodIdx(null) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#8888aa', fontSize: 20 }}>×</button>
           </div>
           <div style={{ background: '#13131f', borderRadius: 14, padding: 16, border: '0.5px solid #1e1e30' }}>
             <div style={{ marginBottom: 12 }}>
@@ -511,12 +512,18 @@ export default function App() {
             </div>
             <button onClick={() => {
               if (!newFood.name || newFood.cal === '') return alert('Preencha nome e calorias.')
-              const cf = [...customFoods, { id: 'custom_' + Date.now(), name: newFood.name, fav: newFood.fav, cal: parseFloat(newFood.cal) || 0, prot: parseFloat(newFood.prot) || 0, carb: parseFloat(newFood.carb) || 0, fat: parseFloat(newFood.fat) || 0, unit: newFood.unit, def: parseFloat(newFood.def) || 100 }]
-              updateCustomFoods(cf)
+              if (editingFoodIdx !== null) {
+                const updated = customFoods.map((f, i) => i === editingFoodIdx ? { ...f, name: newFood.name, fav: newFood.fav, cal: parseFloat(newFood.cal)||0, prot: parseFloat(newFood.prot)||0, carb: parseFloat(newFood.carb)||0, fat: parseFloat(newFood.fat)||0, unit: newFood.unit, def: parseFloat(newFood.def)||100 } : f)
+                updateCustomFoods(updated)
+              } else {
+                const cf = [...customFoods, { id: 'custom_' + Date.now(), name: newFood.name, fav: newFood.fav, cal: parseFloat(newFood.cal)||0, prot: parseFloat(newFood.prot)||0, carb: parseFloat(newFood.carb)||0, fat: parseFloat(newFood.fat)||0, unit: newFood.unit, def: parseFloat(newFood.def)||100 }]
+                updateCustomFoods(cf)
+              }
               setRegisterMode(false)
+              setEditingFoodIdx(null)
               setNewFood({ name: '', cal: '', prot: '', carb: '', fat: '', unit: 'g', def: '100', fav: [] })
             }} style={{ width: '100%', padding: 12, background: '#6366f1', border: 'none', borderRadius: 12, color: '#fff', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700, fontSize: 14 }}>
-              Salvar alimento
+              {editingFoodIdx !== null ? 'Salvar alterações' : 'Salvar alimento'}
             </button>
           </div>
         </div>
@@ -526,7 +533,7 @@ export default function App() {
       <div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
           <div style={{ fontSize: 15, fontWeight: 700 }}>Alimentos</div>
-          <button onClick={() => setRegisterMode(true)} style={{ background: '#6366f1', border: 'none', borderRadius: 10, padding: '7px 12px', color: '#fff', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700 }}>+ Novo</button>
+          <button onClick={() => { setEditingFoodIdx(null); setNewFood({ name: '', cal: '', prot: '', carb: '', fat: '', unit: 'g', def: '100', fav: [] }); setRegisterMode(true) }} style={{ background: '#6366f1', border: 'none', borderRadius: 10, padding: '7px 12px', color: '#fff', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700 }}>+ Novo</button>
         </div>
         {customFoods.length > 0 && (<>
           <div style={{ fontSize: 10, fontWeight: 700, color: '#55557a', textTransform: 'uppercase', letterSpacing: 1, margin: '0 0 8px', fontFamily: 'JetBrains Mono, monospace' }}>Meus alimentos ({customFoods.length})</div>
@@ -536,6 +543,11 @@ export default function App() {
                 <div style={{ fontSize: 13, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{f.name}</div>
                 <div style={{ fontSize: 10, color: '#55557a', fontFamily: 'JetBrains Mono, monospace', marginTop: 1 }}>{f.cal} kcal · P:{f.prot}g · C:{f.carb}g · G:{f.fat}g / {f.unit}</div>
               </div>
+              <button onClick={() => {
+                setEditingFoodIdx(idx)
+                setNewFood({ name: f.name, cal: String(f.cal), prot: String(f.prot), carb: String(f.carb), fat: String(f.fat), unit: f.unit, def: String(f.def), fav: f.fav || [] })
+                setRegisterMode(true)
+              }} style={{ background: '#6366f120', border: 'none', borderRadius: 8, width: 28, height: 28, color: '#6366f1', cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>✎</button>
               <button onClick={() => { if (window.confirm('Remover?')) updateCustomFoods(customFoods.filter((_, i) => i !== idx)) }} style={{ background: '#ef444420', border: 'none', borderRadius: 8, width: 28, height: 28, color: '#ef4444', cursor: 'pointer', fontSize: 16 }}>×</button>
             </div>
           ))}
