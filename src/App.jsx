@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from 'react'
 import { doc, getDoc, setDoc } from 'firebase/firestore'
 import { db, initAuth, loginWithGoogle, handleRedirectResult, logout } from './firebase.js'
 
-// ─── BANCO DE ALIMENTOS ───────────────────────────────────────────────────────
 const DEFAULT_FOODS = [
   { id: 'bready_ovo', name: 'Bready + Ovo', fav: ['cafe_manha'], cal: 135, prot: 14.2, carb: 5.9, fat: 6.1, unit: 'unid', def: 1, note: '20g Bready Dux + 1 ovo preparado' },
   { id: 'supercoffee', name: 'SuperCoffee', fav: ['cafe_manha'], cal: 49, prot: 1.6, carb: 2.1, fat: 3.8, unit: 'dose', def: 1, note: '1 dose = 10g' },
@@ -44,16 +43,10 @@ const DEFAULT_TARGETS = {
   min: 1484, max: 1636, protMin: 140, protMax: 170, fatMax: 52,
 }
 
-// ─── HELPERS ─────────────────────────────────────────────────────────────────
 function todayKey() { return new Date().toISOString().slice(0, 10) }
 function emptyDay() { return { meals: { cafe_manha: [], almoco: [], lanche: [], janta: [], extra: [] } } }
 function r(v) { return Math.round(v * 10) / 10 }
 function r0(v) { return Math.round(v) }
-function formatDate(iso) {
-  const [, m, d] = iso.split('-')
-  const months = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez']
-  return `${d} ${months[parseInt(m) - 1]}`
-}
 function formatDateFull(iso) {
   const dt = new Date(iso + 'T12:00:00')
   const wdays = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb']
@@ -75,7 +68,6 @@ function farolCal(c, t) { return c <= t.cal ? '#10b981' : c <= t.max ? '#f59e0b'
 function farolProt(p, t) { return (p >= (t.protMin || 140) && p <= (t.protMax || 170)) ? '#10b981' : '#ef4444' }
 function farolFat(f, t) { return f <= t.fat ? '#10b981' : f <= (t.fatMax || 52) ? '#f59e0b' : '#ef4444' }
 
-// ─── FIREBASE SYNC ────────────────────────────────────────────────────────────
 async function loadFromFirebase(uid) {
   try {
     const snap = await getDoc(doc(db, 'users', uid))
@@ -90,7 +82,6 @@ async function saveToFirebase(uid, data) {
   } catch (e) { console.error('Firebase save error:', e) }
 }
 
-// ─── APP ──────────────────────────────────────────────────────────────────────
 export default function App() {
   const [uid, setUid] = useState(null)
   const [user, setUser] = useState(null)
@@ -109,7 +100,6 @@ export default function App() {
 
   const allFoods = [...DEFAULT_FOODS, ...customFoods]
 
-  // Init Firebase auth
   useEffect(() => {
     handleRedirectResult()
     initAuth((firebaseUser) => {
@@ -132,16 +122,9 @@ export default function App() {
     })
   }, [])
 
-  // Se não estiver logado, mostra tela de login
-  if (loaded && !uid) {
-    return <LoginScreen />
-  }
-
-  // Auto-save to Firebase whenever data changes
   const persist = useCallback((newDays, newTargets, newCustomFoods) => {
     if (!uid) return
-    const data = { days: newDays, targets: newTargets, customFoods: newCustomFoods }
-    saveToFirebase(uid, data)
+    saveToFirebase(uid, { days: newDays, targets: newTargets, customFoods: newCustomFoods })
   }, [uid])
 
   const updateDays = (newDays) => { setDays(newDays); persist(newDays, targets, customFoods) }
@@ -159,9 +142,8 @@ export default function App() {
   function addFoodToMeal(foodId, qty) {
     const f = allFoods.find(x => x.id === foodId)
     if (!f) return
-    const finalQty = qty ?? f.def
     const day = getDay(activeKey)
-    const updated = { ...day, meals: { ...day.meals, [activeMeal]: [...(day.meals[activeMeal] || []), { id: foodId, qty: finalQty }] } }
+    const updated = { ...day, meals: { ...day.meals, [activeMeal]: [...(day.meals[activeMeal] || []), { id: foodId, qty: qty ?? f.def }] } }
     updateDays({ ...days, [activeKey]: updated })
     setAddingFood(false)
     setSearch('')
@@ -181,25 +163,7 @@ export default function App() {
     updateDays({ ...days, [activeKey]: { ...day, meals } })
   }
 
-  const today = todayKey()
-  const currentDay = getDay(activeKey)
-  const allItems = Object.values(currentDay.meals).flat()
-  const dayMacros = calcMacros(allItems, allFoods)
-  const isEditing = !!editingDay
-  const isToday = activeKey === today
-
-  const dt = new Date(activeKey + 'T12:00:00')
-  const wdays = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb']
-  const months = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
-  const headerDate = isToday ? `${wdays[dt.getDay()]}, ${dt.getDate()} de ${months[dt.getMonth()]}` : `✏️ ${dt.getDate()} de ${months[dt.getMonth()]}`
-
-  const over = dayMacros.cal > targets.max
-  const inRange = dayMacros.cal >= targets.min && dayMacros.cal <= targets.max
-  const calPct = Math.min(100, (dayMacros.cal / targets.max) * 100)
-  const calBarColor = over ? '#ef4444' : inRange ? '#10b981' : '#6366f1'
-  const calDiff = targets.cal - dayMacros.cal
-  const hasData = dayMacros.cal > 0
-
+  // ── EARLY RETURNS — after all hooks ──
   if (!loaded) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0c0c10', color: '#6366f1', fontFamily: 'JetBrains Mono, monospace', fontSize: 13 }}>
@@ -208,44 +172,47 @@ export default function App() {
     )
   }
 
-  if (!uid) {
-    return <LoginScreen />
-  }
+  if (!uid) return <LoginScreen />
+
+  const today = todayKey()
+  const currentDay = getDay(activeKey)
+  const allItems = Object.values(currentDay.meals).flat()
+  const dayMacros = calcMacros(allItems, allFoods)
+  const isEditing = !!editingDay
+  const isToday = activeKey === today
+  const dt = new Date(activeKey + 'T12:00:00')
+  const wdays = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb']
+  const months = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
+  const headerDate = isToday ? `${wdays[dt.getDay()]}, ${dt.getDate()} de ${months[dt.getMonth()]}` : `✏️ ${dt.getDate()} de ${months[dt.getMonth()]}`
+  const over = dayMacros.cal > targets.max
+  const inRange = dayMacros.cal >= targets.min && dayMacros.cal <= targets.max
+  const calPct = Math.min(100, (dayMacros.cal / targets.max) * 100)
+  const calBarColor = over ? '#ef4444' : inRange ? '#10b981' : '#6366f1'
+  const calDiff = targets.cal - dayMacros.cal
+  const hasData = dayMacros.cal > 0
 
   return (
     <div style={{ background: '#0c0c10', minHeight: '100vh', fontFamily: "'Syne', system-ui, sans-serif", color: '#ededf5' }}>
       <div style={{ maxWidth: 480, margin: '0 auto', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-
-        {/* ── HEADER ── */}
         <div style={{ background: '#13131f', borderBottom: '1px solid #1e1e30', padding: '20px 16px 0', flexShrink: 0 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
             <div>
               <div style={{ fontSize: 10, letterSpacing: 2, color: '#55557a', fontFamily: 'JetBrains Mono, monospace', textTransform: 'uppercase' }}>MACRO TRACKER</div>
               <div style={{ fontSize: 18, fontWeight: 800, marginTop: 3 }}>{headerDate}</div>
-              <div style={{ display: 'inline-block', marginTop: 5, padding: '2px 10px', borderRadius: 20, fontSize: 11, fontWeight: 500,
-                background: !isToday ? '#92400e22' : over ? '#ef444422' : inRange && hasData ? '#10b98122' : '#1e1e30',
-                color: !isToday ? '#f59e0b' : over ? '#ef4444' : inRange && hasData ? '#10b981' : '#8888aa'
-              }}>
+              <div style={{ display: 'inline-block', marginTop: 5, padding: '2px 10px', borderRadius: 20, fontSize: 11, fontWeight: 500, background: !isToday ? '#92400e22' : over ? '#ef444422' : inRange && hasData ? '#10b98122' : '#1e1e30', color: !isToday ? '#f59e0b' : over ? '#ef4444' : inRange && hasData ? '#10b981' : '#8888aa' }}>
                 {!isToday ? 'Editando dia anterior' : over ? 'Excesso' : inRange && hasData ? '✓ Na meta' : '—'}
               </div>
             </div>
-            <button onClick={() => setShowTargets(true)} style={{ background: '#1e1e30', border: '1px solid #2a2a40', borderRadius: 10, padding: '7px 10px', color: '#8888aa', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>
-              ⚙ Metas
-            </button>
+            <button onClick={() => setShowTargets(true)} style={{ background: '#1e1e30', border: '1px solid #2a2a40', borderRadius: 10, padding: '7px 10px', color: '#8888aa', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>⚙ Metas</button>
           </div>
-          {/* User info */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, padding: '6px 10px', background: '#0c0c10', borderRadius: 10 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              {user?.photoURL && <img src={user.photoURL} alt="" style={{ width: 22, height: 22, borderRadius: '50%' }} />}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, padding: '5px 8px', background: '#0c0c10', borderRadius: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+              {user?.photoURL && <img src={user.photoURL} alt="" style={{ width: 20, height: 20, borderRadius: '50%' }} />}
               <span style={{ fontSize: 11, color: '#55557a' }}>{user?.displayName || user?.email || 'Usuário'}</span>
             </div>
-            <button onClick={() => logout()} style={{ background: 'none', border: 'none', color: '#55557a', fontSize: 11, cursor: 'pointer', fontFamily: 'inherit' }}>
-              Sair
-            </button>
+            <button onClick={() => logout()} style={{ background: 'none', border: 'none', color: '#55557a', fontSize: 11, cursor: 'pointer', fontFamily: 'inherit' }}>Sair</button>
           </div>
-
-          {/* Macro bar */}
-          <div style={{ background: '#0c0c10', borderRadius: 14, padding: 14, marginBottom: 0 }}>
+          <div style={{ background: '#0c0c10', borderRadius: 14, padding: 14 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ fontSize: 30, fontWeight: 800, fontFamily: 'JetBrains Mono, monospace', color: '#ededf5' }}>{r0(dayMacros.cal)}</span>
@@ -278,15 +245,8 @@ export default function App() {
               ))}
             </div>
           </div>
-
-          {/* Nav */}
           <div style={{ display: 'flex', marginTop: 14, gap: 2 }}>
-            {[
-              { id: 'today', label: 'Hoje' },
-              { id: 'history', label: 'Histórico' },
-              { id: 'analysis', label: 'Análise' },
-              { id: 'foods', label: 'Alimentos' },
-            ].map(t => (
+            {[{ id: 'today', label: 'Hoje' }, { id: 'history', label: 'Histórico' }, { id: 'analysis', label: 'Análise' }, { id: 'foods', label: 'Alimentos' }].map(t => (
               <button key={t.id} onClick={() => { setTab(t.id); setEditingDay(null); setAddingFood(false); setSearch(''); setRegisterMode(false) }}
                 style={{ flex: 1, padding: '10px 0', border: 'none', background: 'transparent', color: tab === t.id ? '#ededf5' : '#55557a', fontWeight: tab === t.id ? 700 : 500, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', borderBottom: `2px solid ${tab === t.id ? '#6366f1' : 'transparent'}`, transition: 'all .2s' }}>
                 {t.label}
@@ -295,7 +255,6 @@ export default function App() {
           </div>
         </div>
 
-        {/* ── CONTENT ── */}
         <div style={{ flex: 1, padding: '16px 16px 100px', overflowY: 'auto' }}>
           {(tab === 'today' || editingDay) && renderDayEditor()}
           {tab === 'history' && !editingDay && renderHistory()}
@@ -303,13 +262,10 @@ export default function App() {
           {tab === 'foods' && !editingDay && renderFoods()}
         </div>
       </div>
-
-      {/* Targets modal */}
       {showTargets && <TargetsModal targets={targets} onSave={t => { updateTargets(t); setShowTargets(false) }} onClose={() => setShowTargets(false)} />}
     </div>
   )
 
-  // ── DAY EDITOR ──
   function renderDayEditor() {
     const meal = MEALS.find(m => m.id === activeMeal)
     const items = currentDay.meals[activeMeal] || []
@@ -317,7 +273,6 @@ export default function App() {
     const favFoods = allFoods.filter(f => f.fav && f.fav.includes(activeMeal))
     const otherFoods = allFoods.filter(f => !f.fav || !f.fav.includes(activeMeal))
     const filtered = search ? allFoods.filter(f => f.name.toLowerCase().includes(search.toLowerCase())) : null
-
     return (
       <div>
         {isEditing && (
@@ -325,8 +280,6 @@ export default function App() {
             ← Voltar ao histórico
           </button>
         )}
-
-        {/* Meal pills */}
         <div style={{ display: 'flex', gap: 6, marginBottom: 16, overflowX: 'auto', paddingBottom: 4 }}>
           {MEALS.map(m => {
             const mac = calcMacros(currentDay.meals[m.id] || [], allFoods)
@@ -341,17 +294,11 @@ export default function App() {
             )
           })}
         </div>
-
-        {/* Active meal header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
           <div style={{ fontSize: 15, fontWeight: 700, color: meal.color }}>{meal.icon} {meal.label}</div>
           <div style={{ fontSize: 10, color: '#55557a', fontFamily: 'JetBrains Mono, monospace' }}>{r0(mealMacros.cal)} kcal · P:{r(mealMacros.prot)} · C:{r(mealMacros.carb)} · G:{r(mealMacros.fat)}</div>
         </div>
-
-        {/* Items */}
-        {items.length === 0 && !addingFood && (
-          <div style={{ textAlign: 'center', padding: '20px 0', color: '#3a3a5a', fontSize: 13 }}>Nenhum alimento registrado</div>
-        )}
+        {items.length === 0 && !addingFood && <div style={{ textAlign: 'center', padding: '20px 0', color: '#3a3a5a', fontSize: 13 }}>Nenhum alimento registrado</div>}
         {items.map((it, idx) => {
           const f = allFoods.find(x => x.id === it.id)
           if (!f) return null
@@ -363,15 +310,13 @@ export default function App() {
                 <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{f.name}</div>
                 <div style={{ fontSize: 11, color: '#55557a', fontFamily: 'JetBrains Mono, monospace', marginTop: 2 }}>{r0(f.cal * m)} kcal · P:{r(f.prot * m)}g · C:{r(f.carb * m)}g · G:{r(f.fat * m)}g</div>
               </div>
-              <input type="number" defaultValue={it.qty} onBlur={e => updateQty(activeMeal, idx, e.target.value)}
+              <input type="number" value={it.qty} onChange={e => updateQty(activeMeal, idx, e.target.value)}
                 style={{ width: 52, textAlign: 'center', fontFamily: 'JetBrains Mono, monospace', fontSize: 12, padding: '5px 4px', border: '0.5px solid #2a2a40', borderRadius: 8, background: '#1e1e30', color: '#ededf5' }} />
               <span style={{ fontSize: 10, color: '#55557a', minWidth: 26 }}>{f.unit}</span>
               <button onClick={() => removeFood(activeMeal, idx)} style={{ background: '#ef444420', border: 'none', borderRadius: 8, width: 28, height: 28, color: '#ef4444', cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>×</button>
             </div>
           )
         })}
-
-        {/* Add food */}
         {!addingFood ? (
           <button onClick={() => setAddingFood(true)} style={{ width: '100%', padding: 12, border: '1.5px dashed #2a2a40', borderRadius: 12, background: 'transparent', color: '#55557a', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', marginTop: 4 }}>
             + Adicionar alimento
@@ -384,14 +329,12 @@ export default function App() {
               <button onClick={() => { setAddingFood(false); setSearch('') }} style={{ background: '#1e1e30', border: 'none', borderRadius: 10, padding: '0 12px', color: '#8888aa', cursor: 'pointer', fontSize: 18 }}>✕</button>
             </div>
             <div style={{ maxHeight: 320, overflowY: 'auto' }}>
-              {!search && favFoods.length > 0 && (
-                <>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: '#55557a', textTransform: 'uppercase', letterSpacing: 1, margin: '4px 0 8px', fontFamily: 'JetBrains Mono, monospace' }}>⭐ Favoritos desta refeição</div>
-                  {favFoods.map(f => <FoodRow key={f.id} food={f} onAdd={addFoodToMeal} mealId={activeMeal} />)}
-                  <div style={{ fontSize: 10, fontWeight: 700, color: '#55557a', textTransform: 'uppercase', letterSpacing: 1, margin: '12px 0 8px', fontFamily: 'JetBrains Mono, monospace' }}>Todos os alimentos</div>
-                  {otherFoods.map(f => <FoodRow key={f.id} food={f} onAdd={addFoodToMeal} mealId={activeMeal} />)}
-                </>
-              )}
+              {!search && favFoods.length > 0 && (<>
+                <div style={{ fontSize: 10, fontWeight: 700, color: '#55557a', textTransform: 'uppercase', letterSpacing: 1, margin: '4px 0 8px', fontFamily: 'JetBrains Mono, monospace' }}>⭐ Favoritos desta refeição</div>
+                {favFoods.map(f => <FoodRow key={f.id} food={f} onAdd={addFoodToMeal} mealId={activeMeal} />)}
+                <div style={{ fontSize: 10, fontWeight: 700, color: '#55557a', textTransform: 'uppercase', letterSpacing: 1, margin: '12px 0 8px', fontFamily: 'JetBrains Mono, monospace' }}>Todos os alimentos</div>
+                {otherFoods.map(f => <FoodRow key={f.id} food={f} onAdd={addFoodToMeal} mealId={activeMeal} />)}
+              </>)}
               {!search && favFoods.length === 0 && allFoods.map(f => <FoodRow key={f.id} food={f} onAdd={addFoodToMeal} mealId={activeMeal} />)}
               {search && (filtered.length > 0
                 ? filtered.map(f => <FoodRow key={f.id} food={f} onAdd={addFoodToMeal} mealId={activeMeal} />)
@@ -404,7 +347,6 @@ export default function App() {
     )
   }
 
-  // ── HISTORY ──
   function renderHistory() {
     const entries = Object.entries(days).sort(([a], [b]) => b.localeCompare(a)).slice(0, 60)
     if (!entries.length) return <div style={{ textAlign: 'center', padding: '48px 0', color: '#3a3a5a', fontSize: 13 }}>Nenhum dia registrado ainda</div>
@@ -447,7 +389,6 @@ export default function App() {
     )
   }
 
-  // ── ANALYSIS ──
   function renderAnalysis() {
     const entries = Object.entries(days).sort(([a], [b]) => a.localeCompare(b))
     if (entries.length < 2) return (
@@ -470,7 +411,6 @@ export default function App() {
     const cy = v => PT + (1 - v / maxV) * (H - PT - PB)
     const pc = v => v > targets.max ? '#ef4444' : v < targets.min ? '#f59e0b' : '#10b981'
     const pts = vals.map((v, i) => `${cx(i)},${cy(v)}`).join(' ')
-
     return (
       <div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 12 }}>
@@ -519,7 +459,6 @@ export default function App() {
     )
   }
 
-  // ── FOODS ──
   function renderFoods() {
     if (registerMode) {
       return (
@@ -529,16 +468,12 @@ export default function App() {
             <button onClick={() => setRegisterMode(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#8888aa', fontSize: 20 }}>×</button>
           </div>
           <div style={{ background: '#13131f', borderRadius: 14, padding: 16, border: '0.5px solid #1e1e30' }}>
-            {[
-              { key: 'name', label: 'Nome *', type: 'text', placeholder: 'Ex: Iogurte grego Danio' },
-            ].map(f => (
-              <div key={f.key} style={{ marginBottom: 12 }}>
-                <label style={{ fontSize: 11, color: '#8888aa', fontWeight: 500, marginBottom: 4, display: 'block' }}>{f.label}</label>
-                <input type={f.type} placeholder={f.placeholder} value={newFood[f.key]}
-                  onChange={e => setNewFood(prev => ({ ...prev, [f.key]: e.target.value }))}
-                  style={{ width: '100%', background: '#1e1e30', border: '0.5px solid #2a2a40', borderRadius: 10, padding: '10px 12px', color: '#ededf5', fontSize: 14, fontFamily: 'inherit' }} />
-              </div>
-            ))}
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ fontSize: 11, color: '#8888aa', fontWeight: 500, marginBottom: 4, display: 'block' }}>Nome *</label>
+              <input type="text" placeholder="Ex: Iogurte grego Danio" value={newFood.name}
+                onChange={e => setNewFood(prev => ({ ...prev, name: e.target.value }))}
+                style={{ width: '100%', background: '#1e1e30', border: '0.5px solid #2a2a40', borderRadius: 10, padding: '10px 12px', color: '#ededf5', fontSize: 14, fontFamily: 'inherit' }} />
+            </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
               <div>
                 <label style={{ fontSize: 11, color: '#8888aa', fontWeight: 500, marginBottom: 4, display: 'block' }}>Unidade *</label>
@@ -587,27 +522,24 @@ export default function App() {
         </div>
       )
     }
-
     return (
       <div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
           <div style={{ fontSize: 15, fontWeight: 700 }}>Alimentos</div>
           <button onClick={() => setRegisterMode(true)} style={{ background: '#6366f1', border: 'none', borderRadius: 10, padding: '7px 12px', color: '#fff', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700 }}>+ Novo</button>
         </div>
-        {customFoods.length > 0 && (
-          <>
-            <div style={{ fontSize: 10, fontWeight: 700, color: '#55557a', textTransform: 'uppercase', letterSpacing: 1, margin: '0 0 8px', fontFamily: 'JetBrains Mono, monospace' }}>Meus alimentos ({customFoods.length})</div>
-            {customFoods.map((f, idx) => (
-              <div key={f.id} style={{ background: '#13131f', borderRadius: 12, padding: '10px 12px', marginBottom: 7, display: 'flex', alignItems: 'center', gap: 8, border: '0.5px solid #1e1e30' }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{f.name}</div>
-                  <div style={{ fontSize: 10, color: '#55557a', fontFamily: 'JetBrains Mono, monospace', marginTop: 1 }}>{f.cal} kcal · P:{f.prot}g · C:{f.carb}g · G:{f.fat}g / {f.unit}</div>
-                </div>
-                <button onClick={() => { if (window.confirm('Remover?')) updateCustomFoods(customFoods.filter((_, i) => i !== idx)) }} style={{ background: '#ef444420', border: 'none', borderRadius: 8, width: 28, height: 28, color: '#ef4444', cursor: 'pointer', fontSize: 16 }}>×</button>
+        {customFoods.length > 0 && (<>
+          <div style={{ fontSize: 10, fontWeight: 700, color: '#55557a', textTransform: 'uppercase', letterSpacing: 1, margin: '0 0 8px', fontFamily: 'JetBrains Mono, monospace' }}>Meus alimentos ({customFoods.length})</div>
+          {customFoods.map((f, idx) => (
+            <div key={f.id} style={{ background: '#13131f', borderRadius: 12, padding: '10px 12px', marginBottom: 7, display: 'flex', alignItems: 'center', gap: 8, border: '0.5px solid #1e1e30' }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{f.name}</div>
+                <div style={{ fontSize: 10, color: '#55557a', fontFamily: 'JetBrains Mono, monospace', marginTop: 1 }}>{f.cal} kcal · P:{f.prot}g · C:{f.carb}g · G:{f.fat}g / {f.unit}</div>
               </div>
-            ))}
-          </>
-        )}
+              <button onClick={() => { if (window.confirm('Remover?')) updateCustomFoods(customFoods.filter((_, i) => i !== idx)) }} style={{ background: '#ef444420', border: 'none', borderRadius: 8, width: 28, height: 28, color: '#ef4444', cursor: 'pointer', fontSize: 16 }}>×</button>
+            </div>
+          ))}
+        </>)}
         <div style={{ fontSize: 10, fontWeight: 700, color: '#55557a', textTransform: 'uppercase', letterSpacing: 1, margin: '12px 0 8px', fontFamily: 'JetBrains Mono, monospace' }}>Base padrão ({DEFAULT_FOODS.length})</div>
         {DEFAULT_FOODS.map(f => (
           <div key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0', borderBottom: '0.5px solid #1e1e30' }}>
@@ -623,15 +555,9 @@ export default function App() {
   }
 }
 
-// ── FOOD ROW COMPONENT ──
 function FoodRow({ food: f, onAdd, mealId }) {
   const [qty, setQty] = useState(f.def)
-
-  // Reseta a quantidade para o padrão sempre que a refeição mudar
-  useEffect(() => {
-    setQty(f.def)
-  }, [mealId, f.id, f.def])
-
+  useEffect(() => { setQty(f.def) }, [mealId, f.id, f.def])
   const fixed = ['unid','dose','porção'].includes(f.unit)
   const m = fixed ? qty : qty / 100
   return (
@@ -654,11 +580,9 @@ function FoodRow({ food: f, onAdd, mealId }) {
   )
 }
 
-// ── LOGIN SCREEN ──
 function LoginScreen() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-
   async function handleLogin() {
     setLoading(true)
     setError('')
@@ -669,56 +593,35 @@ function LoginScreen() {
       setLoading(false)
     }
   }
-
   return (
     <div style={{ minHeight: '100vh', background: '#0c0c10', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, fontFamily: "'Syne', system-ui, sans-serif" }}>
       <div style={{ maxWidth: 360, width: '100%', textAlign: 'center' }}>
-        {/* Logo/título */}
         <div style={{ marginBottom: 40 }}>
           <div style={{ fontSize: 11, letterSpacing: 3, color: '#55557a', fontFamily: 'JetBrains Mono, monospace', textTransform: 'uppercase', marginBottom: 12 }}>MACRO TRACKER</div>
           <div style={{ fontSize: 32, fontWeight: 800, color: '#ededf5', lineHeight: 1.2, marginBottom: 8 }}>Acompanhe sua dieta</div>
           <div style={{ fontSize: 14, color: '#55557a', lineHeight: 1.5 }}>Registre seus macros diários e acompanhe sua evolução</div>
         </div>
-
-        {/* Stats visuais */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 40 }}>
-          {[
-            { label: 'Calorias', color: '#6366f1', icon: '⚡' },
-            { label: 'Proteína', color: '#10b981', icon: '💪' },
-            { label: 'Evolução', color: '#f59e0b', icon: '📈' },
-          ].map(s => (
+          {[{ label: 'Calorias', color: '#6366f1', icon: '⚡' }, { label: 'Proteína', color: '#10b981', icon: '💪' }, { label: 'Evolução', color: '#f59e0b', icon: '📈' }].map(s => (
             <div key={s.label} style={{ background: '#13131f', borderRadius: 12, padding: '14px 8px', border: '0.5px solid #1e1e30' }}>
               <div style={{ fontSize: 22, marginBottom: 4 }}>{s.icon}</div>
               <div style={{ fontSize: 11, color: s.color, fontWeight: 600 }}>{s.label}</div>
             </div>
           ))}
         </div>
-
-        {/* Botão Google */}
-        <button
-          onClick={handleLogin}
-          disabled={loading}
-          style={{
-            width: '100%', padding: '14px 20px', background: loading ? '#1e1e30' : '#fff',
-            border: 'none', borderRadius: 14, cursor: loading ? 'not-allowed' : 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12,
-            fontSize: 15, fontWeight: 700, fontFamily: 'inherit',
-            color: loading ? '#55557a' : '#1a1a1a', transition: 'all .2s',
-          }}>
+        <button onClick={handleLogin} disabled={loading}
+          style={{ width: '100%', padding: '14px 20px', background: loading ? '#1e1e30' : '#fff', border: 'none', borderRadius: 14, cursor: loading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, fontSize: 15, fontWeight: 700, fontFamily: 'inherit', color: loading ? '#55557a' : '#1a1a1a' }}>
           {!loading && (
             <svg width="20" height="20" viewBox="0 0 48 48">
               <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
               <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
               <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
               <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.36-8.16 2.36-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
-              <path fill="none" d="M0 0h48v48H0z"/>
             </svg>
           )}
           {loading ? 'Entrando...' : 'Entrar com Google'}
         </button>
-
         {error && <div style={{ marginTop: 12, fontSize: 12, color: '#ef4444' }}>{error}</div>}
-
         <div style={{ marginTop: 20, fontSize: 11, color: '#3a3a5a', lineHeight: 1.5 }}>
           Seus dados ficam salvos na nuvem e sincronizados entre todos os seus dispositivos
         </div>
@@ -727,7 +630,6 @@ function LoginScreen() {
   )
 }
 
-// ── TARGETS MODAL ──
 function TargetsModal({ targets, onSave, onClose }) {
   const [t, setT] = useState(targets)
   const fields = [
