@@ -296,10 +296,18 @@ export default function App() {
             </div>
           </div>
           <div style={{ display: 'flex', marginTop: 14, gap: 2 }}>
-            {[{ id: 'today', label: 'Hoje' }, { id: 'history', label: 'Histórico' }, { id: 'analysis', label: 'Análise' }, { id: 'treino', label: 'Treino' }, { id: 'foods', label: 'Alimentos' }].map(t => (
+            {[
+              { id: 'today', label: 'Hoje', icon: '🏠' },
+              { id: 'treino', label: 'Treino', icon: '💪' },
+              { id: 'peso', label: 'Peso', icon: '⚖️' },
+              { id: 'history', label: 'Histórico', icon: '📅' },
+              { id: 'analysis', label: 'Análise', icon: '📊' },
+              { id: 'foods', label: 'Alimentos', icon: '🥗' },
+            ].map(t => (
               <button key={t.id} onClick={() => { setTab(t.id); setEditingDay(null); setAddingFood(false); setSearch(''); setRegisterMode(false) }}
-                style={{ flex: 1, padding: '10px 0', border: 'none', background: 'transparent', color: tab === t.id ? '#ededf5' : '#55557a', fontWeight: tab === t.id ? 700 : 500, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', borderBottom: `2px solid ${tab === t.id ? '#6366f1' : 'transparent'}`, transition: 'all .2s' }}>
-                {t.label}
+                style={{ flex: 1, padding: '8px 0', border: 'none', background: 'transparent', color: tab === t.id ? '#ededf5' : '#55557a', fontWeight: tab === t.id ? 700 : 500, fontSize: 10, cursor: 'pointer', fontFamily: 'inherit', borderBottom: `2px solid ${tab === t.id ? '#6366f1' : 'transparent'}`, transition: 'all .2s', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                <span style={{ fontSize: 16 }}>{t.icon}</span>
+                <span>{t.label}</span>
               </button>
             ))}
           </div>
@@ -310,6 +318,7 @@ export default function App() {
           {tab === 'history' && !editingDay && renderHistory()}
           {tab === 'analysis' && !editingDay && renderAnalysis()}
           {tab === 'treino' && !editingDay && renderTreino()}
+          {tab === 'peso' && !editingDay && renderPeso()}
           {tab === 'foods' && !editingDay && renderFoods()}
         </div>
       </div>
@@ -395,6 +404,41 @@ export default function App() {
             </div>
           </div>
         )}
+
+        {/* Activities for this day */}
+        <div style={{ marginTop: 16, background: '#13131f', borderRadius: 14, padding: 14, border: '0.5px solid #1e1e30' }}>
+          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10, color: '#6366f1' }}>💪 Atividades do dia</div>
+          {(currentDay.activities || []).length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+              {(currentDay.activities || []).map(actId => {
+                const act = ACTIVITIES.find(a => a.id === actId)
+                if (!act) return null
+                return (
+                  <div key={actId} style={{ display: 'flex', alignItems: 'center', gap: 5, background: act.color + '20', border: `1px solid ${act.color}40`, borderRadius: 20, padding: '5px 10px' }}>
+                    <span style={{ fontSize: 13 }}>{act.icon}</span>
+                    <span style={{ fontSize: 11, color: act.color, fontWeight: 600 }}>{act.label}</span>
+                    <button onClick={() => removeActivityFromDay(actId)} style={{ background: 'none', border: 'none', color: act.color, cursor: 'pointer', fontSize: 14, padding: 0 }}>×</button>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+          {(currentDay.activities || []).length === 0 && (
+            <div style={{ fontSize: 12, color: '#3a3a5a', marginBottom: 10 }}>Nenhuma atividade registrada</div>
+          )}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {ACTIVITIES.map(act => {
+              const done = (currentDay.activities || []).includes(act.id)
+              return (
+                <button key={act.id} onClick={() => addActivityToDay(act.id)} disabled={done}
+                  style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', border: `1px solid ${done ? act.color : '#2a2a40'}`, borderRadius: 20, background: done ? act.color + '20' : 'transparent', cursor: done ? 'default' : 'pointer', fontFamily: 'inherit' }}>
+                  <span style={{ fontSize: 12 }}>{act.icon}</span>
+                  <span style={{ fontSize: 10, color: done ? act.color : '#8888aa', fontWeight: done ? 700 : 400 }}>{act.label}</span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
       </div>
     )
   }
@@ -666,38 +710,135 @@ export default function App() {
           </div>
         </div>
 
-        {/* Weight section */}
-        <div style={{ background: '#13131f', borderRadius: 14, padding: 14, marginBottom: 14, border: '0.5px solid #1e1e30' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-            <div style={{ fontSize: 13, fontWeight: 700 }}>⚖️ Peso corporal</div>
+      </div>
+    )
+  }
+
+  function renderPeso() {
+    const weightEntries = Object.entries(weights).sort(([a], [b]) => b.localeCompare(a))
+    const latestWeight = weightEntries[0]?.[1] || null
+    const prevWeight = weightEntries[1]?.[1] || null
+    const weightDiff = latestWeight && prevWeight ? (latestWeight - prevWeight).toFixed(1) : null
+
+    // Weekly weight chart data
+    const chartEntries = [...weightEntries].reverse()
+    const wVals = chartEntries.map(([,v]) => v)
+
+    return (
+      <div>
+        {/* Header card */}
+        <div style={{ background: '#13131f', borderRadius: 14, padding: 16, marginBottom: 14, border: '0.5px solid #1e1e30' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+            <div style={{ fontSize: 13, fontWeight: 700 }}>⚖️ Peso Corporal</div>
             <button onClick={() => setShowWeightModal(true)}
-              style={{ background: '#6366f1', border: 'none', borderRadius: 10, padding: '6px 12px', color: '#fff', fontSize: 11, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700 }}>
+              style={{ background: '#6366f1', border: 'none', borderRadius: 10, padding: '7px 14px', color: '#fff', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700 }}>
               + Registrar
             </button>
           </div>
           {latestWeight ? (
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 12 }}>
-              <span style={{ fontSize: 32, fontWeight: 800, fontFamily: 'JetBrains Mono, monospace', color: '#ededf5' }}>{latestWeight}</span>
-              <span style={{ fontSize: 13, color: '#55557a' }}>kg</span>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 4 }}>
+              <span style={{ fontSize: 40, fontWeight: 800, fontFamily: 'JetBrains Mono, monospace', color: '#ededf5' }}>{latestWeight}</span>
+              <span style={{ fontSize: 16, color: '#55557a' }}>kg</span>
               {weightDiff !== null && (
-                <span style={{ fontSize: 12, fontWeight: 700, color: parseFloat(weightDiff) < 0 ? '#10b981' : parseFloat(weightDiff) > 0 ? '#ef4444' : '#55557a' }}>
-                  {parseFloat(weightDiff) > 0 ? '+' : ''}{weightDiff} kg vs anterior
+                <span style={{ fontSize: 13, fontWeight: 700, color: parseFloat(weightDiff) < 0 ? '#10b981' : parseFloat(weightDiff) > 0 ? '#ef4444' : '#55557a' }}>
+                  {parseFloat(weightDiff) > 0 ? '+' : ''}{weightDiff} kg
                 </span>
               )}
             </div>
           ) : (
-            <div style={{ textAlign: 'center', padding: '12px 0', color: '#3a3a5a', fontSize: 13 }}>Nenhum peso registrado ainda</div>
-          )}
-          {weightEntries.length > 0 && (
-            <div>
-              {weightEntries.slice(0, 5).map(([date, val]) => (
-                <div key={date} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: '0.5px solid #1e1e30' }}>
-                  <span style={{ fontSize: 12, color: '#8888aa' }}>{formatDateFull(date)}</span>
-                  <span style={{ fontSize: 13, fontWeight: 600, fontFamily: 'JetBrains Mono, monospace' }}>{val} kg</span>
-                </div>
-              ))}
+            <div style={{ textAlign: 'center', padding: '20px 0', color: '#3a3a5a', fontSize: 13 }}>
+              <div style={{ fontSize: 32, marginBottom: 8 }}>⚖️</div>
+              Nenhum peso registrado ainda.<br/>Registre toda segunda de manhã!
             </div>
           )}
+          {weightEntries.length >= 2 && (() => {
+            const first = weightEntries[weightEntries.length - 1][1]
+            const last = weightEntries[0][1]
+            const diff = (last - first).toFixed(1)
+            return (
+              <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                <div style={{ flex: 1, background: '#0c0c10', borderRadius: 10, padding: '8px 10px', textAlign: 'center' }}>
+                  <div style={{ fontSize: 9, color: '#55557a', marginBottom: 3 }}>INICIAL</div>
+                  <div style={{ fontSize: 16, fontWeight: 700, fontFamily: 'JetBrains Mono, monospace' }}>{first} kg</div>
+                </div>
+                <div style={{ flex: 1, background: '#0c0c10', borderRadius: 10, padding: '8px 10px', textAlign: 'center' }}>
+                  <div style={{ fontSize: 9, color: '#55557a', marginBottom: 3 }}>VARIAÇÃO</div>
+                  <div style={{ fontSize: 16, fontWeight: 700, fontFamily: 'JetBrains Mono, monospace', color: parseFloat(diff) < 0 ? '#10b981' : parseFloat(diff) > 0 ? '#ef4444' : '#55557a' }}>
+                    {parseFloat(diff) > 0 ? '+' : ''}{diff} kg
+                  </div>
+                </div>
+                <div style={{ flex: 1, background: '#0c0c10', borderRadius: 10, padding: '8px 10px', textAlign: 'center' }}>
+                  <div style={{ fontSize: 9, color: '#55557a', marginBottom: 3 }}>REGISTROS</div>
+                  <div style={{ fontSize: 16, fontWeight: 700, fontFamily: 'JetBrains Mono, monospace' }}>{weightEntries.length}x</div>
+                </div>
+              </div>
+            )
+          })()}
+        </div>
+
+        {/* Chart */}
+        {wVals.length >= 2 && (() => {
+          const W = 340, H = 100, PL = 8, PR = 8, PT = 12, PB = 20
+          const maxV = Math.max(...wVals) + 0.5
+          const minV = Math.min(...wVals) - 0.5
+          const cx = i => PL + (i / Math.max(wVals.length - 1, 1)) * (W - PL - PR)
+          const cy = v => PT + (1 - (v - minV) / (maxV - minV)) * (H - PT - PB)
+          const pts = wVals.map((v, i) => `${cx(i)},${cy(v)}`).join(' ')
+          const trend = wVals[wVals.length-1] < wVals[0] ? '#10b981' : '#ef4444'
+          return (
+            <div style={{ background: '#13131f', borderRadius: 14, padding: 14, marginBottom: 14, border: '0.5px solid #1e1e30' }}>
+              <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 10 }}>📈 Evolução</div>
+              <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: H }}>
+                <defs>
+                  <linearGradient id="wGrad" x1="0" x2="0" y1="0" y2="1">
+                    <stop offset="0%" stopColor={trend} stopOpacity="0.2"/>
+                    <stop offset="100%" stopColor={trend} stopOpacity="0"/>
+                  </linearGradient>
+                </defs>
+                <polygon points={`${cx(0)},${H-PB} ${pts} ${cx(wVals.length-1)},${H-PB}`} fill="url(#wGrad)" />
+                <polyline points={pts} fill="none" stroke={trend} strokeWidth="2" strokeLinejoin="round" />
+                {wVals.map((v, i) => (
+                  <g key={i}>
+                    <circle cx={cx(i)} cy={cy(v)} r="4" fill={trend} />
+                    <text x={cx(i)} y={cy(v) - 6} fontSize="8" fill="#8888aa" textAnchor="middle">{v}</text>
+                  </g>
+                ))}
+              </svg>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: '#3a3a5a', fontFamily: 'JetBrains Mono, monospace', marginTop: 2 }}>
+                <span>{chartEntries[0]?.[0]}</span>
+                <span>{chartEntries[chartEntries.length-1]?.[0]}</span>
+              </div>
+            </div>
+          )
+        })()}
+
+        {/* History list */}
+        <div style={{ background: '#13131f', borderRadius: 14, padding: 14, border: '0.5px solid #1e1e30' }}>
+          <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 12 }}>Histórico</div>
+          {weightEntries.length === 0 && (
+            <div style={{ textAlign: 'center', padding: '16px 0', color: '#3a3a5a', fontSize: 13 }}>Nenhum registro ainda</div>
+          )}
+          {weightEntries.map(([date, val], idx) => {
+            const prev = weightEntries[idx + 1]?.[1]
+            const diff = prev ? (val - prev).toFixed(1) : null
+            return (
+              <div key={date} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: idx < weightEntries.length - 1 ? '0.5px solid #1e1e30' : 'none' }}>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 500 }}>{formatDateFull(date)}</div>
+                  {diff !== null && (
+                    <div style={{ fontSize: 11, color: parseFloat(diff) < 0 ? '#10b981' : parseFloat(diff) > 0 ? '#ef4444' : '#55557a', marginTop: 2 }}>
+                      {parseFloat(diff) > 0 ? '+' : ''}{diff} kg vs anterior
+                    </div>
+                  )}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 18, fontWeight: 800, fontFamily: 'JetBrains Mono, monospace' }}>{val} kg</span>
+                  <button onClick={() => { if (window.confirm('Remover esse registro?')) { const w = {...weights}; delete w[date]; updateWeights(w) } }}
+                    style={{ background: '#ef444418', border: 'none', borderRadius: 8, width: 26, height: 26, color: '#ef4444', cursor: 'pointer', fontSize: 14 }}>×</button>
+                </div>
+              </div>
+            )
+          })}
         </div>
       </div>
     )
