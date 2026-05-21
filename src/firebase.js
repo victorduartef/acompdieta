@@ -18,21 +18,22 @@ export const googleProvider = new GoogleAuthProvider()
 
 export function initAuth(callback) {
   onAuthStateChanged(auth, (user) => {
-    if (user) {
-      callback(user)
-    } else {
-      callback(null)
-    }
+    callback(user || null)
   })
 }
 
 export async function loginWithGoogle() {
-  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
-  if (isMobile) {
-    await signInWithRedirect(auth, googleProvider)
-  } else {
+  try {
+    // Tenta popup primeiro (funciona no PC e alguns mobiles)
     const result = await signInWithPopup(auth, googleProvider)
     return result.user
+  } catch (e) {
+    // Se popup falhar (bloqueado no mobile), usa redirect
+    if (e.code === 'auth/popup-blocked' || e.code === 'auth/popup-closed-by-user' || e.code === 'auth/cancelled-popup-request') {
+      await signInWithRedirect(auth, googleProvider)
+    } else {
+      throw e
+    }
   }
 }
 
@@ -41,7 +42,7 @@ export async function handleRedirectResult() {
     const result = await getRedirectResult(auth)
     return result?.user || null
   } catch (e) {
-    console.error(e)
+    console.error('Redirect result error:', e)
     return null
   }
 }
