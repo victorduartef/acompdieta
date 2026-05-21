@@ -445,10 +445,43 @@ export default function App() {
 
   function renderHistory() {
     const entries = Object.entries(days).sort(([a], [b]) => b.localeCompare(a)).slice(0, 60)
-    if (!entries.length) return <div style={{ textAlign: 'center', padding: '48px 0', color: '#3a3a5a', fontSize: 13 }}>Nenhum dia registrado ainda</div>
     return (
       <div>
-        <div style={{ fontSize: 11, color: '#55557a', marginBottom: 14 }}>{entries.length} dias · Toque para editar</div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+          <div style={{ fontSize: 11, color: '#55557a' }}>{entries.length} dias registrados · Toque para editar</div>
+          <button onClick={() => {
+            const input = document.createElement('input')
+            input.type = 'date'
+            input.max = todayKey()
+            input.value = todayKey()
+            input.style.cssText = 'position:fixed;opacity:0;top:50%;left:50%'
+            document.body.appendChild(input)
+            input.showPicker?.()
+            input.addEventListener('change', e => {
+              const chosen = e.target.value
+              if (chosen) {
+                if (!days[chosen]) {
+                  const newDays = { ...days, [chosen]: emptyDay() }
+                  updateDays(newDays)
+                }
+                setEditingDay(chosen)
+                setActiveMeal('cafe_manha')
+                setAddingFood(false)
+                setSearch('')
+              }
+              document.body.removeChild(input)
+            })
+            input.addEventListener('blur', () => { try { document.body.removeChild(input) } catch(e){} })
+          }} style={{ background: '#6366f1', border: 'none', borderRadius: 10, padding: '6px 12px', color: '#fff', fontSize: 11, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700 }}>
+            + Dia anterior
+          </button>
+        </div>
+        {entries.length === 0 && (
+          <div style={{ textAlign: 'center', padding: '32px 0', color: '#3a3a5a', fontSize: 13 }}>
+            <div style={{ fontSize: 32, marginBottom: 8 }}>📅</div>
+            Nenhum dia registrado ainda.<br/>Clique em "+ Dia anterior" para adicionar!
+          </div>
+        )}
         {entries.map(([day, data]) => {
           const isTod = day === today
           const all = Object.values(data.meals || {}).flat()
