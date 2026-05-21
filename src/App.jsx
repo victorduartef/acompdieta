@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { doc, getDoc, setDoc } from 'firebase/firestore'
-import { db, initAuth } from './firebase.js'
+import { db, initAuth, loginWithGoogle, logout } from './firebase.js'
 
 // ─── BANCO DE ALIMENTOS ───────────────────────────────────────────────────────
 const DEFAULT_FOODS = [
@@ -93,6 +93,7 @@ async function saveToFirebase(uid, data) {
 // ─── APP ──────────────────────────────────────────────────────────────────────
 export default function App() {
   const [uid, setUid] = useState(null)
+  const [user, setUser] = useState(null)
   const [days, setDays] = useState({})
   const [targets, setTargets] = useState(DEFAULT_TARGETS)
   const [customFoods, setCustomFoods] = useState([])
@@ -110,18 +111,30 @@ export default function App() {
 
   // Init Firebase auth
   useEffect(() => {
-    initAuth((userId) => {
-      setUid(userId)
-      loadFromFirebase(userId).then(data => {
-        if (data) {
-          if (data.days) setDays(data.days)
-          if (data.targets) setTargets(t => ({ ...t, ...data.targets }))
-          if (data.customFoods) setCustomFoods(data.customFoods)
-        }
+    initAuth((firebaseUser) => {
+      if (firebaseUser) {
+        setUid(firebaseUser.uid)
+        setUser(firebaseUser)
+        loadFromFirebase(firebaseUser.uid).then(data => {
+          if (data) {
+            if (data.days) setDays(data.days)
+            if (data.targets) setTargets(t => ({ ...t, ...data.targets }))
+            if (data.customFoods) setCustomFoods(data.customFoods)
+          }
+          setLoaded(true)
+        })
+      } else {
+        setUid(null)
+        setUser(null)
         setLoaded(true)
-      })
+      }
     })
   }, [])
+
+  // Se não estiver logado, mostra tela de login
+  if (loaded && !uid) {
+    return <LoginScreen />
+  }
 
   // Auto-save to Firebase whenever data changes
   const persist = useCallback((newDays, newTargets, newCustomFoods) => {
@@ -213,6 +226,16 @@ export default function App() {
             </div>
             <button onClick={() => setShowTargets(true)} style={{ background: '#1e1e30', border: '1px solid #2a2a40', borderRadius: 10, padding: '7px 10px', color: '#8888aa', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>
               ⚙ Metas
+            </button>
+          </div>
+          {/* User info */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, padding: '6px 10px', background: '#0c0c10', borderRadius: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {user?.photoURL && <img src={user.photoURL} alt="" style={{ width: 22, height: 22, borderRadius: '50%' }} />}
+              <span style={{ fontSize: 11, color: '#55557a' }}>{user?.displayName || user?.email || 'Usuário'}</span>
+            </div>
+            <button onClick={() => logout()} style={{ background: 'none', border: 'none', color: '#55557a', fontSize: 11, cursor: 'pointer', fontFamily: 'inherit' }}>
+              Sair
             </button>
           </div>
 
@@ -335,7 +358,7 @@ export default function App() {
                 <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{f.name}</div>
                 <div style={{ fontSize: 11, color: '#55557a', fontFamily: 'JetBrains Mono, monospace', marginTop: 2 }}>{r0(f.cal * m)} kcal · P:{r(f.prot * m)}g · C:{r(f.carb * m)}g · G:{r(f.fat * m)}g</div>
               </div>
-              <input type="number" value={it.qty} onChange={e => updateQty(activeMeal, idx, e.target.value)}
+              <input type="number" defaultValue={it.qty} onBlur={e => updateQty(activeMeal, idx, e.target.value)}
                 style={{ width: 52, textAlign: 'center', fontFamily: 'JetBrains Mono, monospace', fontSize: 12, padding: '5px 4px', border: '0.5px solid #2a2a40', borderRadius: 8, background: '#1e1e30', color: '#ededf5' }} />
               <span style={{ fontSize: 10, color: '#55557a', minWidth: 26 }}>{f.unit}</span>
               <button onClick={() => removeFood(activeMeal, idx)} style={{ background: '#ef444420', border: 'none', borderRadius: 8, width: 28, height: 28, color: '#ef4444', cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>×</button>
@@ -621,6 +644,79 @@ function FoodRow({ food: f, onAdd, mealId }) {
           style={{ background: '#6366f1', border: 'none', borderRadius: 10, padding: '7px 14px', color: '#fff', fontSize: 12, cursor: 'pointer', fontWeight: 700, fontFamily: 'inherit', flexShrink: 0 }}>
           Add
         </button>
+      </div>
+    </div>
+  )
+}
+
+// ── LOGIN SCREEN ──
+function LoginScreen() {
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  async function handleLogin() {
+    setLoading(true)
+    setError('')
+    try {
+      await loginWithGoogle()
+    } catch (e) {
+      setError('Erro ao fazer login. Tente novamente.')
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div style={{ minHeight: '100vh', background: '#0c0c10', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, fontFamily: "'Syne', system-ui, sans-serif" }}>
+      <div style={{ maxWidth: 360, width: '100%', textAlign: 'center' }}>
+        {/* Logo/título */}
+        <div style={{ marginBottom: 40 }}>
+          <div style={{ fontSize: 11, letterSpacing: 3, color: '#55557a', fontFamily: 'JetBrains Mono, monospace', textTransform: 'uppercase', marginBottom: 12 }}>MACRO TRACKER</div>
+          <div style={{ fontSize: 32, fontWeight: 800, color: '#ededf5', lineHeight: 1.2, marginBottom: 8 }}>Acompanhe sua dieta</div>
+          <div style={{ fontSize: 14, color: '#55557a', lineHeight: 1.5 }}>Registre seus macros diários e acompanhe sua evolução</div>
+        </div>
+
+        {/* Stats visuais */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 40 }}>
+          {[
+            { label: 'Calorias', color: '#6366f1', icon: '⚡' },
+            { label: 'Proteína', color: '#10b981', icon: '💪' },
+            { label: 'Evolução', color: '#f59e0b', icon: '📈' },
+          ].map(s => (
+            <div key={s.label} style={{ background: '#13131f', borderRadius: 12, padding: '14px 8px', border: '0.5px solid #1e1e30' }}>
+              <div style={{ fontSize: 22, marginBottom: 4 }}>{s.icon}</div>
+              <div style={{ fontSize: 11, color: s.color, fontWeight: 600 }}>{s.label}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Botão Google */}
+        <button
+          onClick={handleLogin}
+          disabled={loading}
+          style={{
+            width: '100%', padding: '14px 20px', background: loading ? '#1e1e30' : '#fff',
+            border: 'none', borderRadius: 14, cursor: loading ? 'not-allowed' : 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12,
+            fontSize: 15, fontWeight: 700, fontFamily: 'inherit',
+            color: loading ? '#55557a' : '#1a1a1a', transition: 'all .2s',
+          }}>
+          {!loading && (
+            <svg width="20" height="20" viewBox="0 0 48 48">
+              <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+              <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+              <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+              <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.36-8.16 2.36-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+              <path fill="none" d="M0 0h48v48H0z"/>
+            </svg>
+          )}
+          {loading ? 'Entrando...' : 'Entrar com Google'}
+        </button>
+
+        {error && <div style={{ marginTop: 12, fontSize: 12, color: '#ef4444' }}>{error}</div>}
+
+        <div style={{ marginTop: 20, fontSize: 11, color: '#3a3a5a', lineHeight: 1.5 }}>
+          Seus dados ficam salvos na nuvem e sincronizados entre todos os seus dispositivos
+        </div>
       </div>
     </div>
   )
