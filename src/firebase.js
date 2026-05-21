@@ -1,8 +1,7 @@
 // src/firebase.js
-// Preencha com as credenciais do seu projeto Firebase
 import { initializeApp } from 'firebase/app'
 import { getFirestore } from 'firebase/firestore'
-import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth'
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth'
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -16,14 +15,23 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig)
 export const db = getFirestore(app)
 export const auth = getAuth(app)
+export const googleProvider = new GoogleAuthProvider()
 
-// Login anônimo automático (dados ficam atrelados ao device)
 export function initAuth(callback) {
   onAuthStateChanged(auth, (user) => {
     if (user) {
-      callback(user.uid)
+      callback(user)
     } else {
-      signInAnonymously(auth).catch(console.error)
+      callback(null)
     }
   })
+}
+
+export async function loginWithGoogle() {
+  const result = await signInWithPopup(auth, googleProvider)
+  return result.user
+}
+
+export async function logout() {
+  await signOut(auth)
 }
