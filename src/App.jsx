@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { doc, getDoc, setDoc } from 'firebase/firestore'
-import { db, initAuth, loginWithGoogle, logout } from './firebase.js'
+import { db, initAuth, loginWithGoogle, handleRedirectResult, logout } from './firebase.js'
 
 // ─── BANCO DE ALIMENTOS ───────────────────────────────────────────────────────
 const DEFAULT_FOODS = [
@@ -111,6 +111,7 @@ export default function App() {
 
   // Init Firebase auth
   useEffect(() => {
+    handleRedirectResult()
     initAuth((firebaseUser) => {
       if (firebaseUser) {
         setUid(firebaseUser.uid)
