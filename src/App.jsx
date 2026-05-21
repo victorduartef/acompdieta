@@ -56,7 +56,7 @@ function formatDateFull(iso) {
 
 function calcMacros(items, allFoods) {
   return items.reduce((a, it) => {
-    const f = allFoods.find(x => x.id === it.id)
+    const f = allFoods.find(x => x.id === it.id) // customFoods override DEFAULT_FOODS
     if (!f) return a
     const fixed = ['unid','dose','porção'].includes(f.unit)
     const m = fixed ? it.qty : it.qty / 100
@@ -99,7 +99,11 @@ export default function App() {
   const [showTargets, setShowTargets] = useState(false)
   const [newFood, setNewFood] = useState({ name: '', cal: '', prot: '', carb: '', fat: '', unit: 'g', def: '100', fav: [] })
 
-  const allFoods = [...DEFAULT_FOODS, ...customFoods]
+  // Merge: customFoods overrides DEFAULT_FOODS by id
+  const allFoods = DEFAULT_FOODS.map(f => {
+    const override = customFoods.find(c => c.id === f.id)
+    return override ? override : f
+  }).concat(customFoods.filter(c => !DEFAULT_FOODS.find(f => f.id === c.id)))
 
   useEffect(() => {
     handleRedirectResult()
@@ -512,12 +516,21 @@ export default function App() {
             </div>
             <button onClick={() => {
               if (!newFood.name || newFood.cal === '') return alert('Preencha nome e calorias.')
-              if (editingFoodIdx !== null) {
-                const updated = customFoods.map((f, i) => i === editingFoodIdx ? { ...f, name: newFood.name, fav: newFood.fav, cal: parseFloat(newFood.cal)||0, prot: parseFloat(newFood.prot)||0, carb: parseFloat(newFood.carb)||0, fat: parseFloat(newFood.fat)||0, unit: newFood.unit, def: parseFloat(newFood.def)||100 } : f)
+              const foodData = { name: newFood.name, fav: newFood.fav, cal: parseFloat(newFood.cal)||0, prot: parseFloat(newFood.prot)||0, carb: parseFloat(newFood.carb)||0, fat: parseFloat(newFood.fat)||0, unit: newFood.unit, def: parseFloat(newFood.def)||100 }
+              if (editingFoodIdx !== null && String(editingFoodIdx).startsWith('default_')) {
+                // Override a default food
+                const defaultId = String(editingFoodIdx).replace('default_', '')
+                const exists = customFoods.find(c => c.id === defaultId)
+                if (exists) {
+                  updateCustomFoods(customFoods.map(c => c.id === defaultId ? { ...c, ...foodData } : c))
+                } else {
+                  updateCustomFoods([...customFoods, { id: defaultId, ...foodData }])
+                }
+              } else if (editingFoodIdx !== null) {
+                const updated = customFoods.map((f, i) => i === editingFoodIdx ? { ...f, ...foodData } : f)
                 updateCustomFoods(updated)
               } else {
-                const cf = [...customFoods, { id: 'custom_' + Date.now(), name: newFood.name, fav: newFood.fav, cal: parseFloat(newFood.cal)||0, prot: parseFloat(newFood.prot)||0, carb: parseFloat(newFood.carb)||0, fat: parseFloat(newFood.fat)||0, unit: newFood.unit, def: parseFloat(newFood.def)||100 }]
-                updateCustomFoods(cf)
+                updateCustomFoods([...customFoods, { id: 'custom_' + Date.now(), ...foodData }])
               }
               setRegisterMode(false)
               setEditingFoodIdx(null)
@@ -553,15 +566,34 @@ export default function App() {
           ))}
         </>)}
         <div style={{ fontSize: 10, fontWeight: 700, color: '#55557a', textTransform: 'uppercase', letterSpacing: 1, margin: '12px 0 8px', fontFamily: 'JetBrains Mono, monospace' }}>Base padrão ({DEFAULT_FOODS.length})</div>
-        {DEFAULT_FOODS.map(f => (
-          <div key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0', borderBottom: '0.5px solid #1e1e30' }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 12, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{f.name}</div>
-              <div style={{ fontSize: 10, color: '#55557a', fontFamily: 'JetBrains Mono, monospace' }}>{f.cal} kcal · P:{f.prot}g · C:{f.carb}g · G:{f.fat}g / {f.unit}</div>
+        {DEFAULT_FOODS.map(f => {
+          const override = customFoods.find(c => c.id === f.id)
+          const display = override || f
+          return (
+            <div key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0', borderBottom: '0.5px solid #1e1e30' }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 12, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {display.name}
+                  {override && <span style={{ marginLeft: 6, fontSize: 9, color: '#6366f1', background: '#6366f120', padding: '1px 5px', borderRadius: 8 }}>editado</span>}
+                </div>
+                <div style={{ fontSize: 10, color: '#55557a', fontFamily: 'JetBrains Mono, monospace' }}>{display.cal} kcal · P:{display.prot}g · C:{display.carb}g · G:{display.fat}g / {display.unit}</div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                {override && (
+                  <button onClick={() => { if (window.confirm('Restaurar valores originais?')) updateCustomFoods(customFoods.filter(c => c.id !== f.id)) }}
+                    style={{ background: '#f59e0b20', border: 'none', borderRadius: 8, width: 28, height: 28, color: '#f59e0b', cursor: 'pointer', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>↺</button>
+                )}
+                <button onClick={() => {
+                  const editData = override || f
+                  setEditingFoodIdx('default_' + f.id)
+                  setNewFood({ name: editData.name, cal: String(editData.cal), prot: String(editData.prot), carb: String(editData.carb), fat: String(editData.fat), unit: editData.unit, def: String(editData.def), fav: editData.fav || [] })
+                  setRegisterMode(true)
+                }} style={{ background: '#6366f120', border: 'none', borderRadius: 8, width: 28, height: 28, color: '#6366f1', cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✎</button>
+                <div style={{ fontSize: 11 }}>{(display.fav || []).map(id => { const m = MEALS.find(x => x.id === id); return m ? m.icon : '' }).join('')}</div>
+              </div>
             </div>
-            <div style={{ fontSize: 11 }}>{(f.fav || []).map(id => { const m = MEALS.find(x => x.id === id); return m ? m.icon : '' }).join('')}</div>
-          </div>
-        ))}
+          )
+        })}
       </div>
     )
   }
