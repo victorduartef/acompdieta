@@ -127,7 +127,7 @@ export default function App() {
   const [weights, setWeights] = useState({})
   const [showWeightModal, setShowWeightModal] = useState(false)
   const [newWeight, setNewWeight] = useState('')
-  const [analysisFilter, setAnalysisFilter] = useState('all')
+  const [analysisFilters, setAnalysisFilters] = useState(new Set())
 
   // Merge: customFoods overrides DEFAULT_FOODS by id
   const allFoods = DEFAULT_FOODS.map(f => {
@@ -534,48 +534,66 @@ export default function App() {
       </div>
     )
 
-    // Helper: is weekend?
     const isWeekend = (iso) => { const d = new Date(iso + 'T12:00:00'); return d.getDay() === 0 || d.getDay() === 6 }
     const isWeekday = (iso) => !isWeekend(iso)
     const hasTraining = (iso) => (days[iso]?.activities || []).length > 0
 
-    // Filter entries based on selected filter
-    const getFiltered = (filter) => {
-      switch(filter) {
-        case 'weekday': return allEntries.filter(([d]) => isWeekday(d))
-        case 'weekend': return allEntries.filter(([d]) => isWeekend(d))
-        case 'training': return allEntries.filter(([d]) => hasTraining(d))
-        case 'notraining': return allEntries.filter(([d]) => !hasTraining(d))
-        default: return allEntries
-      }
+    // Toggle a filter - period filters are exclusive with each other, training filters are exclusive with each other
+    const toggleFilter = (id) => {
+      setAnalysisFilters(prev => {
+        const next = new Set(prev)
+        const periodFilters = ['weekday', 'weekend']
+        const trainingFilters = ['training', 'notraining']
+        if (next.has(id)) {
+          next.delete(id)
+        } else {
+          // Remove conflicting filters in same group
+          if (periodFilters.includes(id)) periodFilters.forEach(f => next.delete(f))
+          if (trainingFilters.includes(id)) trainingFilters.forEach(f => next.delete(f))
+          next.add(id)
+        }
+        return next
+      })
     }
 
-    const filteredEntries = getFiltered(analysisFilter)
+    // Apply all active filters combined
+    const applyFilters = (entries, filters) => {
+      return entries.filter(([d]) => {
+        if (filters.has('weekday') && !isWeekday(d)) return false
+        if (filters.has('weekend') && !isWeekend(d)) return false
+        if (filters.has('training') && !hasTraining(d)) return false
+        if (filters.has('notraining') && hasTraining(d)) return false
+        return true
+      })
+    }
+
+    const filteredEntries = applyFilters(allEntries, analysisFilters)
     const last14 = filteredEntries.slice(-14)
 
-    // Compute avg macros for a set of entries
     const avgMacros = (entries) => {
-      if (!entries.length) return { cal: 0, prot: 0, carb: 0, fat: 0 }
+      if (!entries.length) return { cal: 0, prot: 0, carb: 0, fat: 0, n: 0 }
       const sum = entries.reduce((a, [, d]) => {
         const m = calcMacros(Object.values(d.meals || {}).flat(), allFoods)
         return { cal: a.cal + m.cal, prot: a.prot + m.prot, carb: a.carb + m.carb, fat: a.fat + m.fat }
       }, { cal: 0, prot: 0, carb: 0, fat: 0 })
       const n = entries.length
-      return { cal: r0(sum.cal/n), prot: r0(sum.prot/n), carb: r0(sum.carb/n), fat: r0(sum.fat/n) }
+      return { cal: r0(sum.cal/n), prot: r0(sum.prot/n), carb: r0(sum.carb/n), fat: r0(sum.fat/n), n }
     }
 
     const avg = avgMacros(filteredEntries)
-    const avgAll = avgMacros(allEntries)
-    const avgWeekday = avgMacros(allEntries.filter(([d]) => isWeekday(d)))
-    const avgWeekend = avgMacros(allEntries.filter(([d]) => isWeekend(d)))
-    const avgTraining = avgMacros(allEntries.filter(([d]) => hasTraining(d)))
-    const avgNoTraining = avgMacros(allEntries.filter(([d]) => !hasTraining(d)))
+
+    // Comparativo: always uses filteredEntries as base, then splits by training
+    const baseEntries = filteredEntries.length > 0 ? filteredEntries : allEntries
+    const compTraining = avgMacros(baseEntries.filter(([d]) => hasTraining(d)))
+    const compNoTraining = avgMacros(baseEntries.filter(([d]) => !hasTraining(d)))
+    const compWeekday = avgMacros(baseEntries.filter(([d]) => isWeekday(d)))
+    const compWeekend = avgMacros(baseEntries.filter(([d]) => isWeekend(d)))
+    const compAll = avgMacros(allEntries)
 
     const within = filteredEntries.filter(([, d]) => { const m = calcMacros(Object.values(d.meals||{}).flat(), allFoods); return m.cal >= targets.min && m.cal <= targets.max })
     const over = filteredEntries.filter(([, d]) => { const m = calcMacros(Object.values(d.meals||{}).flat(), allFoods); return m.cal > targets.max })
     const under = filteredEntries.filter(([, d]) => { const m = calcMacros(Object.values(d.meals||{}).flat(), allFoods); return m.cal < targets.min && m.cal > 0 })
 
-    // Chart
     const vals = last14.map(([, d]) => r0(calcMacros(Object.values(d.meals||{}).flat(), allFoods).cal))
     const maxV = Math.max(...vals, targets.max) * 1.1 || 2000
     const W = 340, H = 90, PL = 8, PR = 8, PT = 8, PB = 16
@@ -585,29 +603,54 @@ export default function App() {
     const pts = vals.map((v, i) => `${cx(i)},${cy(v)}`).join(' ')
 
     const filters = [
-      { id: 'all', label: '📊 Todos' },
-      { id: 'weekday', label: '💼 Seg–Sex' },
-      { id: 'weekend', label: '🎉 Fim de semana' },
-      { id: 'training', label: '💪 Com treino' },
-      { id: 'notraining', label: '🛋️ Sem treino' },
+      { id: 'weekday', label: '💼 Seg–Sex', group: 'period' },
+      { id: 'weekend', label: '🎉 Fim de semana', group: 'period' },
+      { id: 'training', label: '💪 Com treino', group: 'training' },
+      { id: 'notraining', label: '🛋️ Sem treino', group: 'training' },
     ]
+
+    const activeLabel = () => {
+      const parts = []
+      if (analysisFilters.has('weekday')) parts.push('Seg–Sex')
+      if (analysisFilters.has('weekend')) parts.push('Fim de semana')
+      if (analysisFilters.has('training')) parts.push('com treino')
+      if (analysisFilters.has('notraining')) parts.push('sem treino')
+      return parts.length ? parts.join(' + ') : 'Todos os dias'
+    }
 
     return (
       <div>
-        {/* Filter pills */}
-        <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 4, marginBottom: 14 }}>
-          {filters.map(f => (
-            <button key={f.id} onClick={() => setAnalysisFilter(f.id)}
-              style={{ flexShrink: 0, padding: '6px 12px', borderRadius: 20, border: `1px solid ${analysisFilter === f.id ? '#6366f1' : '#2a2a40'}`, background: analysisFilter === f.id ? '#6366f120' : 'transparent', color: analysisFilter === f.id ? '#6366f1' : '#8888aa', fontSize: 11, fontWeight: analysisFilter === f.id ? 700 : 400, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
-              {f.label}
-            </button>
-          ))}
+        {/* Filter pills - multi select */}
+        <div style={{ background: '#13131f', borderRadius: 14, padding: 12, marginBottom: 14, border: '0.5px solid #1e1e30' }}>
+          <div style={{ fontSize: 11, color: '#55557a', marginBottom: 8, fontFamily: 'JetBrains Mono, monospace' }}>FILTROS — selecione um ou mais</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {filters.map(f => {
+              const active = analysisFilters.has(f.id)
+              return (
+                <button key={f.id} onClick={() => toggleFilter(f.id)}
+                  style={{ padding: '6px 12px', borderRadius: 20, border: `1.5px solid ${active ? '#6366f1' : '#2a2a40'}`, background: active ? '#6366f120' : 'transparent', color: active ? '#6366f1' : '#8888aa', fontSize: 11, fontWeight: active ? 700 : 400, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap', transition: 'all .2s' }}>
+                  {f.label} {active ? '✓' : ''}
+                </button>
+              )
+            })}
+            {analysisFilters.size > 0 && (
+              <button onClick={() => setAnalysisFilters(new Set())}
+                style={{ padding: '6px 12px', borderRadius: 20, border: '1.5px solid #ef444440', background: '#ef444410', color: '#ef4444', fontSize: 11, cursor: 'pointer', fontFamily: 'inherit' }}>
+                ✕ Limpar
+              </button>
+            )}
+          </div>
+          {analysisFilters.size > 0 && (
+            <div style={{ marginTop: 8, fontSize: 11, color: '#6366f1', fontWeight: 600 }}>
+              Mostrando: {activeLabel()} — {filteredEntries.length} dias
+            </div>
+          )}
         </div>
 
         {filteredEntries.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '32px 20px', color: '#3a3a5a', background: '#13131f', borderRadius: 14, border: '0.5px solid #1e1e30' }}>
             <div style={{ fontSize: 28, marginBottom: 8 }}>🔍</div>
-            <div style={{ fontSize: 13 }}>Nenhum dia encontrado com esse filtro</div>
+            <div style={{ fontSize: 13 }}>Nenhum dia encontrado com esses filtros</div>
           </div>
         ) : (<>
 
@@ -625,7 +668,7 @@ export default function App() {
         {/* Avg for current filter */}
         <div style={{ background: '#13131f', borderRadius: 14, padding: 14, marginBottom: 12, border: '0.5px solid #1e1e30' }}>
           <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 10 }}>
-            Média — {filters.find(f => f.id === analysisFilter)?.label} ({filteredEntries.length} dias)
+            Média — {activeLabel()} ({filteredEntries.length} dias)
           </div>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 10 }}>
             <span style={{ fontSize: 32, fontWeight: 800, fontFamily: 'JetBrains Mono, monospace', color: avg.cal > targets.max ? '#ef4444' : avg.cal >= targets.min ? '#10b981' : '#f59e0b' }}>{avg.cal}</span>
@@ -644,10 +687,10 @@ export default function App() {
           </div>
         </div>
 
-        {/* Calorie chart */}
+        {/* Chart */}
         {vals.length >= 2 && (
           <div style={{ background: '#13131f', borderRadius: 14, padding: 14, marginBottom: 12, border: '0.5px solid #1e1e30' }}>
-            <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 10 }}>Calorias — últimos {last14.length} dias ({filters.find(f=>f.id===analysisFilter)?.label})</div>
+            <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 10 }}>Calorias — {activeLabel()}</div>
             <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: H }}>
               <line x1={PL} y1={cy(targets.max)} x2={W-PR} y2={cy(targets.max)} stroke="#10b98140" strokeWidth="1" strokeDasharray="3,3"/>
               <line x1={PL} y1={cy(targets.min)} x2={W-PR} y2={cy(targets.min)} stroke="#f59e0b40" strokeWidth="1" strokeDasharray="3,3"/>
@@ -661,26 +704,28 @@ export default function App() {
           </div>
         )}
 
-        {/* Comparative summary */}
+        {/* Comparativo - respeita filtros ativos */}
         <div style={{ background: '#13131f', borderRadius: 14, padding: 14, marginBottom: 12, border: '0.5px solid #1e1e30' }}>
-          <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 12 }}>📊 Comparativo de médias</div>
+          <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 4 }}>📊 Comparativo de médias</div>
+          <div style={{ fontSize: 10, color: '#55557a', marginBottom: 12 }}>
+            {analysisFilters.size > 0 ? `Baseado nos ${baseEntries.length} dias filtrados` : `Baseado em todos os ${allEntries.length} dias`}
+          </div>
           {[
-            { label: '📊 Geral', avg: avgAll.cal, n: allEntries.length },
-            { label: '💼 Dias de semana', avg: avgWeekday.cal, n: allEntries.filter(([d]) => isWeekday(d)).length },
-            { label: '🎉 Fim de semana', avg: avgWeekend.cal, n: allEntries.filter(([d]) => isWeekend(d)).length },
-            { label: '💪 Com treino', avg: avgTraining.cal, n: allEntries.filter(([d]) => hasTraining(d)).length },
-            { label: '🛋️ Sem treino', avg: avgNoTraining.cal, n: allEntries.filter(([d]) => !hasTraining(d)).length },
-          ].map(row => {
-            if (row.n === 0) return null
-            const pct = Math.min(100, (row.avg / targets.cal) * 100)
-            const col = row.avg > targets.max ? '#ef4444' : row.avg >= targets.min ? '#10b981' : '#f59e0b'
+            { label: '📊 Geral', data: compAll, show: true },
+            { label: '💼 Seg–Sex', data: compWeekday, show: !analysisFilters.has('weekend') },
+            { label: '🎉 Fim de semana', data: compWeekend, show: !analysisFilters.has('weekday') },
+            { label: '💪 Com treino', data: compTraining, show: !analysisFilters.has('notraining') },
+            { label: '🛋️ Sem treino', data: compNoTraining, show: !analysisFilters.has('training') },
+          ].filter(row => row.show && row.data.n > 0).map(row => {
+            const pct = Math.min(100, (row.data.cal / targets.cal) * 100)
+            const col = row.data.cal > targets.max ? '#ef4444' : row.data.cal >= targets.min ? '#10b981' : '#f59e0b'
             return (
               <div key={row.label} style={{ marginBottom: 12 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
                   <span style={{ color: '#9898b8' }}>{row.label}</span>
                   <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11 }}>
-                    <span style={{ color: col, fontWeight: 700 }}>{row.avg} kcal</span>
-                    <span style={{ color: '#3a3a5a' }}> ({row.n}d)</span>
+                    <span style={{ color: col, fontWeight: 700 }}>{row.data.cal} kcal</span>
+                    <span style={{ color: '#3a3a5a' }}> ({row.data.n}d)</span>
                   </span>
                 </div>
                 <div style={{ background: '#1e1e30', borderRadius: 3, height: 6, overflow: 'hidden' }}>
@@ -695,8 +740,7 @@ export default function App() {
         {Object.keys(weights).length >= 2 && (() => {
           const wEntries = Object.entries(weights).sort(([a],[b]) => a.localeCompare(b))
           const wVals = wEntries.map(([,v]) => v)
-          const lastW = wVals[wVals.length-1]
-          const firstW = wVals[0]
+          const lastW = wVals[wVals.length-1], firstW = wVals[0]
           const totalDiff = (lastW - firstW).toFixed(1)
           const W2=340,H2=80,PL2=8,PR2=8,PT2=8,PB2=16
           const wMax=Math.max(...wVals)+1, wMin=Math.min(...wVals)-1
@@ -720,30 +764,19 @@ export default function App() {
           )
         })()}
 
-        {/* Activity insight */}
-        {avgTraining.cal > 0 && avgNoTraining.cal > 0 && (
+        {/* Insight */}
+        {compTraining.n > 0 && compNoTraining.n > 0 && (
           <div style={{ background: '#13131f', borderRadius: 14, padding: 14, marginBottom: 12, border: '0.5px solid #1e1e30' }}>
-            <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 10 }}>💡 Insight — Treino vs Descanso</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
-              <div style={{ background: '#0c0c10', borderRadius: 10, padding: 10, textAlign: 'center' }}>
-                <div style={{ fontSize: 10, color: '#6366f1', marginBottom: 4 }}>Com treino</div>
-                <div style={{ fontSize: 20, fontWeight: 800, fontFamily: 'JetBrains Mono, monospace' }}>{avgTraining.cal}</div>
-                <div style={{ fontSize: 9, color: '#55557a' }}>kcal médio</div>
-              </div>
-              <div style={{ background: '#0c0c10', borderRadius: 10, padding: 10, textAlign: 'center' }}>
-                <div style={{ fontSize: 10, color: '#8888aa', marginBottom: 4 }}>Sem treino</div>
-                <div style={{ fontSize: 20, fontWeight: 800, fontFamily: 'JetBrains Mono, monospace' }}>{avgNoTraining.cal}</div>
-                <div style={{ fontSize: 9, color: '#55557a' }}>kcal médio</div>
-              </div>
-            </div>
-            <div style={{ background: '#0c0c10', borderRadius: 10, padding: '10px 12px', fontSize: 12, color: '#8888aa', lineHeight: 1.6 }}>
-              {avgTraining.cal > avgNoTraining.cal
-                ? `📈 Nos dias de treino você come em média ${avgTraining.cal - avgNoTraining.cal} kcal a mais que nos dias de descanso.`
-                : `📉 Nos dias de treino você come em média ${avgNoTraining.cal - avgTraining.cal} kcal a menos que nos dias de descanso.`}
-              {avgWeekend.cal > 0 && avgWeekday.cal > 0 && (
-                <span>{avgWeekend.cal > avgWeekday.cal
-                  ? ` Nos fins de semana você consome em média ${avgWeekend.cal - avgWeekday.cal} kcal a mais que nos dias úteis.`
-                  : ` Nos fins de semana você consome em média ${avgWeekday.cal - avgWeekend.cal} kcal a menos que nos dias úteis.`}
+            <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 10 }}>💡 Insights</div>
+            <div style={{ background: '#0c0c10', borderRadius: 10, padding: '10px 12px', fontSize: 12, color: '#8888aa', lineHeight: 1.7 }}>
+              {compTraining.cal > compNoTraining.cal
+                ? `💪 Nos dias de treino (${activeLabel()}) você come em média ${compTraining.cal - compNoTraining.cal} kcal a mais que nos dias de descanso.`
+                : `💪 Nos dias de treino (${activeLabel()}) você come em média ${compNoTraining.cal - compTraining.cal} kcal a menos que nos dias de descanso.`}
+              {compWeekend.n > 0 && compWeekday.n > 0 && !analysisFilters.has('weekday') && !analysisFilters.has('weekend') && (
+                <span style={{ display: 'block', marginTop: 6 }}>
+                  {compWeekend.cal > compWeekday.cal
+                    ? `🎉 Nos fins de semana você come em média ${compWeekend.cal - compWeekday.cal} kcal a mais que nos dias úteis.`
+                    : `🎉 Nos fins de semana você come em média ${compWeekday.cal - compWeekend.cal} kcal a menos que nos dias úteis.`}
                 </span>
               )}
             </div>
