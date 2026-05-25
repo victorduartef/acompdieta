@@ -1243,3 +1243,5 @@ function TargetsModal({ targets, onSave, onClose }) {
     </div>
   )
 }
+
+}
