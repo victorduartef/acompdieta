@@ -63,7 +63,13 @@ const DEFAULT_TARGETS = {
   min: 1460, max: 1680, protMin: 138, protMax: 163, fatMax: 52,
 }
 
-function todayKey() { return new Date().toISOString().slice(0, 10) }
+function todayKey() {
+  const d = new Date()
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
 function emptyDay() { return { meals: { cafe_manha: [], almoco: [], lanche: [], janta: [], extra: [] } } }
 function r(v) { return Math.round(v * 10) / 10 }
 function r0(v) { return Math.round(v) }
@@ -121,6 +127,7 @@ export default function App() {
   const [weights, setWeights] = useState({})
   const [showWeightModal, setShowWeightModal] = useState(false)
   const [newWeight, setNewWeight] = useState('')
+  const [analysisFilter, setAnalysisFilter] = useState('all')
 
   // Merge: customFoods overrides DEFAULT_FOODS by id
   const allFoods = DEFAULT_FOODS.map(f => {
@@ -519,66 +526,165 @@ export default function App() {
   }
 
   function renderAnalysis() {
-    const entries = Object.entries(days).sort(([a], [b]) => a.localeCompare(b))
-    if (entries.length < 2) return (
+    const allEntries = Object.entries(days).sort(([a], [b]) => a.localeCompare(b))
+    if (allEntries.length < 2) return (
       <div style={{ textAlign: 'center', padding: '48px 20px', color: '#3a3a5a' }}>
         <div style={{ fontSize: 32, marginBottom: 10 }}>📊</div>
         <div style={{ fontSize: 14 }}>Registre pelo menos 2 dias para ver as análises</div>
       </div>
     )
-    const last14 = entries.slice(-14)
-    const within = last14.filter(([, d]) => { const m = calcMacros(Object.values(d.meals || {}).flat(), allFoods); return m.cal >= targets.min && m.cal <= targets.max })
-    const over = last14.filter(([, d]) => { const m = calcMacros(Object.values(d.meals || {}).flat(), allFoods); return m.cal > targets.max })
-    const under = last14.filter(([, d]) => { const m = calcMacros(Object.values(d.meals || {}).flat(), allFoods); return m.cal < targets.min && m.cal > 0 })
-    const n = entries.length
-    const avg = entries.reduce((a, [, d]) => { const m = calcMacros(Object.values(d.meals || {}).flat(), allFoods); return { cal: a.cal + m.cal, prot: a.prot + m.prot, carb: a.carb + m.carb, fat: a.fat + m.fat } }, { cal: 0, prot: 0, carb: 0, fat: 0 })
-    Object.keys(avg).forEach(k => avg[k] = r0(avg[k] / n))
-    const vals = last14.map(([, d]) => r0(calcMacros(Object.values(d.meals || {}).flat(), allFoods).cal))
-    const maxV = Math.max(...vals, targets.max) * 1.1
+
+    // Helper: is weekend?
+    const isWeekend = (iso) => { const d = new Date(iso + 'T12:00:00'); return d.getDay() === 0 || d.getDay() === 6 }
+    const isWeekday = (iso) => !isWeekend(iso)
+    const hasTraining = (iso) => (days[iso]?.activities || []).length > 0
+
+    // Filter entries based on selected filter
+    const getFiltered = (filter) => {
+      switch(filter) {
+        case 'weekday': return allEntries.filter(([d]) => isWeekday(d))
+        case 'weekend': return allEntries.filter(([d]) => isWeekend(d))
+        case 'training': return allEntries.filter(([d]) => hasTraining(d))
+        case 'notraining': return allEntries.filter(([d]) => !hasTraining(d))
+        default: return allEntries
+      }
+    }
+
+    const filteredEntries = getFiltered(analysisFilter)
+    const last14 = filteredEntries.slice(-14)
+
+    // Compute avg macros for a set of entries
+    const avgMacros = (entries) => {
+      if (!entries.length) return { cal: 0, prot: 0, carb: 0, fat: 0 }
+      const sum = entries.reduce((a, [, d]) => {
+        const m = calcMacros(Object.values(d.meals || {}).flat(), allFoods)
+        return { cal: a.cal + m.cal, prot: a.prot + m.prot, carb: a.carb + m.carb, fat: a.fat + m.fat }
+      }, { cal: 0, prot: 0, carb: 0, fat: 0 })
+      const n = entries.length
+      return { cal: r0(sum.cal/n), prot: r0(sum.prot/n), carb: r0(sum.carb/n), fat: r0(sum.fat/n) }
+    }
+
+    const avg = avgMacros(filteredEntries)
+    const avgAll = avgMacros(allEntries)
+    const avgWeekday = avgMacros(allEntries.filter(([d]) => isWeekday(d)))
+    const avgWeekend = avgMacros(allEntries.filter(([d]) => isWeekend(d)))
+    const avgTraining = avgMacros(allEntries.filter(([d]) => hasTraining(d)))
+    const avgNoTraining = avgMacros(allEntries.filter(([d]) => !hasTraining(d)))
+
+    const within = filteredEntries.filter(([, d]) => { const m = calcMacros(Object.values(d.meals||{}).flat(), allFoods); return m.cal >= targets.min && m.cal <= targets.max })
+    const over = filteredEntries.filter(([, d]) => { const m = calcMacros(Object.values(d.meals||{}).flat(), allFoods); return m.cal > targets.max })
+    const under = filteredEntries.filter(([, d]) => { const m = calcMacros(Object.values(d.meals||{}).flat(), allFoods); return m.cal < targets.min && m.cal > 0 })
+
+    // Chart
+    const vals = last14.map(([, d]) => r0(calcMacros(Object.values(d.meals||{}).flat(), allFoods).cal))
+    const maxV = Math.max(...vals, targets.max) * 1.1 || 2000
     const W = 340, H = 90, PL = 8, PR = 8, PT = 8, PB = 16
     const cx = i => PL + (i / Math.max(vals.length - 1, 1)) * (W - PL - PR)
     const cy = v => PT + (1 - v / maxV) * (H - PT - PB)
     const pc = v => v > targets.max ? '#ef4444' : v < targets.min ? '#f59e0b' : '#10b981'
     const pts = vals.map((v, i) => `${cx(i)},${cy(v)}`).join(' ')
+
+    const filters = [
+      { id: 'all', label: '📊 Todos' },
+      { id: 'weekday', label: '💼 Seg–Sex' },
+      { id: 'weekend', label: '🎉 Fim de semana' },
+      { id: 'training', label: '💪 Com treino' },
+      { id: 'notraining', label: '🛋️ Sem treino' },
+    ]
+
     return (
       <div>
+        {/* Filter pills */}
+        <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 4, marginBottom: 14 }}>
+          {filters.map(f => (
+            <button key={f.id} onClick={() => setAnalysisFilter(f.id)}
+              style={{ flexShrink: 0, padding: '6px 12px', borderRadius: 20, border: `1px solid ${analysisFilter === f.id ? '#6366f1' : '#2a2a40'}`, background: analysisFilter === f.id ? '#6366f120' : 'transparent', color: analysisFilter === f.id ? '#6366f1' : '#8888aa', fontSize: 11, fontWeight: analysisFilter === f.id ? 700 : 400, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
+              {f.label}
+            </button>
+          ))}
+        </div>
+
+        {filteredEntries.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '32px 20px', color: '#3a3a5a', background: '#13131f', borderRadius: 14, border: '0.5px solid #1e1e30' }}>
+            <div style={{ fontSize: 28, marginBottom: 8 }}>🔍</div>
+            <div style={{ fontSize: 13 }}>Nenhum dia encontrado com esse filtro</div>
+          </div>
+        ) : (<>
+
+        {/* Stat cards */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 12 }}>
           {[{ label: 'Na meta', count: within.length, color: '#10b981' }, { label: 'Excesso', count: over.length, color: '#ef4444' }, { label: 'Abaixo', count: under.length, color: '#f59e0b' }].map(s => (
             <div key={s.label} style={{ background: '#13131f', borderRadius: 12, padding: '10px 8px', textAlign: 'center', border: '0.5px solid #1e1e30' }}>
               <div style={{ fontSize: 22, fontWeight: 800, color: s.color, fontFamily: 'JetBrains Mono, monospace' }}>{s.count}</div>
               <div style={{ fontSize: 10, color: '#8888aa' }}>{s.label}</div>
-              <div style={{ fontSize: 9, color: '#3a3a5a', fontFamily: 'JetBrains Mono, monospace' }}>/{last14.length}d</div>
+              <div style={{ fontSize: 9, color: '#3a3a5a', fontFamily: 'JetBrains Mono, monospace' }}>/{filteredEntries.length}d</div>
             </div>
           ))}
         </div>
+
+        {/* Avg for current filter */}
         <div style={{ background: '#13131f', borderRadius: 14, padding: 14, marginBottom: 12, border: '0.5px solid #1e1e30' }}>
-          <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 10 }}>Calorias — últimos {last14.length} dias</div>
-          <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: H }}>
-            <line x1={PL} y1={cy(targets.max)} x2={W - PR} y2={cy(targets.max)} stroke="#10b98140" strokeWidth="1" strokeDasharray="3,3" />
-            <line x1={PL} y1={cy(targets.min)} x2={W - PR} y2={cy(targets.min)} stroke="#f59e0b40" strokeWidth="1" strokeDasharray="3,3" />
-            <line x1={PL} y1={cy(targets.cal)} x2={W - PR} y2={cy(targets.cal)} stroke="#6366f160" strokeWidth="1.5" strokeDasharray="5,4" />
-            <polyline points={pts} fill="none" stroke="#6366f170" strokeWidth="1.5" strokeLinejoin="round" />
-            {vals.map((v, i) => <circle key={i} cx={cx(i)} cy={cy(v)} r="4" fill={pc(v)} />)}
-          </svg>
-          <div style={{ display: 'flex', gap: 12, fontSize: 10, color: '#55557a', fontFamily: 'JetBrains Mono, monospace', marginTop: 6 }}>
-            <span style={{ color: '#10b981' }}>● meta</span><span style={{ color: '#f59e0b' }}>● abaixo</span><span style={{ color: '#ef4444' }}>● excesso</span>
+          <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 10 }}>
+            Média — {filters.find(f => f.id === analysisFilter)?.label} ({filteredEntries.length} dias)
+          </div>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 10 }}>
+            <span style={{ fontSize: 32, fontWeight: 800, fontFamily: 'JetBrains Mono, monospace', color: avg.cal > targets.max ? '#ef4444' : avg.cal >= targets.min ? '#10b981' : '#f59e0b' }}>{avg.cal}</span>
+            <span style={{ fontSize: 13, color: '#55557a' }}>kcal/dia</span>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+            {[{ l: 'Proteína', v: avg.prot, c: '#10b981', t: targets.prot }, { l: 'Carb', v: avg.carb, c: '#f59e0b', t: targets.carb }, { l: 'Gordura', v: avg.fat, c: '#ec4899', t: targets.fat }].map(m => (
+              <div key={m.l} style={{ background: '#0c0c10', borderRadius: 10, padding: '8px' }}>
+                <div style={{ fontSize: 9, color: '#55557a', marginBottom: 3 }}>{m.l}</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: m.c, fontFamily: 'JetBrains Mono, monospace' }}>{m.v}g</div>
+                <div style={{ background: '#1e1e30', borderRadius: 3, height: 4, marginTop: 4, overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: Math.min(100, (m.v/m.t)*100)+'%', background: m.c }} />
+                </div>
+              </div>
+            ))}
           </div>
         </div>
+
+        {/* Calorie chart */}
+        {vals.length >= 2 && (
+          <div style={{ background: '#13131f', borderRadius: 14, padding: 14, marginBottom: 12, border: '0.5px solid #1e1e30' }}>
+            <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 10 }}>Calorias — últimos {last14.length} dias ({filters.find(f=>f.id===analysisFilter)?.label})</div>
+            <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: H }}>
+              <line x1={PL} y1={cy(targets.max)} x2={W-PR} y2={cy(targets.max)} stroke="#10b98140" strokeWidth="1" strokeDasharray="3,3"/>
+              <line x1={PL} y1={cy(targets.min)} x2={W-PR} y2={cy(targets.min)} stroke="#f59e0b40" strokeWidth="1" strokeDasharray="3,3"/>
+              <line x1={PL} y1={cy(targets.cal)} x2={W-PR} y2={cy(targets.cal)} stroke="#6366f160" strokeWidth="1.5" strokeDasharray="5,4"/>
+              <polyline points={pts} fill="none" stroke="#6366f170" strokeWidth="1.5" strokeLinejoin="round"/>
+              {vals.map((v, i) => <circle key={i} cx={cx(i)} cy={cy(v)} r="4" fill={pc(v)}/>)}
+            </svg>
+            <div style={{ display: 'flex', gap: 12, fontSize: 10, color: '#55557a', fontFamily: 'JetBrains Mono, monospace', marginTop: 6 }}>
+              <span style={{ color: '#10b981' }}>● meta</span><span style={{ color: '#f59e0b' }}>● abaixo</span><span style={{ color: '#ef4444' }}>● excesso</span>
+            </div>
+          </div>
+        )}
+
+        {/* Comparative summary */}
         <div style={{ background: '#13131f', borderRadius: 14, padding: 14, marginBottom: 12, border: '0.5px solid #1e1e30' }}>
-          <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 12 }}>Média diária vs meta ({n} dias)</div>
-          {[{ l: 'Calorias', a: avg.cal, t: targets.cal, c: '#6366f1', u: 'kcal' }, { l: 'Proteína', a: avg.prot, t: targets.prot, c: '#10b981', u: 'g' }, { l: 'Carb', a: avg.carb, t: targets.carb, c: '#f59e0b', u: 'g' }, { l: 'Gordura', a: avg.fat, t: targets.fat, c: '#ec4899', u: 'g' }].map(m => {
-            const ok = Math.abs(m.a - m.t) / m.t <= 0.08; const diff = m.a - m.t
+          <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 12 }}>📊 Comparativo de médias</div>
+          {[
+            { label: '📊 Geral', avg: avgAll.cal, n: allEntries.length },
+            { label: '💼 Dias de semana', avg: avgWeekday.cal, n: allEntries.filter(([d]) => isWeekday(d)).length },
+            { label: '🎉 Fim de semana', avg: avgWeekend.cal, n: allEntries.filter(([d]) => isWeekend(d)).length },
+            { label: '💪 Com treino', avg: avgTraining.cal, n: allEntries.filter(([d]) => hasTraining(d)).length },
+            { label: '🛋️ Sem treino', avg: avgNoTraining.cal, n: allEntries.filter(([d]) => !hasTraining(d)).length },
+          ].map(row => {
+            if (row.n === 0) return null
+            const pct = Math.min(100, (row.avg / targets.cal) * 100)
+            const col = row.avg > targets.max ? '#ef4444' : row.avg >= targets.min ? '#10b981' : '#f59e0b'
             return (
-              <div key={m.l} style={{ marginBottom: 10 }}>
+              <div key={row.label} style={{ marginBottom: 12 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
-                  <span style={{ color: '#9898b8' }}>{m.l}</span>
+                  <span style={{ color: '#9898b8' }}>{row.label}</span>
                   <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11 }}>
-                    <span style={{ color: ok ? '#10b981' : diff > 0 ? '#ef4444' : '#f59e0b', fontWeight: 700 }}>{m.a}{m.u}</span>
-                    <span style={{ color: '#3a3a5a' }}> / {m.t}{m.u}</span>
+                    <span style={{ color: col, fontWeight: 700 }}>{row.avg} kcal</span>
+                    <span style={{ color: '#3a3a5a' }}> ({row.n}d)</span>
                   </span>
                 </div>
-                <div style={{ background: '#1e1e30', borderRadius: 3, height: 5, overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: Math.min(130, (m.a / m.t) * 100) + '%', background: m.c, borderRadius: 3 }} />
+                <div style={{ background: '#1e1e30', borderRadius: 3, height: 6, overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: pct+'%', background: col, borderRadius: 3 }}/>
                 </div>
               </div>
             )
@@ -587,75 +693,69 @@ export default function App() {
 
         {/* Weight evolution */}
         {Object.keys(weights).length >= 2 && (() => {
-          const wEntries = Object.entries(weights).sort(([a], [b]) => a.localeCompare(b))
-          const firstW = wEntries[0][1]
-          const lastW = wEntries[wEntries.length - 1][1]
-          const totalDiff = (lastW - firstW).toFixed(1)
+          const wEntries = Object.entries(weights).sort(([a],[b]) => a.localeCompare(b))
           const wVals = wEntries.map(([,v]) => v)
-          const wMax = Math.max(...wVals) + 1
-          const wMin = Math.min(...wVals) - 1
-          const W2 = 340, H2 = 80, PL2 = 8, PR2 = 8, PT2 = 8, PB2 = 16
-          const cx2 = i => PL2 + (i / Math.max(wVals.length - 1, 1)) * (W2 - PL2 - PR2)
-          const cy2 = v => PT2 + (1 - (v - wMin) / (wMax - wMin)) * (H2 - PT2 - PB2)
-          const pts2 = wVals.map((v, i) => `${cx2(i)},${cy2(v)}`).join(' ')
+          const lastW = wVals[wVals.length-1]
+          const firstW = wVals[0]
+          const totalDiff = (lastW - firstW).toFixed(1)
+          const W2=340,H2=80,PL2=8,PR2=8,PT2=8,PB2=16
+          const wMax=Math.max(...wVals)+1, wMin=Math.min(...wVals)-1
+          const cx2=i=>PL2+(i/Math.max(wVals.length-1,1))*(W2-PL2-PR2)
+          const cy2=v=>PT2+(1-(v-wMin)/(wMax-wMin))*(H2-PT2-PB2)
+          const pts2=wVals.map((v,i)=>`${cx2(i)},${cy2(v)}`).join(' ')
           return (
             <div style={{ background: '#13131f', borderRadius: 14, padding: 14, marginBottom: 12, border: '0.5px solid #1e1e30' }}>
               <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 4 }}>⚖️ Evolução do peso</div>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 10 }}>
                 <span style={{ fontSize: 24, fontWeight: 800, fontFamily: 'JetBrains Mono, monospace' }}>{lastW} kg</span>
-                <span style={{ fontSize: 12, fontWeight: 700, color: parseFloat(totalDiff) < 0 ? '#10b981' : parseFloat(totalDiff) > 0 ? '#ef4444' : '#55557a' }}>
-                  {parseFloat(totalDiff) > 0 ? '+' : ''}{totalDiff} kg total
+                <span style={{ fontSize: 12, fontWeight: 700, color: parseFloat(totalDiff)<0?'#10b981':parseFloat(totalDiff)>0?'#ef4444':'#55557a' }}>
+                  {parseFloat(totalDiff)>0?'+':''}{totalDiff} kg total
                 </span>
               </div>
-              <svg viewBox={`0 0 ${W2} ${H2}`} style={{ width: '100%', height: H2 }}>
-                <polyline points={pts2} fill="none" stroke="#6366f1" strokeWidth="2" strokeLinejoin="round" />
-                {wVals.map((v, i) => <circle key={i} cx={cx2(i)} cy={cy2(v)} r="4" fill="#6366f1" />)}
+              <svg viewBox={`0 0 ${W2} ${H2}`} style={{ width:'100%', height:H2 }}>
+                <polyline points={pts2} fill="none" stroke="#6366f1" strokeWidth="2" strokeLinejoin="round"/>
+                {wVals.map((v,i)=><circle key={i} cx={cx2(i)} cy={cy2(v)} r="4" fill="#6366f1"/>)}
               </svg>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#55557a', fontFamily: 'JetBrains Mono, monospace', marginTop: 4 }}>
-                <span>{wEntries[0][0]}</span><span>{wEntries[wEntries.length-1][0]}</span>
-              </div>
             </div>
           )
         })()}
 
-        {/* Activity vs Diet correlation */}
-        {entries.length >= 3 && (() => {
-          const activeDays = entries.filter(([d]) => (days[d]?.activities || []).length > 0)
-          const inactiveDays = entries.filter(([d]) => (days[d]?.activities || []).length === 0)
-          const avgCal = arr => arr.length ? Math.round(arr.reduce((s, [,d]) => s + calcMacros(Object.values(d.meals||{}).flat(), allFoods).cal, 0) / arr.length) : 0
-          const activeAvg = avgCal(activeDays)
-          const inactiveAvg = avgCal(inactiveDays)
-          if (activeDays.length === 0) return null
-          return (
-            <div style={{ background: '#13131f', borderRadius: 14, padding: 14, marginBottom: 12, border: '0.5px solid #1e1e30' }}>
-              <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 12 }}>💡 Insights — Treino vs Dieta</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
-                <div style={{ background: '#0c0c10', borderRadius: 10, padding: 10, textAlign: 'center' }}>
-                  <div style={{ fontSize: 10, color: '#6366f1', marginBottom: 4 }}>Dias com treino</div>
-                  <div style={{ fontSize: 20, fontWeight: 800, fontFamily: 'JetBrains Mono, monospace', color: '#ededf5' }}>{activeAvg}</div>
-                  <div style={{ fontSize: 9, color: '#55557a' }}>kcal médio ({activeDays.length}d)</div>
-                </div>
-                <div style={{ background: '#0c0c10', borderRadius: 10, padding: 10, textAlign: 'center' }}>
-                  <div style={{ fontSize: 10, color: '#8888aa', marginBottom: 4 }}>Dias sem treino</div>
-                  <div style={{ fontSize: 20, fontWeight: 800, fontFamily: 'JetBrains Mono, monospace', color: '#ededf5' }}>{inactiveAvg}</div>
-                  <div style={{ fontSize: 9, color: '#55557a' }}>kcal médio ({inactiveDays.length}d)</div>
-                </div>
+        {/* Activity insight */}
+        {avgTraining.cal > 0 && avgNoTraining.cal > 0 && (
+          <div style={{ background: '#13131f', borderRadius: 14, padding: 14, marginBottom: 12, border: '0.5px solid #1e1e30' }}>
+            <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 10 }}>💡 Insight — Treino vs Descanso</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
+              <div style={{ background: '#0c0c10', borderRadius: 10, padding: 10, textAlign: 'center' }}>
+                <div style={{ fontSize: 10, color: '#6366f1', marginBottom: 4 }}>Com treino</div>
+                <div style={{ fontSize: 20, fontWeight: 800, fontFamily: 'JetBrains Mono, monospace' }}>{avgTraining.cal}</div>
+                <div style={{ fontSize: 9, color: '#55557a' }}>kcal médio</div>
               </div>
-              {activeAvg > 0 && inactiveAvg > 0 && (
-                <div style={{ background: '#0c0c10', borderRadius: 10, padding: '10px 12px', fontSize: 12, color: '#8888aa', lineHeight: 1.5 }}>
-                  {activeAvg > inactiveAvg
-                    ? `📊 Nos dias de treino você come em média ${activeAvg - inactiveAvg} kcal a mais`
-                    : `📊 Nos dias de treino você come em média ${inactiveAvg - activeAvg} kcal a menos`}
-                </div>
+              <div style={{ background: '#0c0c10', borderRadius: 10, padding: 10, textAlign: 'center' }}>
+                <div style={{ fontSize: 10, color: '#8888aa', marginBottom: 4 }}>Sem treino</div>
+                <div style={{ fontSize: 20, fontWeight: 800, fontFamily: 'JetBrains Mono, monospace' }}>{avgNoTraining.cal}</div>
+                <div style={{ fontSize: 9, color: '#55557a' }}>kcal médio</div>
+              </div>
+            </div>
+            <div style={{ background: '#0c0c10', borderRadius: 10, padding: '10px 12px', fontSize: 12, color: '#8888aa', lineHeight: 1.6 }}>
+              {avgTraining.cal > avgNoTraining.cal
+                ? `📈 Nos dias de treino você come em média ${avgTraining.cal - avgNoTraining.cal} kcal a mais que nos dias de descanso.`
+                : `📉 Nos dias de treino você come em média ${avgNoTraining.cal - avgTraining.cal} kcal a menos que nos dias de descanso.`}
+              {avgWeekend.cal > 0 && avgWeekday.cal > 0 && (
+                <span>{avgWeekend.cal > avgWeekday.cal
+                  ? ` Nos fins de semana você consome em média ${avgWeekend.cal - avgWeekday.cal} kcal a mais que nos dias úteis.`
+                  : ` Nos fins de semana você consome em média ${avgWeekday.cal - avgWeekend.cal} kcal a menos que nos dias úteis.`}
+                </span>
               )}
             </div>
-          )
-        })()}
+          </div>
+        )}
+
+        </>)}
       </div>
     )
   }
 
-  function renderTreino() {
+  function renderTreino() {  function renderTreino() {
     const todayActivities = currentDay.activities || []
     const mondayKey = (() => {
       const d = new Date()
