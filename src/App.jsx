@@ -127,7 +127,7 @@ export default function App() {
   const [weights, setWeights] = useState({})
   const [showWeightModal, setShowWeightModal] = useState(false)
   const [newWeight, setNewWeight] = useState('')
-  const [analysisFilters, setAnalysisFilters] = useState(new Set())
+  const [analysisFilters, setAnalysisFilters] = useState([])
 
   // Merge: customFoods overrides DEFAULT_FOODS by id
   const allFoods = DEFAULT_FOODS.map(f => {
@@ -541,28 +541,26 @@ export default function App() {
     // Toggle a filter - period filters are exclusive with each other, training filters are exclusive with each other
     const toggleFilter = (id) => {
       setAnalysisFilters(prev => {
-        const next = new Set(prev)
         const periodFilters = ['weekday', 'weekend']
         const trainingFilters = ['training', 'notraining']
-        if (next.has(id)) {
-          next.delete(id)
+        if (prev.includes(id)) {
+          return prev.filter(f => f !== id)
         } else {
-          // Remove conflicting filters in same group
-          if (periodFilters.includes(id)) periodFilters.forEach(f => next.delete(f))
-          if (trainingFilters.includes(id)) trainingFilters.forEach(f => next.delete(f))
-          next.add(id)
+          let next = [...prev]
+          if (periodFilters.includes(id)) next = next.filter(f => !periodFilters.includes(f))
+          if (trainingFilters.includes(id)) next = next.filter(f => !trainingFilters.includes(f))
+          return [...next, id]
         }
-        return next
       })
     }
 
     // Apply all active filters combined
     const applyFilters = (entries, filters) => {
       return entries.filter(([d]) => {
-        if (filters.has('weekday') && !isWeekday(d)) return false
-        if (filters.has('weekend') && !isWeekend(d)) return false
-        if (filters.has('training') && !hasTraining(d)) return false
-        if (filters.has('notraining') && hasTraining(d)) return false
+        if (filters.includes('weekday') && !isWeekday(d)) return false
+        if (filters.includes('weekend') && !isWeekend(d)) return false
+        if (filters.includes('training') && !hasTraining(d)) return false
+        if (filters.includes('notraining') && hasTraining(d)) return false
         return true
       })
     }
@@ -611,10 +609,10 @@ export default function App() {
 
     const activeLabel = () => {
       const parts = []
-      if (analysisFilters.has('weekday')) parts.push('Seg–Sex')
-      if (analysisFilters.has('weekend')) parts.push('Fim de semana')
-      if (analysisFilters.has('training')) parts.push('com treino')
-      if (analysisFilters.has('notraining')) parts.push('sem treino')
+      if (analysisFilters.includes('weekday')) parts.push('Seg–Sex')
+      if (analysisFilters.includes('weekend')) parts.push('Fim de semana')
+      if (analysisFilters.includes('training')) parts.push('com treino')
+      if (analysisFilters.includes('notraining')) parts.push('sem treino')
       return parts.length ? parts.join(' + ') : 'Todos os dias'
     }
 
@@ -625,7 +623,7 @@ export default function App() {
           <div style={{ fontSize: 11, color: '#55557a', marginBottom: 8, fontFamily: 'JetBrains Mono, monospace' }}>FILTROS — selecione um ou mais</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
             {filters.map(f => {
-              const active = analysisFilters.has(f.id)
+              const active = analysisFilters.includes(f.id)
               return (
                 <button key={f.id} onClick={() => toggleFilter(f.id)}
                   style={{ padding: '6px 12px', borderRadius: 20, border: `1.5px solid ${active ? '#6366f1' : '#2a2a40'}`, background: active ? '#6366f120' : 'transparent', color: active ? '#6366f1' : '#8888aa', fontSize: 11, fontWeight: active ? 700 : 400, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap', transition: 'all .2s' }}>
@@ -633,14 +631,14 @@ export default function App() {
                 </button>
               )
             })}
-            {analysisFilters.size > 0 && (
-              <button onClick={() => setAnalysisFilters(new Set())}
+            {analysisFilters.length > 0 && (
+              <button onClick={() => setAnalysisFilters([])}
                 style={{ padding: '6px 12px', borderRadius: 20, border: '1.5px solid #ef444440', background: '#ef444410', color: '#ef4444', fontSize: 11, cursor: 'pointer', fontFamily: 'inherit' }}>
                 ✕ Limpar
               </button>
             )}
           </div>
-          {analysisFilters.size > 0 && (
+          {analysisFilters.length > 0 && (
             <div style={{ marginTop: 8, fontSize: 11, color: '#6366f1', fontWeight: 600 }}>
               Mostrando: {activeLabel()} — {filteredEntries.length} dias
             </div>
@@ -708,14 +706,14 @@ export default function App() {
         <div style={{ background: '#13131f', borderRadius: 14, padding: 14, marginBottom: 12, border: '0.5px solid #1e1e30' }}>
           <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 4 }}>📊 Comparativo de médias</div>
           <div style={{ fontSize: 10, color: '#55557a', marginBottom: 12 }}>
-            {analysisFilters.size > 0 ? `Baseado nos ${baseEntries.length} dias filtrados` : `Baseado em todos os ${allEntries.length} dias`}
+            {analysisFilters.length > 0 ? `Baseado nos ${baseEntries.length} dias filtrados` : `Baseado em todos os ${allEntries.length} dias`}
           </div>
           {[
             { label: '📊 Geral', data: compAll, show: true },
-            { label: '💼 Seg–Sex', data: compWeekday, show: !analysisFilters.has('weekend') },
-            { label: '🎉 Fim de semana', data: compWeekend, show: !analysisFilters.has('weekday') },
-            { label: '💪 Com treino', data: compTraining, show: !analysisFilters.has('notraining') },
-            { label: '🛋️ Sem treino', data: compNoTraining, show: !analysisFilters.has('training') },
+            { label: '💼 Seg–Sex', data: compWeekday, show: !analysisFilters.includes('weekend') },
+            { label: '🎉 Fim de semana', data: compWeekend, show: !analysisFilters.includes('weekday') },
+            { label: '💪 Com treino', data: compTraining, show: !analysisFilters.includes('notraining') },
+            { label: '🛋️ Sem treino', data: compNoTraining, show: !analysisFilters.includes('training') },
           ].filter(row => row.show && row.data.n > 0).map(row => {
             const pct = Math.min(100, (row.data.cal / targets.cal) * 100)
             const col = row.data.cal > targets.max ? '#ef4444' : row.data.cal >= targets.min ? '#10b981' : '#f59e0b'
@@ -772,7 +770,7 @@ export default function App() {
               {compTraining.cal > compNoTraining.cal
                 ? `💪 Nos dias de treino (${activeLabel()}) você come em média ${compTraining.cal - compNoTraining.cal} kcal a mais que nos dias de descanso.`
                 : `💪 Nos dias de treino (${activeLabel()}) você come em média ${compNoTraining.cal - compTraining.cal} kcal a menos que nos dias de descanso.`}
-              {compWeekend.n > 0 && compWeekday.n > 0 && !analysisFilters.has('weekday') && !analysisFilters.has('weekend') && (
+              {compWeekend.n > 0 && compWeekday.n > 0 && !analysisFilters.includes('weekday') && !analysisFilters.includes('weekend') && (
                 <span style={{ display: 'block', marginTop: 6 }}>
                   {compWeekend.cal > compWeekday.cal
                     ? `🎉 Nos fins de semana você come em média ${compWeekend.cal - compWeekday.cal} kcal a mais que nos dias úteis.`
