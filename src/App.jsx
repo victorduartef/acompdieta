@@ -526,7 +526,7 @@ export default function App() {
   }
 
   function renderAnalysis() {
-    const allEntries = Object.entries(days).sort(([a], [b]) => a.localeCompare(b))
+    const allEntries = Object.entries(days).filter(([d]) => d !== todayKey()).sort(([a], [b]) => a.localeCompare(b))
     if (allEntries.length < 2) return (
       <div style={{ textAlign: 'center', padding: '48px 20px', color: '#3a3a5a' }}>
         <div style={{ fontSize: 32, marginBottom: 10 }}>📊</div>
