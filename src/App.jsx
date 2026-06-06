@@ -397,9 +397,60 @@ export default function App() {
             <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
               <input autoFocus value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar alimento..."
                 style={{ flex: 1, background: '#1a2d35', border: '0.5px solid #2a2a40', borderRadius: 10, padding: '10px 12px', color: '#f0e8d8', fontSize: 14, fontFamily: 'inherit' }} />
-              <button onClick={() => { setAddingFood(false); setSearch('') }} style={{ background: '#1a2d35', border: 'none', borderRadius: 10, padding: '0 12px', color: '#6a8a98', cursor: 'pointer', fontSize: 18 }}>✕</button>
+              <button onClick={() => { setAddingFood(false); setSearch(''); setAvulso(false) }} style={{ background: '#1a2d35', border: 'none', borderRadius: 10, padding: '0 12px', color: '#6a8a98', cursor: 'pointer', fontSize: 18 }}>✕</button>
             </div>
-            <div style={{ maxHeight: 320, overflowY: 'auto' }}>
+
+            {!avulso && (
+              <button onClick={() => { setAvulso(true); setSearch('') }}
+                style={{ width: '100%', padding: '10px', border: '1px dashed #c8873a60', borderRadius: 10, background: '#c8873a0a', color: '#c8873a', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600, marginBottom: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                ⚡ Entrada avulsa (evento, estimativa...)
+              </button>
+            )}
+
+            {avulso && (
+              <div style={{ background: '#1a2d35', borderRadius: 12, padding: 12, marginBottom: 10, border: '1px solid #c8873a40' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: '#c8873a' }}>⚡ Entrada avulsa</span>
+                  <button onClick={() => setAvulso(false)} style={{ background: 'none', border: 'none', color: '#6a8a98', cursor: 'pointer', fontSize: 16 }}>×</button>
+                </div>
+                <input
+                  placeholder="Nome (ex: Evento, Pizza, Churrasco...)"
+                  value={avulsoData.name}
+                  onChange={e => setAvulsoData(p => ({ ...p, name: e.target.value }))}
+                  style={{ width: '100%', background: '#122028', border: '0.5px solid #1e3540', borderRadius: 8, padding: '8px 10px', color: '#f0e8d8', fontSize: 13, fontFamily: 'inherit', marginBottom: 8 }}
+                />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 10 }}>
+                  {[
+                    { key: 'cal', label: 'Kcal', color: '#c8873a' },
+                    { key: 'prot', label: 'Proteína (g)', color: '#2ab8b8' },
+                    { key: 'carb', label: 'Carb (g)', color: '#e8a040' },
+                    { key: 'fat', label: 'Gordura (g)', color: '#e07060' },
+                  ].map(f => (
+                    <div key={f.key}>
+                      <div style={{ fontSize: 10, color: f.color, marginBottom: 3, fontFamily: 'JetBrains Mono, monospace' }}>{f.label}</div>
+                      <input type="number" placeholder="0" value={avulsoData[f.key]}
+                        onChange={e => setAvulsoData(p => ({ ...p, [f.key]: e.target.value }))}
+                        style={{ width: '100%', background: '#122028', border: '0.5px solid #1e3540', borderRadius: 8, padding: '7px 8px', color: '#f0e8d8', fontSize: 13, fontFamily: 'JetBrains Mono, monospace' }} />
+                    </div>
+                  ))}
+                </div>
+                <button onClick={() => {
+                    if (!avulsoData.name && !avulsoData.cal) return
+                    const id = 'avulso_' + Date.now()
+                    const day = getDay(activeKey)
+                    const item = { id, qty: 1, avulso: true, name: avulsoData.name || 'Entrada avulsa', cal: parseFloat(avulsoData.cal) || 0, prot: parseFloat(avulsoData.prot) || 0, carb: parseFloat(avulsoData.carb) || 0, fat: parseFloat(avulsoData.fat) || 0 }
+                    updateDays({ ...days, [activeKey]: { ...day, meals: { ...day.meals, [activeMeal]: [...(day.meals[activeMeal] || []), item] } } })
+                    setAvulsoData({ name: '', cal: '', prot: '', carb: '', fat: '' })
+                    setAvulso(false)
+                    setAddingFood(false)
+                  }}
+                  style={{ width: '100%', padding: '10px', background: 'linear-gradient(135deg, #c8873a, #e8a040)', border: 'none', borderRadius: 10, color: '#0d1a1f', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+                  Adicionar à refeição
+                </button>
+              </div>
+            )}
+
+            {!avulso && <div style={{ maxHeight: 280, overflowY: 'auto' }}>
               {!search && favFoods.length > 0 && (<>
                 <div style={{ fontSize: 10, fontWeight: 700, color: '#7a9aa8', textTransform: 'uppercase', letterSpacing: 1, margin: '4px 0 8px', fontFamily: 'JetBrains Mono, monospace' }}>⭐ Favoritos desta refeição</div>
                 {favFoods.map(f => <FoodRow key={f.id} food={f} onAdd={addFoodToMeal} mealId={activeMeal} />)}
@@ -411,7 +462,7 @@ export default function App() {
                 ? filtered.map(f => <FoodRow key={f.id} food={f} onAdd={addFoodToMeal} mealId={activeMeal} />)
                 : <div style={{ padding: '20px', textAlign: 'center', color: '#2d4a58', fontSize: 13 }}>Nenhum resultado</div>
               )}
-            </div>
+            </div>}
           </div>
         )}
         <div style={{ marginTop: 16, background: '#122028', borderRadius: 14, padding: 14, border: '0.5px solid #1e1e30' }}>
