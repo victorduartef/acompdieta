@@ -39,19 +39,19 @@ const DEFAULT_FOODS = [
 ]
 
 const MEALS = [
-  { id: 'cafe_manha', label: 'Café da Manhã', short: 'Café', icon: '☀️', color: '#f59e0b' },
-  { id: 'almoco', label: 'Almoço', short: 'Almoço', icon: '🍽️', color: '#10b981' },
-  { id: 'lanche', label: 'Lanche', short: 'Lanche', icon: '🥗', color: '#6366f1' },
-  { id: 'janta', label: 'Janta', short: 'Janta', icon: '🌙', color: '#ec4899' },
+  { id: 'cafe_manha', label: 'Café da Manhã', short: 'Café', icon: '☀️', color: '#e8a040' },
+  { id: 'almoco', label: 'Almoço', short: 'Almoço', icon: '🍽️', color: '#2ab8b8' },
+  { id: 'lanche', label: 'Lanche', short: 'Lanche', icon: '🥗', color: '#c8873a' },
+  { id: 'janta', label: 'Janta', short: 'Janta', icon: '🌙', color: '#e07060' },
   { id: 'extra', label: 'Refeição Extra', short: 'Extra', icon: '⚡', color: '#8b5cf6' },
 ]
 
 const ACTIVITIES = [
-  { id: 'musculacao', label: 'Musculação', icon: '🏋️', color: '#6366f1', type: 'strength' },
-  { id: 'futsal', label: 'Futsal', icon: '⚽', color: '#10b981', type: 'cardio' },
-  { id: 'futebol', label: 'Futebol', icon: '⚽', color: '#10b981', type: 'cardio' },
-  { id: 'tenis', label: 'Tênis', icon: '🎾', color: '#f59e0b', type: 'cardio' },
-  { id: 'volei', label: 'Vôlei', icon: '🏐', color: '#ec4899', type: 'cardio' },
+  { id: 'musculacao', label: 'Musculação', icon: '🏋️', color: '#c8873a', type: 'strength' },
+  { id: 'futsal', label: 'Futsal', icon: '⚽', color: '#2ab8b8', type: 'cardio' },
+  { id: 'futebol', label: 'Futebol', icon: '⚽', color: '#2ab8b8', type: 'cardio' },
+  { id: 'tenis', label: 'Tênis', icon: '🎾', color: '#e8a040', type: 'cardio' },
+  { id: 'volei', label: 'Vôlei', icon: '🏐', color: '#e07060', type: 'cardio' },
   { id: 'corrida', label: 'Corrida', icon: '🏃', color: '#ef4444', type: 'cardio' },
   { id: 'natacao', label: 'Natação', icon: '🏊', color: '#0ea5e9', type: 'cardio' },
   { id: 'ciclismo', label: 'Ciclismo', icon: '🚴', color: '#8b5cf6', type: 'cardio' },
@@ -92,9 +92,9 @@ function calcMacros(items, allFoods) {
   }, { cal: 0, prot: 0, carb: 0, fat: 0 })
 }
 
-function farolCal(c, t) { return c <= t.cal ? '#10b981' : c <= t.max ? '#f59e0b' : '#ef4444' }
-function farolProt(p, t) { return (p >= (t.protMin || 138) && p <= (t.protMax || 163)) ? '#10b981' : '#ef4444' }
-function farolFat(f, t) { return f <= t.fat ? '#10b981' : f <= (t.fatMax || 52) ? '#f59e0b' : '#ef4444' }
+function farolCal(c, t) { return c <= t.cal ? '#2ab8b8' : c <= t.max ? '#e8a040' : '#ef4444' }
+function farolProt(p, t) { return (p >= (t.protMin || 138) && p <= (t.protMax || 163)) ? '#2ab8b8' : '#ef4444' }
+function farolFat(f, t) { return f <= t.fat ? '#2ab8b8' : f <= (t.fatMax || 52) ? '#e8a040' : '#ef4444' }
 
 async function loadFromFirebase(uid) {
   try {
@@ -216,7 +216,12 @@ export default function App() {
   }
 
   if (!loaded) {
-    return <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0c0c10', color: '#6366f1', fontFamily: 'JetBrains Mono, monospace', fontSize: 13 }}>Carregando...</div>
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#0d1a1f', gap: 24 }}>
+        <img src="/icon-512.png" alt="EvoShape" style={{ width: 140, height: 140, borderRadius: 32, boxShadow: '0 0 60px #c8873a40, 0 0 120px #2ab8b820' }} />
+        <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, letterSpacing: 4, color: '#7a9aa8', textTransform: 'uppercase' }}>Carregando...</div>
+      </div>
+    )
   }
 
   if (!uid) return <LoginScreen />
@@ -234,58 +239,61 @@ export default function App() {
   const over = dayMacros.cal > targets.max
   const inRange = dayMacros.cal >= targets.min && dayMacros.cal <= targets.max
   const calPct = Math.min(100, (dayMacros.cal / targets.max) * 100)
-  const calBarColor = over ? '#ef4444' : inRange ? '#10b981' : '#6366f1'
+  const calBarColor = over ? '#e05555' : inRange ? '#2ab8b8' : '#c8873a'
   const calDiff = targets.cal - dayMacros.cal
   const hasData = dayMacros.cal > 0
 
   return (
-    <div style={{ background: '#0c0c10', minHeight: '100vh', fontFamily: "'Syne', system-ui, sans-serif", color: '#ededf5' }}>
+    <div style={{ background: '#0d1a1f', minHeight: '100vh', fontFamily: "'Syne', system-ui, sans-serif", color: '#f0e8d8' }}>
       <div style={{ maxWidth: 480, margin: '0 auto', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ background: '#13131f', borderBottom: '1px solid #1e1e30', padding: '20px 16px 0', flexShrink: 0 }}>
+        <div style={{ background: '#122028', borderBottom: '1px solid #1e1e30', padding: '20px 16px 0', flexShrink: 0 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
             <div>
-              <div style={{ fontSize: 10, letterSpacing: 2, color: '#55557a', fontFamily: 'JetBrains Mono, monospace', textTransform: 'uppercase' }}>EVOSHAPE</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                <img src="/icon-512.png" alt="" style={{ width: 22, height: 22, borderRadius: 6 }} />
+                <div style={{ fontSize: 10, letterSpacing: 2, color: '#c8873a', fontFamily: 'JetBrains Mono, monospace', textTransform: 'uppercase', fontWeight: 700 }}>EVOSHAPE</div>
+              </div>
               <div style={{ fontSize: 18, fontWeight: 800, marginTop: 3 }}>{headerDate}</div>
-              <div style={{ display: 'inline-block', marginTop: 5, padding: '2px 10px', borderRadius: 20, fontSize: 11, fontWeight: 500, background: !isToday ? '#92400e22' : over ? '#ef444422' : inRange && hasData ? '#10b98122' : '#1e1e30', color: !isToday ? '#f59e0b' : over ? '#ef4444' : inRange && hasData ? '#10b981' : '#8888aa' }}>
+              <div style={{ display: 'inline-block', marginTop: 5, padding: '2px 10px', borderRadius: 20, fontSize: 11, fontWeight: 500, background: !isToday ? '#92400e22' : over ? '#ef444422' : inRange && hasData ? '#2ab8b822' : '#1a2d35', color: !isToday ? '#e8a040' : over ? '#ef4444' : inRange && hasData ? '#2ab8b8' : '#6a8a98' }}>
                 {!isToday ? 'Editando dia anterior' : over ? 'Excesso' : inRange && hasData ? '✓ Na meta' : '—'}
               </div>
             </div>
-            <button onClick={() => setShowTargets(true)} style={{ background: '#1e1e30', border: '1px solid #2a2a40', borderRadius: 10, padding: '7px 10px', color: '#8888aa', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>⚙ Metas</button>
+            <button onClick={() => setShowTargets(true)} style={{ background: '#1a2d35', border: '1px solid #2a2a40', borderRadius: 10, padding: '7px 10px', color: '#6a8a98', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>⚙ Metas</button>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, padding: '5px 8px', background: '#0c0c10', borderRadius: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, padding: '5px 8px', background: '#0d1a1f', borderRadius: 8 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
               {user?.photoURL && <img src={user.photoURL} alt="" style={{ width: 20, height: 20, borderRadius: '50%' }} />}
-              <span style={{ fontSize: 11, color: '#55557a' }}>{user?.displayName || user?.email || 'Usuário'}</span>
+              <span style={{ fontSize: 11, color: '#7a9aa8' }}>{user?.displayName || user?.email || 'Usuário'}</span>
             </div>
-            <button onClick={() => logout()} style={{ background: 'none', border: 'none', color: '#55557a', fontSize: 11, cursor: 'pointer', fontFamily: 'inherit' }}>Sair</button>
+            <button onClick={() => logout()} style={{ background: 'none', border: 'none', color: '#7a9aa8', fontSize: 11, cursor: 'pointer', fontFamily: 'inherit' }}>Sair</button>
           </div>
-          <div style={{ background: '#0c0c10', borderRadius: 14, padding: 14 }}>
+          <div style={{ background: '#0d1a1f', borderRadius: 14, padding: 14 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 30, fontWeight: 800, fontFamily: 'JetBrains Mono, monospace', color: '#ededf5' }}>{r0(dayMacros.cal)}</span>
-                <span style={{ fontSize: 12, color: '#55557a' }}>/ {targets.cal} kcal</span>
+                <span style={{ fontSize: 30, fontWeight: 800, fontFamily: 'JetBrains Mono, monospace', color: '#f0e8d8' }}>{r0(dayMacros.cal)}</span>
+                <span style={{ fontSize: 12, color: '#7a9aa8' }}>/ {targets.cal} kcal</span>
                 {hasData && <span style={{ width: 8, height: 8, borderRadius: '50%', background: farolCal(dayMacros.cal, targets), display: 'inline-block' }} />}
               </div>
-              <span style={{ fontSize: 11, fontFamily: 'JetBrains Mono, monospace', color: over ? '#ef4444' : inRange ? '#10b981' : '#55557a' }}>
+              <span style={{ fontSize: 11, fontFamily: 'JetBrains Mono, monospace', color: over ? '#ef4444' : inRange ? '#2ab8b8' : '#7a9aa8' }}>
                 {calDiff >= 0 ? `−${r0(calDiff)}` : `+${r0(-calDiff)}`} kcal
               </span>
             </div>
-            <div style={{ background: '#1e1e30', borderRadius: 4, height: 8, overflow: 'hidden', marginBottom: 12 }}>
+            <div style={{ background: '#1a2d35', borderRadius: 4, height: 8, overflow: 'hidden', marginBottom: 12 }}>
               <div style={{ height: '100%', width: calPct + '%', background: calBarColor, borderRadius: 4, transition: 'width .5s' }} />
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
               {[
-                { label: 'Proteína', val: dayMacros.prot, target: targets.prot, color: '#10b981', farol: hasData ? farolProt(dayMacros.prot, targets) : null },
-                { label: 'Carb', val: dayMacros.carb, target: targets.carb, color: '#f59e0b', farol: null },
-                { label: 'Gordura', val: dayMacros.fat, target: targets.fat, color: '#ec4899', farol: hasData ? farolFat(dayMacros.fat, targets) : null },
+                { label: 'Proteína', val: dayMacros.prot, target: targets.prot, color: '#2ab8b8', farol: hasData ? farolProt(dayMacros.prot, targets) : null },
+                { label: 'Carb', val: dayMacros.carb, target: targets.carb, color: '#e8a040', farol: null },
+                { label: 'Gordura', val: dayMacros.fat, target: targets.fat, color: '#e07060', farol: hasData ? farolFat(dayMacros.fat, targets) : null },
               ].map(m => (
-                <div key={m.label} style={{ background: '#13131f', borderRadius: 10, padding: '8px 10px', position: 'relative' }}>
+                <div key={m.label} style={{ background: '#122028', borderRadius: 10, padding: '8px 10px', position: 'relative' }}>
                   {m.farol && <span style={{ position: 'absolute', top: 8, right: 8, width: 7, height: 7, borderRadius: '50%', background: m.farol }} />}
-                  <div style={{ fontSize: 9, color: '#55557a', fontFamily: 'JetBrains Mono, monospace', textTransform: 'uppercase', letterSpacing: 1 }}>{m.label}</div>
+                  <div style={{ fontSize: 9, color: '#7a9aa8', fontFamily: 'JetBrains Mono, monospace', textTransform: 'uppercase', letterSpacing: 1 }}>{m.label}</div>
                   <div style={{ fontSize: 13, fontWeight: 700, color: m.color, marginTop: 3, fontFamily: 'JetBrains Mono, monospace' }}>
-                    {r(m.val)}<span style={{ fontSize: 9, color: '#55557a' }}>/{m.target}g</span>
+                    {r(m.val)}<span style={{ fontSize: 9, color: '#7a9aa8' }}>/{m.target}g</span>
                   </div>
-                  <div style={{ background: '#1e1e30', borderRadius: 3, height: 4, marginTop: 5, overflow: 'hidden' }}>
+                  <div style={{ background: '#1a2d35', borderRadius: 3, height: 4, marginTop: 5, overflow: 'hidden' }}>
                     <div style={{ height: '100%', width: Math.min(100, (m.val / m.target) * 100) + '%', background: m.color, transition: 'width .4s' }} />
                   </div>
                 </div>
@@ -302,7 +310,7 @@ export default function App() {
               { id: 'foods', label: 'Alimentos', icon: '🥗' },
             ].map(t => (
               <button key={t.id} onClick={() => { setTab(t.id); setEditingDay(null); setAddingFood(false); setSearch(''); setRegisterMode(false) }}
-                style={{ flex: 1, minWidth: 52, padding: '8px 0', border: 'none', background: 'transparent', color: tab === t.id ? '#ededf5' : '#55557a', fontWeight: tab === t.id ? 700 : 500, fontSize: 10, cursor: 'pointer', fontFamily: 'inherit', borderBottom: `2px solid ${tab === t.id ? '#6366f1' : 'transparent'}`, transition: 'all .2s', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                style={{ flex: 1, minWidth: 52, padding: '8px 0', border: 'none', background: 'transparent', color: tab === t.id ? '#f0e8d8' : '#6a8a98', fontWeight: tab === t.id ? 700 : 500, fontSize: 10, cursor: 'pointer', fontFamily: 'inherit', borderBottom: `2px solid ${tab === t.id ? '#c8873a' : 'transparent'}`, transition: 'all .2s', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
                 <span style={{ fontSize: 16 }}>{t.icon}</span>
                 <span>{t.label}</span>
               </button>
@@ -334,7 +342,7 @@ export default function App() {
     return (
       <div>
         {isEditing && (
-          <button onClick={() => { setEditingDay(null); setTab('history') }} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', color: '#8888aa', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', padding: 0, marginBottom: 14 }}>
+          <button onClick={() => { setEditingDay(null); setTab('history') }} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', color: '#6a8a98', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', padding: 0, marginBottom: 14 }}>
             ← Voltar ao histórico
           </button>
         )}
@@ -344,65 +352,65 @@ export default function App() {
             const active = activeMeal === m.id
             return (
               <button key={m.id} onClick={() => { setActiveMeal(m.id); setAddingFood(false); setSearch('') }}
-                style={{ flexShrink: 0, minWidth: 68, padding: '8px 6px', border: `2px solid ${active ? m.color : '#1e1e30'}`, borderRadius: 12, background: active ? m.color + '18' : '#13131f', cursor: 'pointer', textAlign: 'center', fontFamily: 'inherit' }}>
+                style={{ flexShrink: 0, minWidth: 68, padding: '8px 6px', border: `2px solid ${active ? m.color : '#1a2d35'}`, borderRadius: 12, background: active ? m.color + '18' : '#122028', cursor: 'pointer', textAlign: 'center', fontFamily: 'inherit' }}>
                 <div style={{ fontSize: 16 }}>{m.icon}</div>
-                <div style={{ fontSize: 9, fontWeight: 700, marginTop: 2, color: active ? m.color : '#8888aa' }}>{m.short}</div>
-                <div style={{ fontSize: 10, color: '#55557a', fontFamily: 'JetBrains Mono, monospace' }}>{r0(mac.cal)}</div>
+                <div style={{ fontSize: 9, fontWeight: 700, marginTop: 2, color: active ? m.color : '#6a8a98' }}>{m.short}</div>
+                <div style={{ fontSize: 10, color: '#7a9aa8', fontFamily: 'JetBrains Mono, monospace' }}>{r0(mac.cal)}</div>
               </button>
             )
           })}
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
           <div style={{ fontSize: 15, fontWeight: 700, color: meal.color }}>{meal.icon} {meal.label}</div>
-          <div style={{ fontSize: 10, color: '#55557a', fontFamily: 'JetBrains Mono, monospace' }}>{r0(mealMacros.cal)} kcal · P:{r(mealMacros.prot)} · C:{r(mealMacros.carb)} · G:{r(mealMacros.fat)}</div>
+          <div style={{ fontSize: 10, color: '#7a9aa8', fontFamily: 'JetBrains Mono, monospace' }}>{r0(mealMacros.cal)} kcal · P:{r(mealMacros.prot)} · C:{r(mealMacros.carb)} · G:{r(mealMacros.fat)}</div>
         </div>
-        {items.length === 0 && !addingFood && <div style={{ textAlign: 'center', padding: '20px 0', color: '#3a3a5a', fontSize: 13 }}>Nenhum alimento registrado</div>}
+        {items.length === 0 && !addingFood && <div style={{ textAlign: 'center', padding: '20px 0', color: '#2d4a58', fontSize: 13 }}>Nenhum alimento registrado</div>}
         {items.map((it, idx) => {
           const f = allFoods.find(x => x.id === it.id)
           if (!f) return null
           const fixed = ['unid','dose','porção'].includes(f.unit)
           const m = fixed ? it.qty : it.qty / 100
           return (
-            <div key={idx} style={{ background: '#13131f', borderRadius: 12, padding: '10px 12px', marginBottom: 7, display: 'flex', alignItems: 'center', gap: 8, border: '0.5px solid #1e1e30' }}>
+            <div key={idx} style={{ background: '#122028', borderRadius: 12, padding: '10px 12px', marginBottom: 7, display: 'flex', alignItems: 'center', gap: 8, border: '0.5px solid #1e1e30' }}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{f.name}</div>
-                <div style={{ fontSize: 11, color: '#55557a', fontFamily: 'JetBrains Mono, monospace', marginTop: 2 }}>{r0(f.cal * m)} kcal · P:{r(f.prot * m)}g · C:{r(f.carb * m)}g · G:{r(f.fat * m)}g</div>
+                <div style={{ fontSize: 11, color: '#7a9aa8', fontFamily: 'JetBrains Mono, monospace', marginTop: 2 }}>{r0(f.cal * m)} kcal · P:{r(f.prot * m)}g · C:{r(f.carb * m)}g · G:{r(f.fat * m)}g</div>
               </div>
               <input type="number" value={it.qty} onChange={e => updateQty(activeMeal, idx, e.target.value)}
-                style={{ width: 52, textAlign: 'center', fontFamily: 'JetBrains Mono, monospace', fontSize: 12, padding: '5px 4px', border: '0.5px solid #2a2a40', borderRadius: 8, background: '#1e1e30', color: '#ededf5' }} />
-              <span style={{ fontSize: 10, color: '#55557a', minWidth: 26 }}>{f.unit}</span>
+                style={{ width: 52, textAlign: 'center', fontFamily: 'JetBrains Mono, monospace', fontSize: 12, padding: '5px 4px', border: '0.5px solid #2a2a40', borderRadius: 8, background: '#1a2d35', color: '#f0e8d8' }} />
+              <span style={{ fontSize: 10, color: '#7a9aa8', minWidth: 26 }}>{f.unit}</span>
               <button onClick={() => removeFood(activeMeal, idx)} style={{ background: '#ef444420', border: 'none', borderRadius: 8, width: 28, height: 28, color: '#ef4444', cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>×</button>
             </div>
           )
         })}
         {!addingFood ? (
-          <button onClick={() => setAddingFood(true)} style={{ width: '100%', padding: 12, border: '1.5px dashed #2a2a40', borderRadius: 12, background: 'transparent', color: '#55557a', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', marginTop: 4 }}>
+          <button onClick={() => setAddingFood(true)} style={{ width: '100%', padding: 12, border: '1.5px dashed #2a2a40', borderRadius: 12, background: 'transparent', color: '#7a9aa8', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', marginTop: 4 }}>
             + Adicionar alimento
           </button>
         ) : (
-          <div style={{ background: '#13131f', borderRadius: 14, padding: 14, border: '0.5px solid #2a2a40', marginTop: 8 }}>
+          <div style={{ background: '#122028', borderRadius: 14, padding: 14, border: '0.5px solid #2a2a40', marginTop: 8 }}>
             <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
               <input autoFocus value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar alimento..."
-                style={{ flex: 1, background: '#1e1e30', border: '0.5px solid #2a2a40', borderRadius: 10, padding: '10px 12px', color: '#ededf5', fontSize: 14, fontFamily: 'inherit' }} />
-              <button onClick={() => { setAddingFood(false); setSearch('') }} style={{ background: '#1e1e30', border: 'none', borderRadius: 10, padding: '0 12px', color: '#8888aa', cursor: 'pointer', fontSize: 18 }}>✕</button>
+                style={{ flex: 1, background: '#1a2d35', border: '0.5px solid #2a2a40', borderRadius: 10, padding: '10px 12px', color: '#f0e8d8', fontSize: 14, fontFamily: 'inherit' }} />
+              <button onClick={() => { setAddingFood(false); setSearch('') }} style={{ background: '#1a2d35', border: 'none', borderRadius: 10, padding: '0 12px', color: '#6a8a98', cursor: 'pointer', fontSize: 18 }}>✕</button>
             </div>
             <div style={{ maxHeight: 320, overflowY: 'auto' }}>
               {!search && favFoods.length > 0 && (<>
-                <div style={{ fontSize: 10, fontWeight: 700, color: '#55557a', textTransform: 'uppercase', letterSpacing: 1, margin: '4px 0 8px', fontFamily: 'JetBrains Mono, monospace' }}>⭐ Favoritos desta refeição</div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: '#7a9aa8', textTransform: 'uppercase', letterSpacing: 1, margin: '4px 0 8px', fontFamily: 'JetBrains Mono, monospace' }}>⭐ Favoritos desta refeição</div>
                 {favFoods.map(f => <FoodRow key={f.id} food={f} onAdd={addFoodToMeal} mealId={activeMeal} />)}
-                <div style={{ fontSize: 10, fontWeight: 700, color: '#55557a', textTransform: 'uppercase', letterSpacing: 1, margin: '12px 0 8px', fontFamily: 'JetBrains Mono, monospace' }}>Todos os alimentos</div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: '#7a9aa8', textTransform: 'uppercase', letterSpacing: 1, margin: '12px 0 8px', fontFamily: 'JetBrains Mono, monospace' }}>Todos os alimentos</div>
                 {otherFoods.map(f => <FoodRow key={f.id} food={f} onAdd={addFoodToMeal} mealId={activeMeal} />)}
               </>)}
               {!search && favFoods.length === 0 && allFoods.map(f => <FoodRow key={f.id} food={f} onAdd={addFoodToMeal} mealId={activeMeal} />)}
               {search && (filtered.length > 0
                 ? filtered.map(f => <FoodRow key={f.id} food={f} onAdd={addFoodToMeal} mealId={activeMeal} />)
-                : <div style={{ padding: '20px', textAlign: 'center', color: '#3a3a5a', fontSize: 13 }}>Nenhum resultado</div>
+                : <div style={{ padding: '20px', textAlign: 'center', color: '#2d4a58', fontSize: 13 }}>Nenhum resultado</div>
               )}
             </div>
           </div>
         )}
-        <div style={{ marginTop: 16, background: '#13131f', borderRadius: 14, padding: 14, border: '0.5px solid #1e1e30' }}>
-          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10, color: '#6366f1' }}>💪 Atividades do dia</div>
+        <div style={{ marginTop: 16, background: '#122028', borderRadius: 14, padding: 14, border: '0.5px solid #1e1e30' }}>
+          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10, color: '#c8873a' }}>💪 Atividades do dia</div>
           {(currentDay.activities || []).length > 0 && (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
               {(currentDay.activities || []).map(actId => {
@@ -418,15 +426,15 @@ export default function App() {
               })}
             </div>
           )}
-          {(currentDay.activities || []).length === 0 && <div style={{ fontSize: 12, color: '#3a3a5a', marginBottom: 10 }}>Nenhuma atividade registrada</div>}
+          {(currentDay.activities || []).length === 0 && <div style={{ fontSize: 12, color: '#2d4a58', marginBottom: 10 }}>Nenhuma atividade registrada</div>}
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
             {ACTIVITIES.map(act => {
               const done = (currentDay.activities || []).includes(act.id)
               return (
                 <button key={act.id} onClick={() => addActivityToDay(act.id)} disabled={done}
-                  style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', border: `1px solid ${done ? act.color : '#2a2a40'}`, borderRadius: 20, background: done ? act.color + '20' : 'transparent', cursor: done ? 'default' : 'pointer', fontFamily: 'inherit' }}>
+                  style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', border: `1px solid ${done ? act.color : '#1e3540'}`, borderRadius: 20, background: done ? act.color + '20' : 'transparent', cursor: done ? 'default' : 'pointer', fontFamily: 'inherit' }}>
                   <span style={{ fontSize: 12 }}>{act.icon}</span>
-                  <span style={{ fontSize: 10, color: done ? act.color : '#8888aa', fontWeight: done ? 700 : 400 }}>{act.label}</span>
+                  <span style={{ fontSize: 10, color: done ? act.color : '#6a8a98', fontWeight: done ? 700 : 400 }}>{act.label}</span>
                 </button>
               )
             })}
@@ -441,7 +449,7 @@ export default function App() {
     return (
       <div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-          <div style={{ fontSize: 11, color: '#55557a' }}>{entries.length} dias · Toque para editar</div>
+          <div style={{ fontSize: 11, color: '#7a9aa8' }}>{entries.length} dias · Toque para editar</div>
           <button onClick={() => {
             const input = document.createElement('input')
             input.type = 'date'
@@ -462,12 +470,12 @@ export default function App() {
               try { document.body.removeChild(input) } catch(e) {}
             })
             input.addEventListener('blur', () => { try { document.body.removeChild(input) } catch(e){} })
-          }} style={{ background: '#6366f1', border: 'none', borderRadius: 10, padding: '6px 12px', color: '#fff', fontSize: 11, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700 }}>
+          }} style={{ background: 'linear-gradient(135deg, #c8873a, #e8a040)', border: 'none', borderRadius: 10, padding: '6px 12px', color: '#fff', fontSize: 11, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700 }}>
             + Dia anterior
           </button>
         </div>
         {entries.length === 0 && (
-          <div style={{ textAlign: 'center', padding: '32px 0', color: '#3a3a5a', fontSize: 13 }}>
+          <div style={{ textAlign: 'center', padding: '32px 0', color: '#2d4a58', fontSize: 13 }}>
             <div style={{ fontSize: 32, marginBottom: 8 }}>📅</div>
             Nenhum dia registrado. Clique em "+ Dia anterior"!
           </div>
@@ -477,31 +485,31 @@ export default function App() {
           const all = Object.values(data.meals || {}).flat()
           const mac = calcMacros(all, allFoods)
           const ov = mac.cal > targets.max, ok = mac.cal >= targets.min && mac.cal <= targets.max
-          const col = ov ? '#ef4444' : ok ? '#10b981' : '#f59e0b'
+          const col = ov ? '#ef4444' : ok ? '#2ab8b8' : '#e8a040'
           const lbl = ov ? 'Excesso' : ok ? '✓ Na meta' : 'Abaixo'
           const acts = data.activities || []
           return (
             <div key={day} onClick={() => { setEditingDay(day); setActiveMeal('cafe_manha'); setAddingFood(false); setSearch('') }}
-              style={{ background: '#13131f', borderRadius: 12, padding: '12px 14px', marginBottom: 8, border: '0.5px solid #1e1e30', cursor: 'pointer' }}>
+              style={{ background: '#122028', borderRadius: 12, padding: '12px 14px', marginBottom: 8, border: '0.5px solid #1e1e30', cursor: 'pointer' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 7 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <div style={{ fontSize: 14, fontWeight: 600 }}>{formatDateFull(day)}</div>
-                  {isTod && <span style={{ fontSize: 10, background: '#6366f120', color: '#6366f1', padding: '1px 7px', borderRadius: 10 }}>hoje</span>}
+                  {isTod && <span style={{ fontSize: 10, background: '#c8873a20', color: '#c8873a', padding: '1px 7px', borderRadius: 10 }}>hoje</span>}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   {acts.length > 0 && <span style={{ fontSize: 11 }}>{acts.slice(0,2).map(id => ACTIVITIES.find(a=>a.id===id)?.icon || '').join('')}</span>}
                   <span style={{ fontSize: 11, fontWeight: 700, color: col, fontFamily: 'JetBrains Mono, monospace' }}>{lbl}</span>
-                  <span style={{ fontSize: 13, color: '#55557a' }}>✏️</span>
+                  <span style={{ fontSize: 13, color: '#7a9aa8' }}>✏️</span>
                 </div>
               </div>
-              <div style={{ background: '#1e1e30', borderRadius: 4, height: 6, marginBottom: 7, overflow: 'hidden' }}>
+              <div style={{ background: '#1a2d35', borderRadius: 4, height: 6, marginBottom: 7, overflow: 'hidden' }}>
                 <div style={{ height: '100%', width: Math.min(110, (mac.cal / targets.cal) * 100) + '%', background: col, borderRadius: 4 }} />
               </div>
               <div style={{ display: 'flex', gap: 12, fontSize: 11, fontFamily: 'JetBrains Mono, monospace' }}>
                 <span style={{ fontWeight: 700 }}>{r0(mac.cal)} kcal</span>
-                <span style={{ color: '#10b981' }}>P:{r(mac.prot)}g</span>
-                <span style={{ color: '#f59e0b' }}>C:{r(mac.carb)}g</span>
-                <span style={{ color: '#ec4899' }}>G:{r(mac.fat)}g</span>
+                <span style={{ color: '#2ab8b8' }}>P:{r(mac.prot)}g</span>
+                <span style={{ color: '#e8a040' }}>C:{r(mac.carb)}g</span>
+                <span style={{ color: '#e07060' }}>G:{r(mac.fat)}g</span>
               </div>
             </div>
           )
@@ -528,34 +536,34 @@ export default function App() {
     }
     const weekStrength = weekDays.filter(wd => (days[wd]?.activities || []).some(a => ACTIVITIES.find(x => x.id === a)?.type === 'strength')).length
     const weekCardio = weekDays.filter(wd => (days[wd]?.activities || []).some(a => ACTIVITIES.find(x => x.id === a)?.type === 'cardio')).length
-    const strengthFarol = weekStrength >= 4 ? '#10b981' : weekStrength === 3 ? '#f59e0b' : '#ef4444'
-    const cardioFarol = weekCardio >= 1 ? '#10b981' : '#ef4444'
+    const strengthFarol = weekStrength >= 4 ? '#2ab8b8' : weekStrength === 3 ? '#e8a040' : '#ef4444'
+    const cardioFarol = weekCardio >= 1 ? '#2ab8b8' : '#ef4444'
     return (
       <div>
-        <div style={{ background: '#13131f', borderRadius: 14, padding: 14, marginBottom: 14, border: '0.5px solid #1e1e30' }}>
+        <div style={{ background: '#122028', borderRadius: 14, padding: 14, marginBottom: 14, border: '0.5px solid #1e1e30' }}>
           <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12 }}>📅 Semana atual</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-            <div style={{ background: '#0c0c10', borderRadius: 10, padding: '10px 12px' }}>
+            <div style={{ background: '#0d1a1f', borderRadius: 10, padding: '10px 12px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                 <span style={{ width: 8, height: 8, borderRadius: '50%', background: strengthFarol, display: 'inline-block' }} />
-                <span style={{ fontSize: 11, color: '#8888aa' }}>Musculação</span>
+                <span style={{ fontSize: 11, color: '#6a8a98' }}>Musculação</span>
               </div>
-              <div style={{ fontSize: 22, fontWeight: 800, color: strengthFarol, fontFamily: 'JetBrains Mono, monospace' }}>{weekStrength}<span style={{ fontSize: 12, color: '#55557a', fontWeight: 400 }}>/4x</span></div>
-              <div style={{ fontSize: 10, color: '#55557a', marginTop: 2 }}>{weekStrength >= 4 ? 'Meta atingida! ✓' : weekStrength === 3 ? 'Quase lá!' : 'Abaixo da meta'}</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: strengthFarol, fontFamily: 'JetBrains Mono, monospace' }}>{weekStrength}<span style={{ fontSize: 12, color: '#7a9aa8', fontWeight: 400 }}>/4x</span></div>
+              <div style={{ fontSize: 10, color: '#7a9aa8', marginTop: 2 }}>{weekStrength >= 4 ? 'Meta atingida! ✓' : weekStrength === 3 ? 'Quase lá!' : 'Abaixo da meta'}</div>
             </div>
-            <div style={{ background: '#0c0c10', borderRadius: 10, padding: '10px 12px' }}>
+            <div style={{ background: '#0d1a1f', borderRadius: 10, padding: '10px 12px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                 <span style={{ width: 8, height: 8, borderRadius: '50%', background: cardioFarol, display: 'inline-block' }} />
-                <span style={{ fontSize: 11, color: '#8888aa' }}>Cardio</span>
+                <span style={{ fontSize: 11, color: '#6a8a98' }}>Cardio</span>
               </div>
-              <div style={{ fontSize: 22, fontWeight: 800, color: cardioFarol, fontFamily: 'JetBrains Mono, monospace' }}>{weekCardio}<span style={{ fontSize: 12, color: '#55557a', fontWeight: 400 }}>/1x</span></div>
-              <div style={{ fontSize: 10, color: '#55557a', marginTop: 2 }}>{weekCardio >= 1 ? 'Meta atingida! ✓' : 'Sem cardio essa semana'}</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: cardioFarol, fontFamily: 'JetBrains Mono, monospace' }}>{weekCardio}<span style={{ fontSize: 12, color: '#7a9aa8', fontWeight: 400 }}>/1x</span></div>
+              <div style={{ fontSize: 10, color: '#7a9aa8', marginTop: 2 }}>{weekCardio >= 1 ? 'Meta atingida! ✓' : 'Sem cardio essa semana'}</div>
             </div>
           </div>
         </div>
-        <div style={{ background: '#13131f', borderRadius: 14, padding: 14, border: '0.5px solid #1e1e30' }}>
+        <div style={{ background: '#122028', borderRadius: 14, padding: 14, border: '0.5px solid #1e1e30' }}>
           <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>🏋️ Atividades de hoje</div>
-          {todayActivities.length === 0 && <div style={{ fontSize: 12, color: '#3a3a5a', marginBottom: 10 }}>Nenhuma atividade registrada</div>}
+          {todayActivities.length === 0 && <div style={{ fontSize: 12, color: '#2d4a58', marginBottom: 10 }}>Nenhuma atividade registrada</div>}
           {todayActivities.length > 0 && (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
               {todayActivities.map(actId => {
@@ -571,15 +579,15 @@ export default function App() {
               })}
             </div>
           )}
-          <div style={{ fontSize: 11, color: '#55557a', marginBottom: 8, fontWeight: 600 }}>Adicionar atividade:</div>
+          <div style={{ fontSize: 11, color: '#7a9aa8', marginBottom: 8, fontWeight: 600 }}>Adicionar atividade:</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
             {ACTIVITIES.map(act => {
               const done = todayActivities.includes(act.id)
               return (
                 <button key={act.id} onClick={() => addActivityToDay(act.id)} disabled={done}
-                  style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', border: `1px solid ${done ? act.color : '#2a2a40'}`, borderRadius: 20, background: done ? act.color + '20' : 'transparent', cursor: done ? 'default' : 'pointer', fontFamily: 'inherit' }}>
+                  style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', border: `1px solid ${done ? act.color : '#1e3540'}`, borderRadius: 20, background: done ? act.color + '20' : 'transparent', cursor: done ? 'default' : 'pointer', fontFamily: 'inherit' }}>
                   <span style={{ fontSize: 13 }}>{act.icon}</span>
-                  <span style={{ fontSize: 11, color: done ? act.color : '#8888aa', fontWeight: done ? 700 : 400 }}>{act.label}</span>
+                  <span style={{ fontSize: 11, color: done ? act.color : '#6a8a98', fontWeight: done ? 700 : 400 }}>{act.label}</span>
                 </button>
               )
             })}
@@ -598,18 +606,18 @@ export default function App() {
     const wVals = chartEntries.map(([, v]) => v)
     return (
       <div>
-        <div style={{ background: '#13131f', borderRadius: 14, padding: 16, marginBottom: 14, border: '0.5px solid #1e1e30' }}>
+        <div style={{ background: '#122028', borderRadius: 14, padding: 16, marginBottom: 14, border: '0.5px solid #1e1e30' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
             <div style={{ fontSize: 13, fontWeight: 700 }}>⚖️ Peso Corporal</div>
-            <button onClick={() => setShowWeightModal(true)} style={{ background: '#6366f1', border: 'none', borderRadius: 10, padding: '7px 14px', color: '#fff', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700 }}>+ Registrar</button>
+            <button onClick={() => setShowWeightModal(true)} style={{ background: '#c8873a', border: 'none', borderRadius: 10, padding: '7px 14px', color: '#fff', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700 }}>+ Registrar</button>
           </div>
           {latestWeight ? (
             <>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 4 }}>
-                <span style={{ fontSize: 40, fontWeight: 800, fontFamily: 'JetBrains Mono, monospace', color: '#ededf5' }}>{latestWeight}</span>
-                <span style={{ fontSize: 16, color: '#55557a' }}>kg</span>
+                <span style={{ fontSize: 40, fontWeight: 800, fontFamily: 'JetBrains Mono, monospace', color: '#f0e8d8' }}>{latestWeight}</span>
+                <span style={{ fontSize: 16, color: '#7a9aa8' }}>kg</span>
                 {weightDiff !== null && (
-                  <span style={{ fontSize: 13, fontWeight: 700, color: parseFloat(weightDiff) < 0 ? '#10b981' : parseFloat(weightDiff) > 0 ? '#ef4444' : '#55557a' }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: parseFloat(weightDiff) < 0 ? '#2ab8b8' : parseFloat(weightDiff) > 0 ? '#ef4444' : '#7a9aa8' }}>
                     {parseFloat(weightDiff) > 0 ? '+' : ''}{weightDiff} kg
                   </span>
                 )}
@@ -620,18 +628,18 @@ export default function App() {
                 const diff = (last - first).toFixed(1)
                 return (
                   <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-                    <div style={{ flex: 1, background: '#0c0c10', borderRadius: 10, padding: '8px 10px', textAlign: 'center' }}>
-                      <div style={{ fontSize: 9, color: '#55557a', marginBottom: 3 }}>INICIAL</div>
+                    <div style={{ flex: 1, background: '#0d1a1f', borderRadius: 10, padding: '8px 10px', textAlign: 'center' }}>
+                      <div style={{ fontSize: 9, color: '#7a9aa8', marginBottom: 3 }}>INICIAL</div>
                       <div style={{ fontSize: 16, fontWeight: 700, fontFamily: 'JetBrains Mono, monospace' }}>{first} kg</div>
                     </div>
-                    <div style={{ flex: 1, background: '#0c0c10', borderRadius: 10, padding: '8px 10px', textAlign: 'center' }}>
-                      <div style={{ fontSize: 9, color: '#55557a', marginBottom: 3 }}>VARIAÇÃO</div>
-                      <div style={{ fontSize: 16, fontWeight: 700, fontFamily: 'JetBrains Mono, monospace', color: parseFloat(diff) < 0 ? '#10b981' : parseFloat(diff) > 0 ? '#ef4444' : '#55557a' }}>
+                    <div style={{ flex: 1, background: '#0d1a1f', borderRadius: 10, padding: '8px 10px', textAlign: 'center' }}>
+                      <div style={{ fontSize: 9, color: '#7a9aa8', marginBottom: 3 }}>VARIAÇÃO</div>
+                      <div style={{ fontSize: 16, fontWeight: 700, fontFamily: 'JetBrains Mono, monospace', color: parseFloat(diff) < 0 ? '#2ab8b8' : parseFloat(diff) > 0 ? '#ef4444' : '#7a9aa8' }}>
                         {parseFloat(diff) > 0 ? '+' : ''}{diff} kg
                       </div>
                     </div>
-                    <div style={{ flex: 1, background: '#0c0c10', borderRadius: 10, padding: '8px 10px', textAlign: 'center' }}>
-                      <div style={{ fontSize: 9, color: '#55557a', marginBottom: 3 }}>REGISTROS</div>
+                    <div style={{ flex: 1, background: '#0d1a1f', borderRadius: 10, padding: '8px 10px', textAlign: 'center' }}>
+                      <div style={{ fontSize: 9, color: '#7a9aa8', marginBottom: 3 }}>REGISTROS</div>
                       <div style={{ fontSize: 16, fontWeight: 700, fontFamily: 'JetBrains Mono, monospace' }}>{weightEntries.length}x</div>
                     </div>
                   </div>
@@ -639,7 +647,7 @@ export default function App() {
               })()}
             </>
           ) : (
-            <div style={{ textAlign: 'center', padding: '20px 0', color: '#3a3a5a', fontSize: 13 }}>
+            <div style={{ textAlign: 'center', padding: '20px 0', color: '#2d4a58', fontSize: 13 }}>
               <div style={{ fontSize: 32, marginBottom: 8 }}>⚖️</div>
               Nenhum peso registrado ainda.<br />Registre toda segunda de manhã!
             </div>
@@ -652,9 +660,9 @@ export default function App() {
           const cx = i => PL + (i / Math.max(wVals.length - 1, 1)) * (W - PL - PR)
           const cy = v => PT + (1 - (v - minV) / (maxV - minV)) * (H - PT - PB)
           const pts = wVals.map((v, i) => `${cx(i)},${cy(v)}`).join(' ')
-          const trend = wVals[wVals.length - 1] < wVals[0] ? '#10b981' : '#ef4444'
+          const trend = wVals[wVals.length - 1] < wVals[0] ? '#2ab8b8' : '#ef4444'
           return (
-            <div style={{ background: '#13131f', borderRadius: 14, padding: 14, marginBottom: 14, border: '0.5px solid #1e1e30' }}>
+            <div style={{ background: '#122028', borderRadius: 14, padding: 14, marginBottom: 14, border: '0.5px solid #1e1e30' }}>
               <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 10 }}>📈 Evolução</div>
               <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: H }}>
                 <polyline points={pts} fill="none" stroke={trend} strokeWidth="2" strokeLinejoin="round" />
@@ -668,9 +676,9 @@ export default function App() {
             </div>
           )
         })()}
-        <div style={{ background: '#13131f', borderRadius: 14, padding: 14, border: '0.5px solid #1e1e30' }}>
+        <div style={{ background: '#122028', borderRadius: 14, padding: 14, border: '0.5px solid #1e1e30' }}>
           <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 12 }}>Histórico</div>
-          {weightEntries.length === 0 && <div style={{ textAlign: 'center', padding: '16px 0', color: '#3a3a5a', fontSize: 13 }}>Nenhum registro ainda</div>}
+          {weightEntries.length === 0 && <div style={{ textAlign: 'center', padding: '16px 0', color: '#2d4a58', fontSize: 13 }}>Nenhum registro ainda</div>}
           {weightEntries.map(([date, val], idx) => {
             const prev = weightEntries[idx + 1]?.[1]
             const diff = prev ? (val - prev).toFixed(1) : null
@@ -678,7 +686,7 @@ export default function App() {
               <div key={date} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: idx < weightEntries.length - 1 ? '0.5px solid #1e1e30' : 'none' }}>
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 500 }}>{formatDateFull(date)}</div>
-                  {diff !== null && <div style={{ fontSize: 11, color: parseFloat(diff) < 0 ? '#10b981' : parseFloat(diff) > 0 ? '#ef4444' : '#55557a', marginTop: 2 }}>{parseFloat(diff) > 0 ? '+' : ''}{diff} kg vs anterior</div>}
+                  {diff !== null && <div style={{ fontSize: 11, color: parseFloat(diff) < 0 ? '#2ab8b8' : parseFloat(diff) > 0 ? '#ef4444' : '#7a9aa8', marginTop: 2 }}>{parseFloat(diff) > 0 ? '+' : ''}{diff} kg vs anterior</div>}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span style={{ fontSize: 18, fontWeight: 800, fontFamily: 'JetBrains Mono, monospace' }}>{val} kg</span>
@@ -696,7 +704,7 @@ export default function App() {
   function renderAnalysis() {
     const allEntries = Object.entries(days).filter(([d]) => d !== todayKey()).sort(([a], [b]) => a.localeCompare(b))
     if (allEntries.length < 2) return (
-      <div style={{ textAlign: 'center', padding: '48px 20px', color: '#3a3a5a' }}>
+      <div style={{ textAlign: 'center', padding: '48px 20px', color: '#2d4a58' }}>
         <div style={{ fontSize: 32, marginBottom: 10 }}>📊</div>
         <div style={{ fontSize: 14 }}>Registre pelo menos 2 dias para ver as análises</div>
       </div>
@@ -743,7 +751,7 @@ export default function App() {
     const W = 340, H = 90, PL = 8, PR = 8, PT = 8, PB = 16
     const cx = i => PL + (i / Math.max(vals.length - 1, 1)) * (W - PL - PR)
     const cy = v => PT + (1 - v / maxV) * (H - PT - PB)
-    const pc = v => v > targets.max ? '#ef4444' : v < targets.min ? '#f59e0b' : '#10b981'
+    const pc = v => v > targets.max ? '#ef4444' : v < targets.min ? '#e8a040' : '#2ab8b8'
     const pts = vals.map((v, i) => `${cx(i)},${cy(v)}`).join(' ')
     const activeLabel = () => {
       const parts = []
@@ -761,14 +769,14 @@ export default function App() {
     ]
     return (
       <div>
-        <div style={{ background: '#13131f', borderRadius: 14, padding: 12, marginBottom: 14, border: '0.5px solid #1e1e30' }}>
-          <div style={{ fontSize: 11, color: '#55557a', marginBottom: 8, fontFamily: 'JetBrains Mono, monospace' }}>FILTROS — combine para comparar</div>
+        <div style={{ background: '#122028', borderRadius: 14, padding: 12, marginBottom: 14, border: '0.5px solid #1e1e30' }}>
+          <div style={{ fontSize: 11, color: '#7a9aa8', marginBottom: 8, fontFamily: 'JetBrains Mono, monospace' }}>FILTROS — combine para comparar</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
             {filterBtns.map(f => {
               const active = analysisFilters.includes(f.id)
               return (
                 <button key={f.id} onClick={() => toggleFilter(f.id)}
-                  style={{ padding: '6px 12px', borderRadius: 20, border: `1.5px solid ${active ? '#6366f1' : '#2a2a40'}`, background: active ? '#6366f120' : 'transparent', color: active ? '#6366f1' : '#8888aa', fontSize: 11, fontWeight: active ? 700 : 400, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
+                  style={{ padding: '6px 12px', borderRadius: 20, border: `1.5px solid ${active ? '#c8873a' : '#1e3540'}`, background: active ? '#c8873a20' : 'transparent', color: active ? '#c8873a' : '#6a8a98', fontSize: 11, fontWeight: active ? 700 : 400, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
                   {f.label}{active ? ' ✓' : ''}
                 </button>
               )
@@ -777,35 +785,35 @@ export default function App() {
               <button onClick={() => setAnalysisFilters([])} style={{ padding: '6px 12px', borderRadius: 20, border: '1.5px solid #ef444440', background: '#ef444410', color: '#ef4444', fontSize: 11, cursor: 'pointer', fontFamily: 'inherit' }}>✕ Limpar</button>
             )}
           </div>
-          {analysisFilters.length > 0 && <div style={{ marginTop: 8, fontSize: 11, color: '#6366f1', fontWeight: 600 }}>Mostrando: {activeLabel()} — {filteredEntries.length} dias</div>}
+          {analysisFilters.length > 0 && <div style={{ marginTop: 8, fontSize: 11, color: '#c8873a', fontWeight: 600 }}>Mostrando: {activeLabel()} — {filteredEntries.length} dias</div>}
         </div>
         {filteredEntries.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '32px 20px', color: '#3a3a5a', background: '#13131f', borderRadius: 14, border: '0.5px solid #1e1e30' }}>
+          <div style={{ textAlign: 'center', padding: '32px 20px', color: '#2d4a58', background: '#122028', borderRadius: 14, border: '0.5px solid #1e1e30' }}>
             <div style={{ fontSize: 28, marginBottom: 8 }}>🔍</div>
             <div style={{ fontSize: 13 }}>Nenhum dia com esses filtros</div>
           </div>
         ) : (<>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 12 }}>
-            {[{ label: 'Na meta', count: within.length, color: '#10b981' }, { label: 'Excesso', count: over.length, color: '#ef4444' }, { label: 'Abaixo', count: under.length, color: '#f59e0b' }].map(s => (
-              <div key={s.label} style={{ background: '#13131f', borderRadius: 12, padding: '10px 8px', textAlign: 'center', border: '0.5px solid #1e1e30' }}>
+            {[{ label: 'Na meta', count: within.length, color: '#2ab8b8' }, { label: 'Excesso', count: over.length, color: '#ef4444' }, { label: 'Abaixo', count: under.length, color: '#e8a040' }].map(s => (
+              <div key={s.label} style={{ background: '#122028', borderRadius: 12, padding: '10px 8px', textAlign: 'center', border: '0.5px solid #1e1e30' }}>
                 <div style={{ fontSize: 22, fontWeight: 800, color: s.color, fontFamily: 'JetBrains Mono, monospace' }}>{s.count}</div>
-                <div style={{ fontSize: 10, color: '#8888aa' }}>{s.label}</div>
-                <div style={{ fontSize: 9, color: '#3a3a5a', fontFamily: 'JetBrains Mono, monospace' }}>/{filteredEntries.length}d</div>
+                <div style={{ fontSize: 10, color: '#6a8a98' }}>{s.label}</div>
+                <div style={{ fontSize: 9, color: '#2d4a58', fontFamily: 'JetBrains Mono, monospace' }}>/{filteredEntries.length}d</div>
               </div>
             ))}
           </div>
-          <div style={{ background: '#13131f', borderRadius: 14, padding: 14, marginBottom: 12, border: '0.5px solid #1e1e30' }}>
+          <div style={{ background: '#122028', borderRadius: 14, padding: 14, marginBottom: 12, border: '0.5px solid #1e1e30' }}>
             <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 10 }}>Média — {activeLabel()} ({filteredEntries.length} dias)</div>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 10 }}>
-              <span style={{ fontSize: 32, fontWeight: 800, fontFamily: 'JetBrains Mono, monospace', color: avg.cal > targets.max ? '#ef4444' : avg.cal >= targets.min ? '#10b981' : '#f59e0b' }}>{avg.cal}</span>
-              <span style={{ fontSize: 13, color: '#55557a' }}>kcal/dia</span>
+              <span style={{ fontSize: 32, fontWeight: 800, fontFamily: 'JetBrains Mono, monospace', color: avg.cal > targets.max ? '#ef4444' : avg.cal >= targets.min ? '#2ab8b8' : '#e8a040' }}>{avg.cal}</span>
+              <span style={{ fontSize: 13, color: '#7a9aa8' }}>kcal/dia</span>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-              {[{ l: 'Proteína', v: avg.prot, c: '#10b981', t: targets.prot }, { l: 'Carb', v: avg.carb, c: '#f59e0b', t: targets.carb }, { l: 'Gordura', v: avg.fat, c: '#ec4899', t: targets.fat }].map(m => (
-                <div key={m.l} style={{ background: '#0c0c10', borderRadius: 10, padding: '8px' }}>
-                  <div style={{ fontSize: 9, color: '#55557a', marginBottom: 3 }}>{m.l}</div>
+              {[{ l: 'Proteína', v: avg.prot, c: '#2ab8b8', t: targets.prot }, { l: 'Carb', v: avg.carb, c: '#e8a040', t: targets.carb }, { l: 'Gordura', v: avg.fat, c: '#e07060', t: targets.fat }].map(m => (
+                <div key={m.l} style={{ background: '#0d1a1f', borderRadius: 10, padding: '8px' }}>
+                  <div style={{ fontSize: 9, color: '#7a9aa8', marginBottom: 3 }}>{m.l}</div>
                   <div style={{ fontSize: 13, fontWeight: 700, color: m.c, fontFamily: 'JetBrains Mono, monospace' }}>{m.v}g</div>
-                  <div style={{ background: '#1e1e30', borderRadius: 3, height: 4, marginTop: 4, overflow: 'hidden' }}>
+                  <div style={{ background: '#1a2d35', borderRadius: 3, height: 4, marginTop: 4, overflow: 'hidden' }}>
                     <div style={{ height: '100%', width: Math.min(100, (m.v / m.t) * 100) + '%', background: m.c }} />
                   </div>
                 </div>
@@ -813,7 +821,7 @@ export default function App() {
             </div>
           </div>
           {vals.length >= 2 && (
-            <div style={{ background: '#13131f', borderRadius: 14, padding: 14, marginBottom: 12, border: '0.5px solid #1e1e30' }}>
+            <div style={{ background: '#122028', borderRadius: 14, padding: 14, marginBottom: 12, border: '0.5px solid #1e1e30' }}>
               <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 10 }}>Calorias — {activeLabel()}</div>
               <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: H }}>
                 <line x1={PL} y1={cy(targets.max)} x2={W - PR} y2={cy(targets.max)} stroke="#10b98140" strokeWidth="1" strokeDasharray="3,3" />
@@ -822,14 +830,14 @@ export default function App() {
                 <polyline points={pts} fill="none" stroke="#6366f170" strokeWidth="1.5" strokeLinejoin="round" />
                 {vals.map((v, i) => <circle key={i} cx={cx(i)} cy={cy(v)} r="4" fill={pc(v)} />)}
               </svg>
-              <div style={{ display: 'flex', gap: 12, fontSize: 10, color: '#55557a', fontFamily: 'JetBrains Mono, monospace', marginTop: 6 }}>
-                <span style={{ color: '#10b981' }}>● meta</span><span style={{ color: '#f59e0b' }}>● abaixo</span><span style={{ color: '#ef4444' }}>● excesso</span>
+              <div style={{ display: 'flex', gap: 12, fontSize: 10, color: '#7a9aa8', fontFamily: 'JetBrains Mono, monospace', marginTop: 6 }}>
+                <span style={{ color: '#2ab8b8' }}>● meta</span><span style={{ color: '#e8a040' }}>● abaixo</span><span style={{ color: '#ef4444' }}>● excesso</span>
               </div>
             </div>
           )}
-          <div style={{ background: '#13131f', borderRadius: 14, padding: 14, marginBottom: 12, border: '0.5px solid #1e1e30' }}>
+          <div style={{ background: '#122028', borderRadius: 14, padding: 14, marginBottom: 12, border: '0.5px solid #1e1e30' }}>
             <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 4 }}>📊 Comparativo de médias</div>
-            <div style={{ fontSize: 10, color: '#55557a', marginBottom: 12 }}>{analysisFilters.length > 0 ? `Dentro do filtro: ${activeLabel()}` : `Todos os ${allEntries.length} dias`}</div>
+            <div style={{ fontSize: 10, color: '#7a9aa8', marginBottom: 12 }}>{analysisFilters.length > 0 ? `Dentro do filtro: ${activeLabel()}` : `Todos os ${allEntries.length} dias`}</div>
             {[
               { label: '📊 Geral', data: compAll, show: true },
               { label: '💼 Seg–Sex', data: compWeekday, show: !analysisFilters.includes('weekend') },
@@ -838,17 +846,17 @@ export default function App() {
               { label: '🛋️ Sem treino', data: compNoTraining, show: !analysisFilters.includes('training') },
             ].filter(row => row.show && row.data.n > 0).map(row => {
               const pct = Math.min(100, (row.data.cal / targets.cal) * 100)
-              const col = row.data.cal > targets.max ? '#ef4444' : row.data.cal >= targets.min ? '#10b981' : '#f59e0b'
+              const col = row.data.cal > targets.max ? '#ef4444' : row.data.cal >= targets.min ? '#2ab8b8' : '#e8a040'
               return (
                 <div key={row.label} style={{ marginBottom: 12 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
-                    <span style={{ color: '#9898b8' }}>{row.label}</span>
+                    <span style={{ color: '#7a9aa8' }}>{row.label}</span>
                     <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11 }}>
                       <span style={{ color: col, fontWeight: 700 }}>{row.data.cal} kcal</span>
-                      <span style={{ color: '#3a3a5a' }}> ({row.data.n}d)</span>
+                      <span style={{ color: '#2d4a58' }}> ({row.data.n}d)</span>
                     </span>
                   </div>
-                  <div style={{ background: '#1e1e30', borderRadius: 3, height: 6, overflow: 'hidden' }}>
+                  <div style={{ background: '#1a2d35', borderRadius: 3, height: 6, overflow: 'hidden' }}>
                     <div style={{ height: '100%', width: pct + '%', background: col, borderRadius: 3 }} />
                   </div>
                 </div>
@@ -866,11 +874,11 @@ export default function App() {
             const cy2 = v => PT2 + (1 - (v - wMin) / (wMax - wMin)) * (H2 - PT2 - PB2)
             const pts2 = wVals.map((v, i) => `${cx2(i)},${cy2(v)}`).join(' ')
             return (
-              <div style={{ background: '#13131f', borderRadius: 14, padding: 14, marginBottom: 12, border: '0.5px solid #1e1e30' }}>
+              <div style={{ background: '#122028', borderRadius: 14, padding: 14, marginBottom: 12, border: '0.5px solid #1e1e30' }}>
                 <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 4 }}>⚖️ Evolução do peso</div>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 10 }}>
                   <span style={{ fontSize: 24, fontWeight: 800, fontFamily: 'JetBrains Mono, monospace' }}>{lastW} kg</span>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: parseFloat(totalDiff) < 0 ? '#10b981' : parseFloat(totalDiff) > 0 ? '#ef4444' : '#55557a' }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: parseFloat(totalDiff) < 0 ? '#2ab8b8' : parseFloat(totalDiff) > 0 ? '#ef4444' : '#7a9aa8' }}>
                     {parseFloat(totalDiff) > 0 ? '+' : ''}{totalDiff} kg total
                   </span>
                 </div>
@@ -882,9 +890,9 @@ export default function App() {
             )
           })()}
           {compTraining.n > 0 && compNoTraining.n > 0 && (
-            <div style={{ background: '#13131f', borderRadius: 14, padding: 14, marginBottom: 12, border: '0.5px solid #1e1e30' }}>
+            <div style={{ background: '#122028', borderRadius: 14, padding: 14, marginBottom: 12, border: '0.5px solid #1e1e30' }}>
               <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 10 }}>💡 Insights</div>
-              <div style={{ background: '#0c0c10', borderRadius: 10, padding: '10px 12px', fontSize: 12, color: '#8888aa', lineHeight: 1.7 }}>
+              <div style={{ background: '#0d1a1f', borderRadius: 10, padding: '10px 12px', fontSize: 12, color: '#6a8a98', lineHeight: 1.7 }}>
                 {compTraining.cal > compNoTraining.cal
                   ? `💪 Nos dias de treino você come em média ${compTraining.cal - compNoTraining.cal} kcal a mais que nos dias de descanso.`
                   : `💪 Nos dias de treino você come em média ${compNoTraining.cal - compTraining.cal} kcal a menos que nos dias de descanso.`}
@@ -909,45 +917,45 @@ export default function App() {
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
             <div style={{ fontSize: 15, fontWeight: 700 }}>{editingFoodIdx !== null ? 'Editar Alimento' : 'Novo Alimento'}</div>
-            <button onClick={() => { setRegisterMode(false); setEditingFoodIdx(null) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#8888aa', fontSize: 20 }}>×</button>
+            <button onClick={() => { setRegisterMode(false); setEditingFoodIdx(null) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6a8a98', fontSize: 20 }}>×</button>
           </div>
-          <div style={{ background: '#13131f', borderRadius: 14, padding: 16, border: '0.5px solid #1e1e30' }}>
+          <div style={{ background: '#122028', borderRadius: 14, padding: 16, border: '0.5px solid #1e1e30' }}>
             <div style={{ marginBottom: 12 }}>
-              <label style={{ fontSize: 11, color: '#8888aa', fontWeight: 500, marginBottom: 4, display: 'block' }}>Nome *</label>
+              <label style={{ fontSize: 11, color: '#6a8a98', fontWeight: 500, marginBottom: 4, display: 'block' }}>Nome *</label>
               <input type="text" placeholder="Ex: Iogurte grego" value={newFood.name} onChange={e => setNewFood(p => ({ ...p, name: e.target.value }))}
-                style={{ width: '100%', background: '#1e1e30', border: '0.5px solid #2a2a40', borderRadius: 10, padding: '10px 12px', color: '#ededf5', fontSize: 14, fontFamily: 'inherit' }} />
+                style={{ width: '100%', background: '#1a2d35', border: '0.5px solid #2a2a40', borderRadius: 10, padding: '10px 12px', color: '#f0e8d8', fontSize: 14, fontFamily: 'inherit' }} />
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
               <div>
-                <label style={{ fontSize: 11, color: '#8888aa', fontWeight: 500, marginBottom: 4, display: 'block' }}>Unidade *</label>
+                <label style={{ fontSize: 11, color: '#6a8a98', fontWeight: 500, marginBottom: 4, display: 'block' }}>Unidade *</label>
                 <select value={newFood.unit} onChange={e => setNewFood(p => ({ ...p, unit: e.target.value }))}
-                  style={{ width: '100%', background: '#1e1e30', border: '0.5px solid #2a2a40', borderRadius: 10, padding: '10px', color: '#ededf5', fontSize: 13, fontFamily: 'inherit' }}>
+                  style={{ width: '100%', background: '#1a2d35', border: '0.5px solid #2a2a40', borderRadius: 10, padding: '10px', color: '#f0e8d8', fontSize: 13, fontFamily: 'inherit' }}>
                   {['g', 'ml', 'unid', 'dose', 'porção'].map(u => <option key={u} value={u}>{u}</option>)}
                 </select>
               </div>
               <div>
-                <label style={{ fontSize: 11, color: '#8888aa', fontWeight: 500, marginBottom: 4, display: 'block' }}>Qtd padrão</label>
+                <label style={{ fontSize: 11, color: '#6a8a98', fontWeight: 500, marginBottom: 4, display: 'block' }}>Qtd padrão</label>
                 <input type="number" value={newFood.def} onChange={e => setNewFood(p => ({ ...p, def: e.target.value }))}
-                  style={{ width: '100%', background: '#1e1e30', border: '0.5px solid #2a2a40', borderRadius: 10, padding: '10px', color: '#ededf5', fontSize: 13, fontFamily: 'inherit' }} />
+                  style={{ width: '100%', background: '#1a2d35', border: '0.5px solid #2a2a40', borderRadius: 10, padding: '10px', color: '#f0e8d8', fontSize: 13, fontFamily: 'inherit' }} />
               </div>
             </div>
-            <div style={{ background: '#0c0c10', borderRadius: 10, padding: 12, marginBottom: 12 }}>
-              <div style={{ fontSize: 10, color: '#55557a', fontFamily: 'JetBrains Mono, monospace', marginBottom: 8 }}>MACROS POR 100g/ml OU POR UNIDADE *</div>
+            <div style={{ background: '#0d1a1f', borderRadius: 10, padding: 12, marginBottom: 12 }}>
+              <div style={{ fontSize: 10, color: '#7a9aa8', fontFamily: 'JetBrains Mono, monospace', marginBottom: 8 }}>MACROS POR 100g/ml OU POR UNIDADE *</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                {[{ k: 'cal', l: 'Calorias (kcal)', c: '#6366f1' }, { k: 'prot', l: 'Proteína (g)', c: '#10b981' }, { k: 'carb', l: 'Carb (g)', c: '#f59e0b' }, { k: 'fat', l: 'Gordura (g)', c: '#ec4899' }].map(f => (
+                {[{ k: 'cal', l: 'Calorias (kcal)', c: '#c8873a' }, { k: 'prot', l: 'Proteína (g)', c: '#2ab8b8' }, { k: 'carb', l: 'Carb (g)', c: '#e8a040' }, { k: 'fat', l: 'Gordura (g)', c: '#e07060' }].map(f => (
                   <div key={f.k}>
                     <label style={{ fontSize: 11, color: f.c, fontWeight: 500, marginBottom: 4, display: 'block' }}>{f.l}</label>
                     <input type="number" placeholder="0" value={newFood[f.k]} onChange={e => setNewFood(p => ({ ...p, [f.k]: e.target.value }))}
-                      style={{ width: '100%', background: '#1e1e30', border: '0.5px solid #2a2a40', borderRadius: 10, padding: '8px', color: '#ededf5', fontSize: 13, fontFamily: 'inherit' }} />
+                      style={{ width: '100%', background: '#1a2d35', border: '0.5px solid #2a2a40', borderRadius: 10, padding: '8px', color: '#f0e8d8', fontSize: 13, fontFamily: 'inherit' }} />
                   </div>
                 ))}
               </div>
             </div>
             <div style={{ marginBottom: 12 }}>
-              <label style={{ fontSize: 11, color: '#8888aa', fontWeight: 500, marginBottom: 6, display: 'block' }}>Favorito em qual refeição?</label>
+              <label style={{ fontSize: 11, color: '#6a8a98', fontWeight: 500, marginBottom: 6, display: 'block' }}>Favorito em qual refeição?</label>
               <div>{MEALS.map(m => (
                 <span key={m.id} onClick={() => setNewFood(p => ({ ...p, fav: p.fav.includes(m.id) ? p.fav.filter(x => x !== m.id) : [...p.fav, m.id] }))}
-                  style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 20, fontSize: 10, cursor: 'pointer', margin: '2px', border: '0.5px solid', borderColor: newFood.fav.includes(m.id) ? '#6366f1' : '#2a2a40', color: newFood.fav.includes(m.id) ? '#6366f1' : '#8888aa', background: newFood.fav.includes(m.id) ? '#6366f120' : 'transparent' }}>
+                  style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 20, fontSize: 10, cursor: 'pointer', margin: '2px', border: '0.5px solid', borderColor: newFood.fav.includes(m.id) ? '#c8873a' : '#1e3540', color: newFood.fav.includes(m.id) ? '#c8873a' : '#6a8a98', background: newFood.fav.includes(m.id) ? '#c8873a20' : 'transparent' }}>
                   {m.icon} {m.short}
                 </span>
               ))}</div>
@@ -968,7 +976,7 @@ export default function App() {
               setRegisterMode(false)
               setEditingFoodIdx(null)
               setNewFood({ name: '', cal: '', prot: '', carb: '', fat: '', unit: 'g', def: '100', fav: [] })
-            }} style={{ width: '100%', padding: 12, background: '#6366f1', border: 'none', borderRadius: 12, color: '#fff', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700, fontSize: 14 }}>
+            }} style={{ width: '100%', padding: 12, background: 'linear-gradient(135deg, #c8873a 0%, #e8a040 100%)', border: 'none', borderRadius: 12, color: '#0d1a1f', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700, fontSize: 14 }}>
               {editingFoodIdx !== null ? 'Salvar alterações' : 'Salvar alimento'}
             </button>
           </div>
@@ -980,26 +988,26 @@ export default function App() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
           <div style={{ fontSize: 15, fontWeight: 700 }}>Alimentos</div>
           <button onClick={() => { setEditingFoodIdx(null); setNewFood({ name: '', cal: '', prot: '', carb: '', fat: '', unit: 'g', def: '100', fav: [] }); setRegisterMode(true) }}
-            style={{ background: '#6366f1', border: 'none', borderRadius: 10, padding: '7px 12px', color: '#fff', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700 }}>+ Novo</button>
+            style={{ background: '#c8873a', border: 'none', borderRadius: 10, padding: '7px 12px', color: '#fff', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700 }}>+ Novo</button>
         </div>
         {customFoods.filter(c => !DEFAULT_FOODS.find(f => f.id === c.id)).length > 0 && (<>
-          <div style={{ fontSize: 10, fontWeight: 700, color: '#55557a', textTransform: 'uppercase', letterSpacing: 1, margin: '0 0 8px', fontFamily: 'JetBrains Mono, monospace' }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: '#7a9aa8', textTransform: 'uppercase', letterSpacing: 1, margin: '0 0 8px', fontFamily: 'JetBrains Mono, monospace' }}>
             Meus alimentos ({customFoods.filter(c => !DEFAULT_FOODS.find(f => f.id === c.id)).length})
           </div>
           {customFoods.filter(c => !DEFAULT_FOODS.find(f => f.id === c.id)).map((f, idx) => (
-            <div key={f.id} style={{ background: '#13131f', borderRadius: 12, padding: '10px 12px', marginBottom: 7, display: 'flex', alignItems: 'center', gap: 8, border: '0.5px solid #1e1e30' }}>
+            <div key={f.id} style={{ background: '#122028', borderRadius: 12, padding: '10px 12px', marginBottom: 7, display: 'flex', alignItems: 'center', gap: 8, border: '0.5px solid #1e1e30' }}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 13, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{f.name}</div>
-                <div style={{ fontSize: 10, color: '#55557a', fontFamily: 'JetBrains Mono, monospace', marginTop: 1 }}>{f.cal} kcal · P:{f.prot}g · C:{f.carb}g · G:{f.fat}g / {f.unit}</div>
+                <div style={{ fontSize: 10, color: '#7a9aa8', fontFamily: 'JetBrains Mono, monospace', marginTop: 1 }}>{f.cal} kcal · P:{f.prot}g · C:{f.carb}g · G:{f.fat}g / {f.unit}</div>
               </div>
               <button onClick={() => { const realIdx = customFoods.findIndex(c => c.id === f.id); setEditingFoodIdx(realIdx); setNewFood({ name: f.name, cal: String(f.cal), prot: String(f.prot), carb: String(f.carb), fat: String(f.fat), unit: f.unit, def: String(f.def), fav: f.fav || [] }); setRegisterMode(true) }}
-                style={{ background: '#6366f120', border: 'none', borderRadius: 8, width: 28, height: 28, color: '#6366f1', cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>✎</button>
+                style={{ background: '#c8873a20', border: 'none', borderRadius: 8, width: 28, height: 28, color: '#c8873a', cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>✎</button>
               <button onClick={() => { if (window.confirm('Remover?')) updateCustomFoods(customFoods.filter(c => c.id !== f.id)) }}
                 style={{ background: '#ef444420', border: 'none', borderRadius: 8, width: 28, height: 28, color: '#ef4444', cursor: 'pointer', fontSize: 16 }}>×</button>
             </div>
           ))}
         </>)}
-        <div style={{ fontSize: 10, fontWeight: 700, color: '#55557a', textTransform: 'uppercase', letterSpacing: 1, margin: '12px 0 8px', fontFamily: 'JetBrains Mono, monospace' }}>Base padrão ({DEFAULT_FOODS.length})</div>
+        <div style={{ fontSize: 10, fontWeight: 700, color: '#7a9aa8', textTransform: 'uppercase', letterSpacing: 1, margin: '12px 0 8px', fontFamily: 'JetBrains Mono, monospace' }}>Base padrão ({DEFAULT_FOODS.length})</div>
         {DEFAULT_FOODS.map(f => {
           const override = customFoods.find(c => c.id === f.id)
           const display = override || f
@@ -1008,17 +1016,17 @@ export default function App() {
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 12, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {display.name}
-                  {override && <span style={{ marginLeft: 6, fontSize: 9, color: '#6366f1', background: '#6366f120', padding: '1px 5px', borderRadius: 8 }}>editado</span>}
+                  {override && <span style={{ marginLeft: 6, fontSize: 9, color: '#c8873a', background: '#c8873a20', padding: '1px 5px', borderRadius: 8 }}>editado</span>}
                 </div>
-                <div style={{ fontSize: 10, color: '#55557a', fontFamily: 'JetBrains Mono, monospace' }}>{display.cal} kcal · P:{display.prot}g · C:{display.carb}g · G:{display.fat}g / {display.unit}</div>
+                <div style={{ fontSize: 10, color: '#7a9aa8', fontFamily: 'JetBrains Mono, monospace' }}>{display.cal} kcal · P:{display.prot}g · C:{display.carb}g · G:{display.fat}g / {display.unit}</div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                 {override && (
                   <button onClick={() => { if (window.confirm('Restaurar valores originais?')) updateCustomFoods(customFoods.filter(c => c.id !== f.id)) }}
-                    style={{ background: '#f59e0b20', border: 'none', borderRadius: 8, width: 28, height: 28, color: '#f59e0b', cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>↺</button>
+                    style={{ background: '#e8a04020', border: 'none', borderRadius: 8, width: 28, height: 28, color: '#e8a040', cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>↺</button>
                 )}
                 <button onClick={() => { setEditingFoodIdx('default_' + f.id); setNewFood({ name: display.name, cal: String(display.cal), prot: String(display.prot), carb: String(display.carb), fat: String(display.fat), unit: display.unit, def: String(display.def), fav: display.fav || [] }); setRegisterMode(true) }}
-                  style={{ background: '#6366f120', border: 'none', borderRadius: 8, width: 28, height: 28, color: '#6366f1', cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✎</button>
+                  style={{ background: '#c8873a20', border: 'none', borderRadius: 8, width: 28, height: 28, color: '#c8873a', cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✎</button>
                 <div style={{ fontSize: 11 }}>{(display.fav || []).map(id => { const m = MEALS.find(x => x.id === id); return m ? m.icon : '' }).join('')}</div>
               </div>
             </div>
@@ -1037,15 +1045,15 @@ function FoodRow({ food: f, onAdd, mealId }) {
   return (
     <div style={{ padding: '10px 0', borderBottom: '0.5px solid #1e1e30' }}>
       <div style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.3 }}>{f.name}</div>
-      {f.note && <div style={{ fontSize: 11, color: '#55557a', marginTop: 1 }}>{f.note}</div>}
+      {f.note && <div style={{ fontSize: 11, color: '#7a9aa8', marginTop: 1 }}>{f.note}</div>}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
-        <div style={{ fontSize: 11, color: '#8888aa', fontFamily: 'JetBrains Mono, monospace', flex: 1 }}>
+        <div style={{ fontSize: 11, color: '#6a8a98', fontFamily: 'JetBrains Mono, monospace', flex: 1 }}>
           {Math.round(f.cal * m)} kcal · P:{Math.round(f.prot * m * 10) / 10}g · C:{Math.round(f.carb * m * 10) / 10}g · G:{Math.round(f.fat * m * 10) / 10}g
         </div>
         <input type="number" value={qty} onChange={e => setQty(parseFloat(e.target.value) || 0)}
-          style={{ width: 52, textAlign: 'center', fontFamily: 'JetBrains Mono, monospace', fontSize: 13, padding: '5px 4px', border: '0.5px solid #2a2a40', borderRadius: 8, background: '#1e1e30', color: '#ededf5' }} />
-        <span style={{ fontSize: 10, color: '#55557a', minWidth: 26 }}>{f.unit}</span>
-        <button onClick={() => onAdd(f.id, qty)} style={{ background: '#6366f1', border: 'none', borderRadius: 10, padding: '7px 14px', color: '#fff', fontSize: 12, cursor: 'pointer', fontWeight: 700, fontFamily: 'inherit', flexShrink: 0 }}>Add</button>
+          style={{ width: 52, textAlign: 'center', fontFamily: 'JetBrains Mono, monospace', fontSize: 13, padding: '5px 4px', border: '0.5px solid #2a2a40', borderRadius: 8, background: '#1a2d35', color: '#f0e8d8' }} />
+        <span style={{ fontSize: 10, color: '#7a9aa8', minWidth: 26 }}>{f.unit}</span>
+        <button onClick={() => onAdd(f.id, qty)} style={{ background: '#c8873a', border: 'none', borderRadius: 10, padding: '7px 14px', color: '#fff', fontSize: 12, cursor: 'pointer', fontWeight: 700, fontFamily: 'inherit', flexShrink: 0 }}>Add</button>
       </div>
     </div>
   )
@@ -1060,23 +1068,23 @@ function LoginScreen() {
     try { await loginWithGoogle() } catch (e) { setError('Erro ao fazer login. Tente novamente.'); setLoading(false) }
   }
   return (
-    <div style={{ minHeight: '100vh', background: '#0c0c10', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, fontFamily: "'Syne', system-ui, sans-serif" }}>
+    <div style={{ minHeight: '100vh', background: '#0d1a1f', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, fontFamily: "'Syne', system-ui, sans-serif" }}>
       <div style={{ maxWidth: 360, width: '100%', textAlign: 'center' }}>
         <div style={{ marginBottom: 40 }}>
-          <div style={{ fontSize: 11, letterSpacing: 3, color: '#55557a', fontFamily: 'JetBrains Mono, monospace', textTransform: 'uppercase', marginBottom: 12 }}>EVOSHAPE</div>
-          <div style={{ fontSize: 32, fontWeight: 800, color: '#ededf5', lineHeight: 1.2, marginBottom: 8 }}>EvoShape</div>
-          <div style={{ fontSize: 14, color: '#55557a', lineHeight: 1.5 }}>Dieta · Treino · Peso · Evolução</div>
+          <div style={{ fontSize: 11, letterSpacing: 3, color: '#7a9aa8', fontFamily: 'JetBrains Mono, monospace', textTransform: 'uppercase', marginBottom: 12 }}>EVOSHAPE</div>
+          <div style={{ fontSize: 32, fontWeight: 800, color: '#f0e8d8', lineHeight: 1.2, marginBottom: 8 }}>EvoShape</div>
+          <div style={{ fontSize: 14, color: '#7a9aa8', lineHeight: 1.5 }}>Dieta · Treino · Peso · Evolução</div>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 40 }}>
-          {[{ label: 'Dieta', color: '#6366f1', icon: '🥗' }, { label: 'Treino', color: '#10b981', icon: '💪' }, { label: 'Evolução', color: '#f59e0b', icon: '📈' }].map(s => (
-            <div key={s.label} style={{ background: '#13131f', borderRadius: 12, padding: '14px 8px', border: '0.5px solid #1e1e30' }}>
+          {[{ label: 'Dieta', color: '#c8873a', icon: '🥗' }, { label: 'Treino', color: '#2ab8b8', icon: '💪' }, { label: 'Evolução', color: '#e8a040', icon: '📈' }].map(s => (
+            <div key={s.label} style={{ background: '#122028', borderRadius: 12, padding: '14px 8px', border: '0.5px solid #1e1e30' }}>
               <div style={{ fontSize: 22, marginBottom: 4 }}>{s.icon}</div>
               <div style={{ fontSize: 11, color: s.color, fontWeight: 600 }}>{s.label}</div>
             </div>
           ))}
         </div>
         <button onClick={handleLogin} disabled={loading}
-          style={{ width: '100%', padding: '14px 20px', background: loading ? '#1e1e30' : '#fff', border: 'none', borderRadius: 14, cursor: loading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, fontSize: 15, fontWeight: 700, fontFamily: 'inherit', color: loading ? '#55557a' : '#1a1a1a' }}>
+          style={{ width: '100%', padding: '14px 20px', background: loading ? '#1a2d35' : '#fff', border: 'none', borderRadius: 14, cursor: loading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, fontSize: 15, fontWeight: 700, fontFamily: 'inherit', color: loading ? '#7a9aa8' : '#1a1a1a' }}>
           {!loading && (
             <svg width="20" height="20" viewBox="0 0 48 48">
               <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
@@ -1088,7 +1096,7 @@ function LoginScreen() {
           {loading ? 'Entrando...' : 'Entrar com Google'}
         </button>
         {error && <div style={{ marginTop: 12, fontSize: 12, color: '#ef4444' }}>{error}</div>}
-        <div style={{ marginTop: 20, fontSize: 11, color: '#3a3a5a', lineHeight: 1.5 }}>Seus dados ficam salvos na nuvem e sincronizados entre todos os seus dispositivos</div>
+        <div style={{ marginTop: 20, fontSize: 11, color: '#2d4a58', lineHeight: 1.5 }}>Seus dados ficam salvos na nuvem e sincronizados entre todos os seus dispositivos</div>
       </div>
     </div>
   )
@@ -1099,21 +1107,21 @@ function WeightModal({ onSave, onClose }) {
   const [weight, setWeight] = useState('')
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 200 }} onClick={e => e.target === e.currentTarget && onClose()}>
-      <div style={{ background: '#13131f', borderRadius: '16px 16px 0 0', padding: 24, width: '100%', maxWidth: 480, border: '0.5px solid #2a2a40' }}>
+      <div style={{ background: '#122028', borderRadius: '16px 16px 0 0', padding: 24, width: '100%', maxWidth: 480, border: '0.5px solid #2a2a40' }}>
         <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 20 }}>⚖️ Registrar Peso</div>
         <div style={{ marginBottom: 14 }}>
-          <label style={{ fontSize: 11, color: '#8888aa', fontWeight: 500, marginBottom: 4, display: 'block' }}>Data</label>
+          <label style={{ fontSize: 11, color: '#6a8a98', fontWeight: 500, marginBottom: 4, display: 'block' }}>Data</label>
           <input type="date" value={date} onChange={e => setDate(e.target.value)}
-            style={{ width: '100%', background: '#1e1e30', border: '0.5px solid #2a2a40', borderRadius: 10, padding: '10px 14px', color: '#ededf5', fontSize: 14, fontFamily: 'JetBrains Mono, monospace' }} />
+            style={{ width: '100%', background: '#1a2d35', border: '0.5px solid #2a2a40', borderRadius: 10, padding: '10px 14px', color: '#f0e8d8', fontSize: 14, fontFamily: 'JetBrains Mono, monospace' }} />
         </div>
         <div style={{ marginBottom: 20 }}>
-          <label style={{ fontSize: 11, color: '#10b981', fontWeight: 500, marginBottom: 4, display: 'block' }}>Peso (kg)</label>
+          <label style={{ fontSize: 11, color: '#2ab8b8', fontWeight: 500, marginBottom: 4, display: 'block' }}>Peso (kg)</label>
           <input type="number" step="0.1" placeholder="Ex: 76.5" value={weight} onChange={e => setWeight(e.target.value)} autoFocus
-            style={{ width: '100%', background: '#1e1e30', border: '0.5px solid #10b98140', borderRadius: 10, padding: '10px 14px', color: '#ededf5', fontSize: 18, fontFamily: 'JetBrains Mono, monospace', textAlign: 'center' }} />
+            style={{ width: '100%', background: '#1a2d35', border: '0.5px solid #10b98140', borderRadius: 10, padding: '10px 14px', color: '#f0e8d8', fontSize: 18, fontFamily: 'JetBrains Mono, monospace', textAlign: 'center' }} />
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
-          <button onClick={onClose} style={{ flex: 1, padding: 12, background: '#1e1e30', border: 'none', borderRadius: 12, color: '#8888aa', cursor: 'pointer', fontFamily: 'inherit' }}>Cancelar</button>
-          <button onClick={() => { if (weight) onSave(date, weight) }} style={{ flex: 2, padding: 12, background: '#6366f1', border: 'none', borderRadius: 12, color: '#fff', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700, fontSize: 14 }}>Salvar</button>
+          <button onClick={onClose} style={{ flex: 1, padding: 12, background: '#1a2d35', border: 'none', borderRadius: 12, color: '#6a8a98', cursor: 'pointer', fontFamily: 'inherit' }}>Cancelar</button>
+          <button onClick={() => { if (weight) onSave(date, weight) }} style={{ flex: 2, padding: 12, background: 'linear-gradient(135deg, #c8873a 0%, #e8a040 100%)', border: 'none', borderRadius: 12, color: '#0d1a1f', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700, fontSize: 14 }}>Salvar</button>
         </div>
       </div>
     </div>
@@ -1123,26 +1131,26 @@ function WeightModal({ onSave, onClose }) {
 function TargetsModal({ targets, onSave, onClose }) {
   const [t, setT] = useState(targets)
   const fields = [
-    { k: 'cal', l: 'Calorias alvo (kcal)', c: '#6366f1' }, { k: 'min', l: 'Kcal mínimo', c: '#f59e0b' }, { k: 'max', l: 'Kcal máximo', c: '#ef4444' },
-    { k: 'prot', l: 'Proteína alvo (g)', c: '#10b981' }, { k: 'protMin', l: 'Proteína mínima (g)', c: '#10b981' }, { k: 'protMax', l: 'Proteína máxima (g)', c: '#10b981' },
-    { k: 'carb', l: 'Carboidratos (g)', c: '#f59e0b' }, { k: 'fat', l: 'Gordura alvo (g)', c: '#ec4899' }, { k: 'fatMax', l: 'Gordura máxima (g)', c: '#ec4899' },
+    { k: 'cal', l: 'Calorias alvo (kcal)', c: '#c8873a' }, { k: 'min', l: 'Kcal mínimo', c: '#e8a040' }, { k: 'max', l: 'Kcal máximo', c: '#ef4444' },
+    { k: 'prot', l: 'Proteína alvo (g)', c: '#2ab8b8' }, { k: 'protMin', l: 'Proteína mínima (g)', c: '#2ab8b8' }, { k: 'protMax', l: 'Proteína máxima (g)', c: '#2ab8b8' },
+    { k: 'carb', l: 'Carboidratos (g)', c: '#e8a040' }, { k: 'fat', l: 'Gordura alvo (g)', c: '#e07060' }, { k: 'fatMax', l: 'Gordura máxima (g)', c: '#e07060' },
   ]
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 200 }} onClick={e => e.target === e.currentTarget && onClose()}>
-      <div style={{ background: '#13131f', borderRadius: '16px 16px 0 0', padding: 24, width: '100%', maxWidth: 480, border: '0.5px solid #2a2a40', maxHeight: '80vh', overflowY: 'auto' }}>
+      <div style={{ background: '#122028', borderRadius: '16px 16px 0 0', padding: 24, width: '100%', maxWidth: 480, border: '0.5px solid #2a2a40', maxHeight: '80vh', overflowY: 'auto' }}>
         <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 16 }}>Metas diárias</div>
         {fields.map(f => (
           <div key={f.k} style={{ marginBottom: 12 }}>
             <label style={{ fontSize: 11, color: f.c, fontWeight: 500, marginBottom: 4, display: 'block' }}>{f.l}</label>
             <input type="number" value={t[f.k] || ''} onChange={e => setT(prev => ({ ...prev, [f.k]: parseFloat(e.target.value) || 0 }))}
-              style={{ width: '100%', background: '#1e1e30', border: `0.5px solid ${f.c}40`, borderRadius: 10, padding: '10px 14px', color: '#ededf5', fontSize: 14, fontFamily: 'JetBrains Mono, monospace' }} />
+              style={{ width: '100%', background: '#1a2d35', border: `0.5px solid ${f.c}40`, borderRadius: 10, padding: '10px 14px', color: '#f0e8d8', fontSize: 14, fontFamily: 'JetBrains Mono, monospace' }} />
           </div>
         ))}
         <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
-          <button onClick={onClose} style={{ flex: 1, padding: 12, background: '#1e1e30', border: 'none', borderRadius: 12, color: '#8888aa', cursor: 'pointer', fontFamily: 'inherit' }}>Cancelar</button>
-          <button onClick={() => onSave(t)} style={{ flex: 2, padding: 12, background: '#6366f1', border: 'none', borderRadius: 12, color: '#fff', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700, fontSize: 14 }}>Salvar</button>
+          <button onClick={onClose} style={{ flex: 1, padding: 12, background: '#1a2d35', border: 'none', borderRadius: 12, color: '#6a8a98', cursor: 'pointer', fontFamily: 'inherit' }}>Cancelar</button>
+          <button onClick={() => onSave(t)} style={{ flex: 2, padding: 12, background: 'linear-gradient(135deg, #c8873a 0%, #e8a040 100%)', border: 'none', borderRadius: 12, color: '#0d1a1f', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700, fontSize: 14 }}>Salvar</button>
         </div>
-        <div style={{ marginTop: 12, padding: '8px 12px', background: '#0c0c10', borderRadius: 10, fontSize: 10, color: '#55557a', fontFamily: 'JetBrains Mono, monospace' }}>
+        <div style={{ marginTop: 12, padding: '8px 12px', background: '#0d1a1f', borderRadius: 10, fontSize: 10, color: '#7a9aa8', fontFamily: 'JetBrains Mono, monospace' }}>
           Padrão: 1562 kcal · min 1460 · max 1680 · P:150g · C:151g · G:43g
         </div>
       </div>
