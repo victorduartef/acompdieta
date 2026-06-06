@@ -84,6 +84,9 @@ function isWeekday(iso) { return !isWeekend(iso) }
 
 function calcMacros(items, allFoods) {
   return items.reduce((a, it) => {
+    if (it.avulso) {
+      return { cal: a.cal + (it.cal || 0), prot: a.prot + (it.prot || 0), carb: a.carb + (it.carb || 0), fat: a.fat + (it.fat || 0) }
+    }
     const f = allFoods.find(x => x.id === it.id)
     if (!f) return a
     const fixed = ['unid','dose','porção'].includes(f.unit)
@@ -126,6 +129,8 @@ export default function App() {
   const [showWeightModal, setShowWeightModal] = useState(false)
   const [analysisFilters, setAnalysisFilters] = useState([])
   const [newFood, setNewFood] = useState({ name: '', cal: '', prot: '', carb: '', fat: '', unit: 'g', def: '100', fav: [] })
+  const [avulso, setAvulso] = useState(false)
+  const [avulsoData, setAvulsoData] = useState({ name: '', cal: '', prot: '', carb: '', fat: '' })
 
   const allFoods = DEFAULT_FOODS.map(f => {
     const override = customFoods.find(c => c.id === f.id)
