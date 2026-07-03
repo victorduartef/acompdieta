@@ -150,7 +150,6 @@ export default function App() {
   const [targetsHistory, setTargetsHistory] = useState([])
   const [customFoods, setCustomFoods] = useState([])
   const [weights, setWeights] = useState({})
-  const [targetsHistory, setTargetsHistory] = useState([])
   const [loaded, setLoaded] = useState(false)
   const [tab, setTab] = useState('today')
   const [activeMeal, setActiveMeal] = useState('cafe_manha')
