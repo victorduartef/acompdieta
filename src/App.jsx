@@ -61,6 +61,20 @@ const ACTIVITIES = [
 const DEFAULT_TARGETS = {
   cal: 1562, prot: 150, carb: 151, fat: 43,
   min: 1460, max: 1680, protMin: 138, protMax: 163, fatMax: 52,
+  dualMode: false,
+  targets2: { cal: 1800, prot: 150, carb: 220, fat: 50, min: 1700, max: 1900, protMin: 138, protMax: 163, fatMax: 60 },
+  highCarbDays: [1, 3, 5], // Mon, Wed, Fri = carbo alto by default
+}
+
+function getTargetsForDate(targets, dateKey) {
+  if (!targets.dualMode) return targets
+  const d = new Date(dateKey + 'T12:00:00')
+  const dayOfWeek = d.getDay() // 0=Sun, 1=Mon...
+  const highCarbDays = targets.highCarbDays || [1, 3, 5]
+  if (highCarbDays.includes(dayOfWeek)) {
+    return { ...targets.targets2, dualMode: true, highCarbDays, targets2: targets.targets2 }
+  }
+  return targets
 }
 
 function todayKey() {
@@ -129,7 +143,9 @@ export default function App() {
   const [showWeightModal, setShowWeightModal] = useState(false)
   const [analysisFilters, setAnalysisFilters] = useState([])
   const [newFood, setNewFood] = useState({ name: '', cal: '', prot: '', carb: '', fat: '', unit: 'g', def: '100', fav: [] })
+  const [foodSearch, setFoodSearch] = useState('')
   const [avulso, setAvulso] = useState(false)
+  const [foodSearch, setFoodSearch] = useState('')
   const [avulsoData, setAvulsoData] = useState({ name: '', cal: '', prot: '', carb: '', fat: '' })
 
   const allFoods = DEFAULT_FOODS.map(f => {
@@ -241,11 +257,12 @@ export default function App() {
   const wdaysH = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb']
   const monthsH = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
   const headerDate = isToday ? `${wdaysH[dt.getDay()]}, ${dt.getDate()} de ${monthsH[dt.getMonth()]}` : `✏️ ${dt.getDate()} de ${monthsH[dt.getMonth()]}`
-  const over = dayMacros.cal > targets.max
-  const inRange = dayMacros.cal >= targets.min && dayMacros.cal <= targets.max
-  const calPct = Math.min(100, (dayMacros.cal / targets.max) * 100)
+  const activeTargets = getTargetsForDate(targets, activeKey)
+  const over = dayMacros.cal > activeTargets.max
+  const inRange = dayMacros.cal >= activeTargets.min && dayMacros.cal <= activeTargets.max
+  const calPct = Math.min(100, (dayMacros.cal / activeTargets.max) * 100)
   const calBarColor = over ? '#e05555' : inRange ? '#2ab8b8' : '#c8873a'
-  const calDiff = targets.cal - dayMacros.cal
+  const calDiff = activeTargets.cal - dayMacros.cal
   const hasData = dayMacros.cal > 0
 
   return (
@@ -276,8 +293,8 @@ export default function App() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ fontSize: 30, fontWeight: 800, fontFamily: 'JetBrains Mono, monospace', color: '#f0e8d8' }}>{r0(dayMacros.cal)}</span>
-                <span style={{ fontSize: 12, color: '#7a9aa8' }}>/ {targets.cal} kcal</span>
-                {hasData && <span style={{ width: 8, height: 8, borderRadius: '50%', background: farolCal(dayMacros.cal, targets), display: 'inline-block' }} />}
+                <span style={{ fontSize: 12, color: '#7a9aa8' }}>/ {activeTargets.cal} kcal</span>
+                {hasData && <span style={{ width: 8, height: 8, borderRadius: '50%', background: farolCal(dayMacros.cal, activeTargets), display: 'inline-block' }} />}
               </div>
               <span style={{ fontSize: 11, fontFamily: 'JetBrains Mono, monospace', color: over ? '#ef4444' : inRange ? '#2ab8b8' : '#7a9aa8' }}>
                 {calDiff >= 0 ? `−${r0(calDiff)}` : `+${r0(-calDiff)}`} kcal
@@ -288,9 +305,9 @@ export default function App() {
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
               {[
-                { label: 'Proteína', val: dayMacros.prot, target: targets.prot, color: '#2ab8b8', farol: hasData ? farolProt(dayMacros.prot, targets) : null },
-                { label: 'Carb', val: dayMacros.carb, target: targets.carb, color: '#e8a040', farol: null },
-                { label: 'Gordura', val: dayMacros.fat, target: targets.fat, color: '#e07060', farol: hasData ? farolFat(dayMacros.fat, targets) : null },
+                { label: 'Proteína', val: dayMacros.prot, target: activeTargets.prot, color: '#2ab8b8', farol: hasData ? farolProt(dayMacros.prot, activeTargets) : null },
+                { label: 'Carb', val: dayMacros.carb, target: activeTargets.carb, color: '#e8a040', farol: null },
+                { label: 'Gordura', val: dayMacros.fat, target: activeTargets.fat, color: '#e07060', farol: hasData ? farolFat(dayMacros.fat, activeTargets) : null },
               ].map(m => (
                 <div key={m.label} style={{ background: '#122028', borderRadius: 10, padding: '8px 10px', position: 'relative' }}>
                   {m.farol && <span style={{ position: 'absolute', top: 8, right: 8, width: 7, height: 7, borderRadius: '50%', background: m.farol }} />}
@@ -1041,16 +1058,18 @@ export default function App() {
     }
     return (
       <div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
           <div style={{ fontSize: 15, fontWeight: 700 }}>Alimentos</div>
           <button onClick={() => { setEditingFoodIdx(null); setNewFood({ name: '', cal: '', prot: '', carb: '', fat: '', unit: 'g', def: '100', fav: [] }); setRegisterMode(true) }}
             style={{ background: '#c8873a', border: 'none', borderRadius: 10, padding: '7px 12px', color: '#fff', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700 }}>+ Novo</button>
         </div>
-        {customFoods.filter(c => !DEFAULT_FOODS.find(f => f.id === c.id)).length > 0 && (<>
+        <input value={foodSearch} onChange={e => setFoodSearch(e.target.value)} placeholder="🔍 Buscar na lista..."
+          style={{ width: '100%', background: '#1a2d35', border: '0.5px solid #1e3540', borderRadius: 10, padding: '10px 12px', color: '#f0e8d8', fontSize: 13, fontFamily: 'inherit', marginBottom: 14 }} />
+        {customFoods.filter(c => !DEFAULT_FOODS.find(f => f.id === c.id) && (!foodSearch || c.name.toLowerCase().includes(foodSearch.toLowerCase()))).length > 0 && (<>
           <div style={{ fontSize: 10, fontWeight: 700, color: '#7a9aa8', textTransform: 'uppercase', letterSpacing: 1, margin: '0 0 8px', fontFamily: 'JetBrains Mono, monospace' }}>
             Meus alimentos ({customFoods.filter(c => !DEFAULT_FOODS.find(f => f.id === c.id)).length})
           </div>
-          {customFoods.filter(c => !DEFAULT_FOODS.find(f => f.id === c.id)).map((f, idx) => (
+          {customFoods.filter(c => !DEFAULT_FOODS.find(f => f.id === c.id) && (!foodSearch || c.name.toLowerCase().includes(foodSearch.toLowerCase()))).map((f, idx) => (
             <div key={f.id} style={{ background: '#122028', borderRadius: 12, padding: '10px 12px', marginBottom: 7, display: 'flex', alignItems: 'center', gap: 8, border: '0.5px solid #1e1e30' }}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 13, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{f.name}</div>
@@ -1064,7 +1083,7 @@ export default function App() {
           ))}
         </>)}
         <div style={{ fontSize: 10, fontWeight: 700, color: '#7a9aa8', textTransform: 'uppercase', letterSpacing: 1, margin: '12px 0 8px', fontFamily: 'JetBrains Mono, monospace' }}>Base padrão ({DEFAULT_FOODS.length})</div>
-        {DEFAULT_FOODS.map(f => {
+        {DEFAULT_FOODS.filter(f => !foodSearch || (customFoods.find(c=>c.id===f.id)||f).name.toLowerCase().includes(foodSearch.toLowerCase())).map(f => {
           const override = customFoods.find(c => c.id === f.id)
           const display = override || f
           return (
@@ -1185,30 +1204,85 @@ function WeightModal({ onSave, onClose }) {
 }
 
 function TargetsModal({ targets, onSave, onClose }) {
-  const [t, setT] = useState(targets)
+  const [t, setT] = useState({
+    ...targets,
+    targets2: targets.targets2 || { cal: 1800, prot: 150, carb: 220, fat: 50, min: 1700, max: 1900, protMin: 138, protMax: 163, fatMax: 60 },
+    highCarbDays: targets.highCarbDays || [1, 3, 5],
+    dualMode: targets.dualMode || false,
+  })
+  const [activeTab, setActiveTab] = useState('meta1')
+  const DAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
   const fields = [
-    { k: 'cal', l: 'Calorias alvo (kcal)', c: '#c8873a' }, { k: 'min', l: 'Kcal mínimo', c: '#e8a040' }, { k: 'max', l: 'Kcal máximo', c: '#ef4444' },
+    { k: 'cal', l: 'Calorias alvo (kcal)', c: '#c8873a' }, { k: 'min', l: 'Kcal mínimo', c: '#e8a040' }, { k: 'max', l: 'Kcal máximo', c: '#e05555' },
     { k: 'prot', l: 'Proteína alvo (g)', c: '#2ab8b8' }, { k: 'protMin', l: 'Proteína mínima (g)', c: '#2ab8b8' }, { k: 'protMax', l: 'Proteína máxima (g)', c: '#2ab8b8' },
     { k: 'carb', l: 'Carboidratos (g)', c: '#e8a040' }, { k: 'fat', l: 'Gordura alvo (g)', c: '#e07060' }, { k: 'fatMax', l: 'Gordura máxima (g)', c: '#e07060' },
   ]
+  const toggleDay = (day) => setT(p => ({ ...p, highCarbDays: (p.highCarbDays||[]).includes(day) ? p.highCarbDays.filter(d=>d!==day) : [...(p.highCarbDays||[]), day] }))
+
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 200 }} onClick={e => e.target === e.currentTarget && onClose()}>
-      <div style={{ background: '#122028', borderRadius: '16px 16px 0 0', padding: 24, width: '100%', maxWidth: 480, border: '0.5px solid #2a2a40', maxHeight: '80vh', overflowY: 'auto' }}>
-        <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 16 }}>Metas diárias</div>
-        {fields.map(f => (
-          <div key={f.k} style={{ marginBottom: 12 }}>
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 200 }} onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={{ background: '#122028', borderRadius: '16px 16px 0 0', padding: 20, width: '100%', maxWidth: 480, border: '0.5px solid #1e3540', maxHeight: '88vh', overflowY: 'auto' }}>
+        <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 16, color: '#f0e8d8' }}>⚙️ Metas diárias</div>
+
+        {/* Toggle dual mode */}
+        <div style={{ background: '#1a2d35', borderRadius: 12, padding: '12px 14px', marginBottom: 14, border: '0.5px solid #1e3540' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#f0e8d8' }}>Metas por tipo de dia</div>
+              <div style={{ fontSize: 11, color: '#7a9aa8', marginTop: 2 }}>Carbo alto em dias específicos</div>
+            </div>
+            <div onClick={() => setT(p => ({ ...p, dualMode: !p.dualMode }))}
+              style={{ width: 44, height: 24, borderRadius: 12, background: t.dualMode ? '#c8873a' : '#1e3540', cursor: 'pointer', position: 'relative', transition: 'background .2s', flexShrink: 0 }}>
+              <div style={{ position: 'absolute', top: 3, left: t.dualMode ? 22 : 3, width: 18, height: 18, borderRadius: '50%', background: '#f0e8d8', transition: 'left .2s' }} />
+            </div>
+          </div>
+          {t.dualMode && (
+            <div style={{ marginTop: 12 }}>
+              <div style={{ fontSize: 11, color: '#7a9aa8', marginBottom: 8 }}>Marque os dias de <span style={{ color: '#2ab8b8', fontWeight: 700 }}>Carbo Alto</span> (Meta 2):</div>
+              <div style={{ display: 'flex', gap: 5 }}>
+                {DAYS.map((day, idx) => {
+                  const on = (t.highCarbDays||[]).includes(idx)
+                  return <div key={idx} onClick={() => toggleDay(idx)} style={{ flex: 1, textAlign: 'center', padding: '6px 0', borderRadius: 8, cursor: 'pointer', fontSize: 10, fontWeight: 700, border: `1.5px solid ${on ? '#2ab8b8' : '#1e3540'}`, background: on ? '#2ab8b820' : 'transparent', color: on ? '#2ab8b8' : '#7a9aa8' }}>{day}</div>
+                })}
+              </div>
+              <div style={{ marginTop: 8, fontSize: 10, color: '#3d5a68', fontFamily: 'JetBrains Mono, monospace' }}>
+                Dias não marcados → <span style={{ color: '#c8873a' }}>Carbo Baixo (Meta 1)</span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Tab selector for dual mode */}
+        {t.dualMode && (
+          <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
+            <button onClick={() => setActiveTab('meta1')} style={{ flex: 1, padding: '9px 0', border: 'none', borderRadius: 10, background: activeTab === 'meta1' ? '#c8873a' : '#1a2d35', color: activeTab === 'meta1' ? '#0d1a1f' : '#7a9aa8', fontWeight: 700, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>🟡 Meta 1 — Carbo Baixo</button>
+            <button onClick={() => setActiveTab('meta2')} style={{ flex: 1, padding: '9px 0', border: 'none', borderRadius: 10, background: activeTab === 'meta2' ? '#2ab8b8' : '#1a2d35', color: activeTab === 'meta2' ? '#0d1a1f' : '#7a9aa8', fontWeight: 700, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>🔵 Meta 2 — Carbo Alto</button>
+          </div>
+        )}
+
+        {/* Meta 1 fields */}
+        {(!t.dualMode || activeTab === 'meta1') && fields.map(f => (
+          <div key={f.k} style={{ marginBottom: 10 }}>
             <label style={{ fontSize: 11, color: f.c, fontWeight: 500, marginBottom: 4, display: 'block' }}>{f.l}</label>
-            <input type="number" value={t[f.k] || ''} onChange={e => setT(prev => ({ ...prev, [f.k]: parseFloat(e.target.value) || 0 }))}
-              style={{ width: '100%', background: '#1a2d35', border: `0.5px solid ${f.c}40`, borderRadius: 10, padding: '10px 14px', color: '#f0e8d8', fontSize: 14, fontFamily: 'JetBrains Mono, monospace' }} />
+            <input type="number" value={t[f.k] || ''} onChange={e => setT(p => ({ ...p, [f.k]: parseFloat(e.target.value) || 0 }))}
+              style={{ width: '100%', background: '#1a2d35', border: `0.5px solid ${f.c}40`, borderRadius: 10, padding: '9px 14px', color: '#f0e8d8', fontSize: 14, fontFamily: 'JetBrains Mono, monospace' }} />
           </div>
         ))}
+
+        {/* Meta 2 fields */}
+        {t.dualMode && activeTab === 'meta2' && fields.map(f => (
+          <div key={f.k} style={{ marginBottom: 10 }}>
+            <label style={{ fontSize: 11, color: '#2ab8b8', fontWeight: 500, marginBottom: 4, display: 'block' }}>{f.l} <span style={{ color: '#3d5a68', fontSize: 10 }}>(Carbo Alto)</span></label>
+            <input type="number" value={(t.targets2||{})[f.k] || ''} onChange={e => setT(p => ({ ...p, targets2: { ...(p.targets2||{}), [f.k]: parseFloat(e.target.value) || 0 } }))}
+              style={{ width: '100%', background: '#1a2d35', border: '0.5px solid #2ab8b840', borderRadius: 10, padding: '9px 14px', color: '#f0e8d8', fontSize: 14, fontFamily: 'JetBrains Mono, monospace' }} />
+          </div>
+        ))}
+
         <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
-          <button onClick={onClose} style={{ flex: 1, padding: 12, background: '#1a2d35', border: 'none', borderRadius: 12, color: '#6a8a98', cursor: 'pointer', fontFamily: 'inherit' }}>Cancelar</button>
-          <button onClick={() => onSave(t)} style={{ flex: 2, padding: 12, background: 'linear-gradient(135deg, #c8873a 0%, #e8a040 100%)', border: 'none', borderRadius: 12, color: '#0d1a1f', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700, fontSize: 14 }}>Salvar</button>
+          <button onClick={onClose} style={{ flex: 1, padding: 12, background: '#1a2d35', border: 'none', borderRadius: 12, color: '#7a9aa8', cursor: 'pointer', fontFamily: 'inherit' }}>Cancelar</button>
+          <button onClick={() => onSave(t)} style={{ flex: 2, padding: 12, background: 'linear-gradient(135deg, #c8873a, #e8a040)', border: 'none', borderRadius: 12, color: '#0d1a1f', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700, fontSize: 14 }}>Salvar</button>
         </div>
-        <div style={{ marginTop: 12, padding: '8px 12px', background: '#0d1a1f', borderRadius: 10, fontSize: 10, color: '#7a9aa8', fontFamily: 'JetBrains Mono, monospace' }}>
-          Padrão: 1562 kcal · min 1460 · max 1680 · P:150g · C:151g · G:43g
-        </div>
+        {!t.dualMode && <div style={{ marginTop: 10, padding: '8px 12px', background: '#0d1a1f', borderRadius: 10, fontSize: 10, color: '#3d5a68', fontFamily: 'JetBrains Mono, monospace' }}>Padrão: 1562 kcal · min 1460 · max 1680 · P:150g · C:151g · G:43g</div>}
       </div>
     </div>
   )
