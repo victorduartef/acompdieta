@@ -145,7 +145,6 @@ export default function App() {
   const [newFood, setNewFood] = useState({ name: '', cal: '', prot: '', carb: '', fat: '', unit: 'g', def: '100', fav: [] })
   const [foodSearch, setFoodSearch] = useState('')
   const [avulso, setAvulso] = useState(false)
-  const [foodSearch, setFoodSearch] = useState('')
   const [avulsoData, setAvulsoData] = useState({ name: '', cal: '', prot: '', carb: '', fat: '' })
 
   const allFoods = DEFAULT_FOODS.map(f => {
