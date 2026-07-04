@@ -775,7 +775,7 @@ export default function App() {
 
     const vals=last14.map(([,d])=>r0(calcMacros(Object.values(d.meals||{}).flat(),allFoods).cal))
     const maxV=vals.length?Math.max(...vals,activeTargets.max)*1.1:2000
-    const W=340,H=90,PL=8,PR=8,PT=8,PB=16
+    const W=340,H=110,PL=8,PR=8,PT=8,PB=36
     const cx=i=>PL+(i/Math.max(vals.length-1,1))*(W-PL-PR)
     const cy=v=>PT+(1-v/maxV)*(H-PT-PB)
     const pc=v=>v>activeTargets.max?C.red:v<activeTargets.min?C.gold:C.teal
@@ -871,6 +871,14 @@ export default function App() {
               <line x1={PL} y1={cy(activeTargets.cal)} x2={W-PR} y2={cy(activeTargets.cal)} stroke={`${C.gold}60`} strokeWidth="1.5" strokeDasharray="5,4"/>
               <polyline points={pts} fill="none" stroke={`${C.gold}70`} strokeWidth="1.5" strokeLinejoin="round"/>
               {vals.map((v,i)=><circle key={i} cx={cx(i)} cy={cy(v)} r="4" fill={pc(v)}/>)}
+              {last14.map(([date],i)=>{
+                const d=new Date(date+'T12:00:00')
+                const label=`${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`
+                const x=cx(i)
+                // Show every label if <=7 points, else show every 2nd
+                if(last14.length>7&&i%2!==0) return null
+                return <text key={i} x={x} y={H-4} fontSize="7.5" fill={C.text2} textAnchor="middle" fontFamily="JetBrains Mono,monospace">{label}</text>
+              })}
             </svg>
             <div style={{ display:'flex', gap:12, fontSize:10, color:C.text2, fontFamily:'JetBrains Mono,monospace', marginTop:6 }}>
               <span style={{ color:C.teal }}>● meta</span><span style={{ color:C.gold }}>● abaixo</span><span style={{ color:C.red }}>● excesso</span>
