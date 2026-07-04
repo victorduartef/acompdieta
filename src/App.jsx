@@ -778,7 +778,7 @@ export default function App() {
     const W=340,H=110,PL=8,PR=8,PT=8,PB=36
     const cx=i=>PL+(i/Math.max(vals.length-1,1))*(W-PL-PR)
     const cy=v=>PT+(1-v/maxV)*(H-PT-PB)
-    const pc=v=>v>activeTargets.max?C.red:v<activeTargets.min?C.gold:C.teal
+    const pc=(v,date)=>{ const t=getTargetsForDate(targets,targetsHistory,date); return v>t.max?C.red:v<t.min?C.gold:C.teal }
     const pts=vals.map((v,i)=>`${cx(i)},${cy(v)}`).join(' ')
 
     const activeLabel=()=>{
@@ -870,7 +870,7 @@ export default function App() {
               <line x1={PL} y1={cy(activeTargets.min)} x2={W-PR} y2={cy(activeTargets.min)} stroke={`${C.gold}40`} strokeWidth="1" strokeDasharray="3,3"/>
               <line x1={PL} y1={cy(activeTargets.cal)} x2={W-PR} y2={cy(activeTargets.cal)} stroke={`${C.gold}60`} strokeWidth="1.5" strokeDasharray="5,4"/>
               <polyline points={pts} fill="none" stroke={`${C.gold}70`} strokeWidth="1.5" strokeLinejoin="round"/>
-              {vals.map((v,i)=><circle key={i} cx={cx(i)} cy={cy(v)} r="4" fill={pc(v)}/>)}
+              {last14.map(([date],i)=><circle key={i} cx={cx(i)} cy={cy(vals[i])} r="4" fill={pc(vals[i],date)}/>)}
               {last14.map(([date],i)=>{
                 const d=new Date(date+'T12:00:00')
                 const label=`${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`
