@@ -266,6 +266,15 @@ export default function App() {
     updateWeights({ ...weights, [dateKey]: parseFloat(value) })
   }
 
+  // Save weight + body composition together in a single persist (avoids race condition)
+  function saveWeightAndBody(dateKey, bodyObj) {
+    const newWeights = { ...weights, [dateKey]: parseFloat(bodyObj.weight) }
+    const newBodyData = { ...bodyData, [dateKey]: bodyObj }
+    setWeights(newWeights)
+    setBodyData(newBodyData)
+    persist(days, targets, targetsHistory, customFoods, newWeights, darkMode, newBodyData)
+  }
+
   if (!loaded) return (
     <div style={{ minHeight:'100vh', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', background:'#0d1a1f', gap:24 }}>
       <img src="/icon-512.png" alt="EvoShape" style={{ width:140, height:140, borderRadius:32, boxShadow:'0 0 60px #c8873a40, 0 0 120px #2ab8b820' }} />
@@ -395,9 +404,7 @@ export default function App() {
       {showTargets&&<TargetsModal targets={targets} targetsHistory={targetsHistory} C={C} onSave={(nt,nth)=>{ updateTargets(nt,nth); setShowTargets(false) }} onClose={()=>setShowTargets(false)}/>}
       {showWeightModal&&<WeightModal C={C} onSave={(date,val)=>{ saveWeight(date,val); setShowWeightModal(false) }} onClose={()=>setShowWeightModal(false)}/>}
       {showRelaxFitModal&&<RelaxFitModal C={C} onSave={(date,data)=>{
-        saveWeight(date, data.weight)
-        const newBD = { ...bodyData, [date]: data }
-        updateBodyData(newBD)
+        saveWeightAndBody(date, data)
         setShowRelaxFitModal(false)
       }} onClose={()=>setShowRelaxFitModal(false)}/>}
     </div>
