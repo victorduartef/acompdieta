@@ -1517,109 +1517,45 @@ function RelaxFitModal({ C, onSave, onClose }) {
 
   function extractFromText(text) {
     const out = {}
-    // The RelaxFit "Índice corporal" section lists values in a FIXED order.
-    // OCR often mangles labels but keeps numbers, so we combine two strategies:
-    // 1) Try to match by label (when OCR read it well)
-    // 2) Fall back to sequential order for the body-index block
+    // OCR reads labels reasonably well but adds noise prefixes (e.g. "6o Taxa muscular",
+    // "Le Músculo Esquelético", "1o Proteína"). We match each label flexibly and grab
+    // the number that appears right after it. Deduplicate by taking FIRST good match.
 
     const full = text.replace(/\r/g, '').replace(/[ \t]+/g, ' ')
 
-    // Strategy 1: label-based matching (best effort)
-    const grab = (labels) => {
-      for (const label of labels) {
-        const esc = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-        const re = new RegExp(esc + '[^0-9]{0,15}(\\d+[.,]?\\d*)', 'i')
-        const m = full.match(re)
-        if (m) { const v = parseFloat(m[1].replace(',', '.')); if (!isNaN(v)) return v }
-      }
-      return undefined
-    }
-
-    const labelMap = [
-      { key:'weight',         labels:['Peso'] },
-      { key:'bmi',            labels:['IMC','BMI'] },
-      { key:'bodyFat',        labels:['Gordura corporal'] },
-      { key:'muscleMass',     labels:['Taxa muscular'] },
-      { key:'leanMass',       labels:['Corporal Magra','Massa Corporal Magra'] },
-      { key:'bmr',            labels:['TMB','kcal'] },
-      { key:'bodyType',       labels:[] },
+    // Each field: fuzzy label regex + expected unit. Order matters for specificity
+    // (more specific labels first to avoid "Massa" matching wrong rows).
+    const defs = [
+      { key:'weight',         re:/Peso\s+(\d+[.,]?\d*)\s*kg/i },
+      { key:'bmi',            re:/(?:IMC|BMI)\s*(?:IMC)?\s*(\d+[.,]?\d*)/i },
+      { key:'bodyFat',        re:/Gordura corporal?\s+(\d+[.,]?\d*)\s*%/i },
+      { key:'muscleMass',     re:/Taxa muscular\s+(\d+[.,]?\d*)\s*%/i },
+      { key:'leanMass',       re:/Corporal Magra\s+(\d+[.,]?\d*)\s*kg/i },
+      { key:'subcutFat',      re:/Subcut[aâ]nea\s+(\d+[.,]?\d*)\s*%/i },
+      { key:'visceralFat',    re:/Gordura Visceral\s+(\d+[.,]?\d*)/i },
+      { key:'bodyWater',      re:/[ÁA]gua Corporal\s+(\d+[.,]?\d*)\s*%/i },
+      { key:'skeletalMuscle', re:/Esquel[eé]tico\s+(\d+[.,]?\d*)\s*%/i },
+      { key:'muscleMassKg',   re:/Massa Muscular\s+(\d+[.,]?\d*)\s*kg/i },
+      { key:'boneMass',       re:/Massa [ÓO]ssea\s+(\d+[.,]?\d*)\s*kg/i },
+      { key:'protein',        re:/Prote[íi]na\s+(\d+[.,]?\d*)\s*%/i },
+      { key:'bmr',            re:/TMB\s+(\d+[.,]?\d*)\s*kcal/i },
+      { key:'bodyAge',        re:/Idade do corpo\s+(\d+)/i },
+      { key:'fatMass',        re:/Massa Gorda\s+(\d+[.,]?\d*)\s*kg/i },
+      { key:'waterMass',      re:/Peso da [ÁA]gua\s+(\d+[.,]?\d*)\s*kg/i },
+      { key:'proteinMass',    re:/Massa de Prote[íi]na\s+(\d+[.,]?\d*)\s*kg/i },
     ]
-    labelMap.forEach(({key, labels}) => {
-      const v = grab(labels)
-      if (v !== undefined) out[key] = v
+
+    defs.forEach(({ key, re }) => {
+      const m = full.match(re)
+      if (m) {
+        const v = parseFloat(m[1].replace(',', '.'))
+        if (!isNaN(v)) out[key] = v
+      }
     })
 
-    // Strategy 2: SEQUENTIAL extraction for the "Índice corporal" block.
-    // Find the start of the body index section, then read numbers in order.
-    // Fixed order of the 17 numeric fields in RelaxFit:
-    const SEQUENCE = [
-      { key:'weight',        unit:'kg'   },
-      { key:'bmi',           unit:''     },
-      { key:'bodyFat',       unit:'%'    },
-      { key:'muscleMass',    unit:'%'    },
-      { key:'leanMass',      unit:'kg'   },
-      { key:'subcutFat',     unit:'%'    },
-      { key:'visceralFat',   unit:''     },
-      { key:'bodyWater',     unit:'%'    },
-      { key:'skeletalMuscle',unit:'%'    },
-      { key:'muscleMassKg',  unit:'kg'   },
-      { key:'boneMass',      unit:'kg'   },
-      { key:'protein',       unit:'%'    },
-      { key:'bmr',           unit:'kcal' },
-      { key:'bodyAge',       unit:''     },
-      { key:'fatMass',       unit:'kg'   },
-      { key:'waterMass',     unit:'kg'   },
-      { key:'proteinMass',   unit:'kg'   },
-    ]
-
-    // Locate the body-index block start (after "corporal"/"Indice corporal"/"Peso")
-    let block = full
-    const idxMatch = full.search(/[ÍIi]ndice corporal/i)
-    if (idxMatch >= 0) block = full.slice(idxMatch)
-    else {
-      // fallback: start at "Peso" occurrence that is followed by a kg number
-      const pesoMatch = full.search(/Peso\s+\d+[.,]?\d*\s*kg/i)
-      if (pesoMatch >= 0) block = full.slice(pesoMatch)
-    }
-
-    // Extract all numbers with their following unit from the block, in order
-    // Matches: "73.40 kg", "22.2", "11.3%", "1776 kcal", "1.0"
-    const tokenRe = /(\d+[.,]?\d*)\s*(kg|kcal|%)?/gi
-    const tokens = []
-    let mm
-    while ((mm = tokenRe.exec(block)) !== null) {
-      const val = parseFloat(mm[1].replace(',', '.'))
-      if (isNaN(val)) continue
-      const unit = (mm[2] || '').toLowerCase()
-      tokens.push({ val, unit })
-    }
-
-    // Walk the sequence, consuming tokens that match the expected unit
-    let ti = 0
-    for (const field of SEQUENCE) {
-      // Skip tokens that clearly don't belong (e.g. stray small numbers)
-      // Find next token matching expected unit (or any if unit empty)
-      let matched = null
-      let searchStart = ti
-      for (let k = searchStart; k < tokens.length; k++) {
-        const tok = tokens[k]
-        if (field.unit === '' ) {
-          // number with no unit (bmi, visceralFat, bodyAge)
-          if (tok.unit === '') { matched = k; break }
-        } else if (field.unit === tok.unit) {
-          matched = k; break
-        }
-      }
-      if (matched !== null) {
-        if (out[field.key] === undefined) out[field.key] = tokens[matched].val
-        ti = matched + 1
-      }
-    }
-
-    // Body type (textual) - look for known types
-    const btMatch = full.match(/Tipo de corpo[^A-Za-zÀ-ú]{0,10}([A-Za-zÀ-ú]{4,})/i)
+    // Body type
+    const btMatch = full.match(/Tipo de corpo\s+([A-Za-zÀ-ú]{4,})/i)
     if (btMatch) out.bodyType = btMatch[1]
-    else if (/M[úu]sculo\b/i.test(full.slice(-60))) out.bodyType = 'Músculo'
 
     return out
   }
