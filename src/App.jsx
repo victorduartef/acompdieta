@@ -1516,57 +1516,115 @@ function RelaxFitModal({ C, onSave, onClose }) {
   }
 
   function extractFromText(text) {
-    // Normalize: unify decimal separator, collapse whitespace
-    const lines = text.split('\n').map(l => l.trim()).filter(Boolean)
-    const full = text.replace(/\r/g,'').replace(/[ \t]+/g,' ')
+    const out = {}
+    // The RelaxFit "Índice corporal" section lists values in a FIXED order.
+    // OCR often mangles labels but keeps numbers, so we combine two strategies:
+    // 1) Try to match by label (when OCR read it well)
+    // 2) Fall back to sequential order for the body-index block
 
-    // Helper: find a number near a label
-    const grab = (labels, wantPercent, wantKg, wantKcal) => {
+    const full = text.replace(/\r/g, '').replace(/[ \t]+/g, ' ')
+
+    // Strategy 1: label-based matching (best effort)
+    const grab = (labels) => {
       for (const label of labels) {
-        // search each line for the label, then a number
-        const re = new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g,'\\$&') + '[^0-9]{0,25}(\\d+[.,]?\\d*)', 'i')
+        const esc = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+        const re = new RegExp(esc + '[^0-9]{0,15}(\\d+[.,]?\\d*)', 'i')
         const m = full.match(re)
-        if (m) {
-          const val = parseFloat(m[1].replace(',','.'))
-          if (!isNaN(val)) return val
-        }
+        if (m) { const v = parseFloat(m[1].replace(',', '.')); if (!isNaN(v)) return v }
       }
       return undefined
     }
 
-    const out = {}
-    const map = [
-      { key:'weight',         labels:['Peso'],                           },
-      { key:'bmi',            labels:['IMC','BMI'],                      },
-      { key:'bodyFat',        labels:['Gordura corporal','Gordura corpora'] },
-      { key:'muscleMass',     labels:['Taxa muscular'],                  },
-      { key:'leanMass',       labels:['Massa Corporal Magra','Corporal Magra'] },
-      { key:'subcutFat',      labels:['Gordura Subcut','Subcutanea','Subcutânea'] },
-      { key:'visceralFat',    labels:['Gordura Visceral','Visceral'],    },
-      { key:'bodyWater',      labels:['Agua Corporal','Água Corporal','gua Corporal'] },
-      { key:'skeletalMuscle', labels:['Musculo Esquel','Músculo Esquel','Esqueletico','Esquelético'] },
-      { key:'muscleMassKg',   labels:['Massa Muscular'],                 },
-      { key:'boneMass',       labels:['Massa Ossea','Massa Óssea','Óssea','Ossea'] },
-      { key:'protein',        labels:['Proteina','Proteína'],            },
-      { key:'bmr',            labels:['TMB'],                            },
-      { key:'bodyAge',        labels:['Idade do corpo','Idade'],         },
-      { key:'fatMass',        labels:['Massa Gorda'],                    },
-      { key:'waterMass',      labels:['Peso da Agua','Peso da Água'],    },
-      { key:'proteinMass',    labels:['Massa de Proteina','Massa de Proteína'] },
+    const labelMap = [
+      { key:'weight',         labels:['Peso'] },
+      { key:'bmi',            labels:['IMC','BMI'] },
+      { key:'bodyFat',        labels:['Gordura corporal'] },
+      { key:'muscleMass',     labels:['Taxa muscular'] },
+      { key:'leanMass',       labels:['Corporal Magra','Massa Corporal Magra'] },
+      { key:'bmr',            labels:['TMB','kcal'] },
+      { key:'bodyType',       labels:[] },
     ]
-    map.forEach(({key, labels}) => {
+    labelMap.forEach(({key, labels}) => {
       const v = grab(labels)
       if (v !== undefined) out[key] = v
     })
 
-    // Body type is textual
+    // Strategy 2: SEQUENTIAL extraction for the "Índice corporal" block.
+    // Find the start of the body index section, then read numbers in order.
+    // Fixed order of the 17 numeric fields in RelaxFit:
+    const SEQUENCE = [
+      { key:'weight',        unit:'kg'   },
+      { key:'bmi',           unit:''     },
+      { key:'bodyFat',       unit:'%'    },
+      { key:'muscleMass',    unit:'%'    },
+      { key:'leanMass',      unit:'kg'   },
+      { key:'subcutFat',     unit:'%'    },
+      { key:'visceralFat',   unit:''     },
+      { key:'bodyWater',     unit:'%'    },
+      { key:'skeletalMuscle',unit:'%'    },
+      { key:'muscleMassKg',  unit:'kg'   },
+      { key:'boneMass',      unit:'kg'   },
+      { key:'protein',       unit:'%'    },
+      { key:'bmr',           unit:'kcal' },
+      { key:'bodyAge',       unit:''     },
+      { key:'fatMass',       unit:'kg'   },
+      { key:'waterMass',     unit:'kg'   },
+      { key:'proteinMass',   unit:'kg'   },
+    ]
+
+    // Locate the body-index block start (after "corporal"/"Indice corporal"/"Peso")
+    let block = full
+    const idxMatch = full.search(/[ÍIi]ndice corporal/i)
+    if (idxMatch >= 0) block = full.slice(idxMatch)
+    else {
+      // fallback: start at "Peso" occurrence that is followed by a kg number
+      const pesoMatch = full.search(/Peso\s+\d+[.,]?\d*\s*kg/i)
+      if (pesoMatch >= 0) block = full.slice(pesoMatch)
+    }
+
+    // Extract all numbers with their following unit from the block, in order
+    // Matches: "73.40 kg", "22.2", "11.3%", "1776 kcal", "1.0"
+    const tokenRe = /(\d+[.,]?\d*)\s*(kg|kcal|%)?/gi
+    const tokens = []
+    let mm
+    while ((mm = tokenRe.exec(block)) !== null) {
+      const val = parseFloat(mm[1].replace(',', '.'))
+      if (isNaN(val)) continue
+      const unit = (mm[2] || '').toLowerCase()
+      tokens.push({ val, unit })
+    }
+
+    // Walk the sequence, consuming tokens that match the expected unit
+    let ti = 0
+    for (const field of SEQUENCE) {
+      // Skip tokens that clearly don't belong (e.g. stray small numbers)
+      // Find next token matching expected unit (or any if unit empty)
+      let matched = null
+      let searchStart = ti
+      for (let k = searchStart; k < tokens.length; k++) {
+        const tok = tokens[k]
+        if (field.unit === '' ) {
+          // number with no unit (bmi, visceralFat, bodyAge)
+          if (tok.unit === '') { matched = k; break }
+        } else if (field.unit === tok.unit) {
+          matched = k; break
+        }
+      }
+      if (matched !== null) {
+        if (out[field.key] === undefined) out[field.key] = tokens[matched].val
+        ti = matched + 1
+      }
+    }
+
+    // Body type (textual) - look for known types
     const btMatch = full.match(/Tipo de corpo[^A-Za-zÀ-ú]{0,10}([A-Za-zÀ-ú]{4,})/i)
     if (btMatch) out.bodyType = btMatch[1]
+    else if (/M[úu]sculo\b/i.test(full.slice(-60))) out.bodyType = 'Músculo'
 
     return out
   }
 
-    async function handleImage(file) {
+  async function handleImage(file) {
     if (!file) return
     setParsing(true)
     setError('')
@@ -1578,39 +1636,43 @@ function RelaxFitModal({ C, onSave, onClose }) {
       setImg(dataUrl)
 
       try {
-        // Compress/resize image to stay under 1MB (OCR.space free limit)
-        const compressed = await compressImage(dataUrl, 1000)
+        // Split tall image into overlapping slices so OCR reads everything
+        const slices = await sliceImage(dataUrl)
+        console.log('Image split into', slices.length, 'slices')
 
-        const formData = new FormData()
-        formData.append('base64Image', compressed)
-        formData.append('language', 'por')
-        formData.append('OCREngine', '2')
-        formData.append('scale', 'true')
-        formData.append('isTable', 'true')
+        let fullText = ''
+        for (let i = 0; i < slices.length; i++) {
+          const formData = new FormData()
+          formData.append('base64Image', slices[i])
+          formData.append('language', 'por')
+          formData.append('OCREngine', '2')
+          formData.append('scale', 'true')
+          formData.append('isTable', 'true')
 
-        const resp = await fetch('https://api.ocr.space/parse/image', {
-          method: 'POST',
-          headers: { 'apikey': 'helloworld' },
-          body: formData,
-        })
-        const data = await resp.json()
-        console.log('OCR.space response:', data)
-
-        if (data.IsErroredOnProcessing) {
-          throw new Error(data.ErrorMessage?.[0] || 'Erro no OCR')
+          const resp = await fetch('https://api.ocr.space/parse/image', {
+            method: 'POST',
+            headers: { 'apikey': 'helloworld' },
+            body: formData,
+          })
+          const data = await resp.json()
+          if (data.IsErroredOnProcessing) {
+            console.warn('Slice', i, 'error:', data.ErrorMessage)
+            continue
+          }
+          const t = data.ParsedResults?.[0]?.ParsedText || ''
+          fullText += '\n' + t
         }
 
-        const text = data.ParsedResults?.[0]?.ParsedText || ''
-        console.log('=== OCR TEXT ===\n' + text + '\n===============')
+        console.log('=== OCR FULL TEXT ===\n' + fullText + '\n===============')
 
-        const extracted = extractFromText(text)
+        const extracted = extractFromText(fullText)
         console.log('Extracted:', extracted)
 
         if (Object.keys(extracted).length >= 2) {
           setResult(extracted)
-          setError(Object.keys(extracted).length < 6 ? '⚠️ Alguns campos não foram lidos. Confira e complete abaixo.' : '')
+          setError(Object.keys(extracted).length < 10 ? '⚠️ Alguns campos podem não ter sido lidos. Confira abaixo.' : '')
         } else {
-          setError('Não consegui ler os dados automaticamente. Preencha manualmente.')
+          setError('Não consegui ler os dados. Preencha manualmente.')
           setResult({})
         }
       } catch(err) {
@@ -1623,37 +1685,61 @@ function RelaxFitModal({ C, onSave, onClose }) {
     reader.readAsDataURL(file)
   }
 
-  // Compress image to keep under size limit for OCR API
-  function compressImage(dataUrl, maxWidth) {
+  // Slice a tall image into overlapping horizontal bands, each compressed under 1MB
+  function sliceImage(dataUrl) {
     return new Promise((resolve) => {
       const img = new Image()
       img.onload = () => {
-        let { width, height } = img
-        // For tall RelaxFit images, keep aspect ratio but limit width
-        if (width > maxWidth) {
-          height = height * (maxWidth / width)
-          width = maxWidth
+        const iw = img.naturalWidth
+        const ih = img.naturalHeight
+        const aspect = ih / iw
+
+        // If image is not very tall, just send whole thing
+        if (aspect < 3) {
+          const c = document.createElement('canvas')
+          const scale = Math.min(1, 1500 / iw)
+          c.width = iw * scale
+          c.height = ih * scale
+          const ctx = c.getContext('2d')
+          ctx.fillStyle = '#fff'; ctx.fillRect(0,0,c.width,c.height)
+          ctx.drawImage(img, 0, 0, c.width, c.height)
+          let q = 0.9, r = c.toDataURL('image/jpeg', q)
+          while (r.length > 1024*1024 && q > 0.3) { q -= 0.15; r = c.toDataURL('image/jpeg', q) }
+          return resolve([r])
         }
-        const canvas = document.createElement('canvas')
-        canvas.width = width
-        canvas.height = height
-        const ctx = canvas.getContext('2d')
-        ctx.fillStyle = '#ffffff'
-        ctx.fillRect(0, 0, width, height)
-        ctx.drawImage(img, 0, 0, width, height)
-        // Try progressively lower quality until under ~1MB
-        let quality = 0.85
-        let result = canvas.toDataURL('image/jpeg', quality)
-        while (result.length > 1024*1024 && quality > 0.3) {
-          quality -= 0.15
-          result = canvas.toDataURL('image/jpeg', quality)
+
+        // Tall image: split into slices with overlap
+        const numSlices = Math.ceil(aspect / 1.5) // each slice ~1.5:1 ratio
+        const sliceHeight = Math.ceil(ih / numSlices)
+        const overlap = Math.floor(sliceHeight * 0.12) // 12% overlap to not cut text
+        const slices = []
+
+        for (let i = 0; i < numSlices; i++) {
+          const y0 = Math.max(0, i * sliceHeight - overlap)
+          const y1 = Math.min(ih, (i+1) * sliceHeight + overlap)
+          const sh = y1 - y0
+
+          const c = document.createElement('canvas')
+          // Upscale narrow images for better OCR accuracy
+          const scale = Math.min(2, 1500 / iw)
+          c.width = Math.floor(iw * scale)
+          c.height = Math.floor(sh * scale)
+          const ctx = c.getContext('2d')
+          ctx.fillStyle = '#fff'; ctx.fillRect(0,0,c.width,c.height)
+          ctx.drawImage(img, 0, y0, iw, sh, 0, 0, c.width, c.height)
+
+          let q = 0.9, r = c.toDataURL('image/jpeg', q)
+          while (r.length > 1024*1024 && q > 0.3) { q -= 0.15; r = c.toDataURL('image/jpeg', q) }
+          slices.push(r)
         }
-        resolve(result)
+        resolve(slices)
       }
-      img.onerror = () => resolve(dataUrl)
+      img.onerror = () => resolve([dataUrl])
       img.src = dataUrl
     })
   }
+
+
 
   const fields = [
     { key: 'weight', label: 'Peso (kg)', color: C.gold },
