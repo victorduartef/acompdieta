@@ -1633,27 +1633,49 @@ function RelaxFitModal({ C, onSave, onClose }) {
         const slices = await sliceImage(dataUrl)
         console.log('Image split into', slices.length, 'slices')
 
+        const OCR_KEY = 'helloworld' // public test key — replace with your own free key from ocr.space/ocrapi for higher limits
         let fullText = ''
         for (let i = 0; i < slices.length; i++) {
-          const formData = new FormData()
-          formData.append('base64Image', slices[i])
-          formData.append('language', 'por')
-          formData.append('OCREngine', '2')
-          formData.append('scale', 'true')
-          formData.append('isTable', 'true')
+          // Delay between requests to avoid 429 rate limiting
+          if (i > 0) await new Promise(r => setTimeout(r, 1200))
 
-          const resp = await fetch('https://api.ocr.space/parse/image', {
-            method: 'POST',
-            headers: { 'apikey': 'helloworld' },
-            body: formData,
-          })
-          const data = await resp.json()
-          if (data.IsErroredOnProcessing) {
-            console.warn('Slice', i, 'error:', data.ErrorMessage)
-            continue
+          try {
+            const formData = new FormData()
+            formData.append('base64Image', slices[i])
+            formData.append('language', 'por')
+            formData.append('OCREngine', '2')
+            formData.append('scale', 'true')
+            formData.append('isTable', 'true')
+
+            const resp = await fetch('https://api.ocr.space/parse/image', {
+              method: 'POST',
+              headers: { 'apikey': OCR_KEY },
+              body: formData,
+            })
+
+            if (resp.status === 429) {
+              // Rate limited - wait longer and retry once
+              await new Promise(r => setTimeout(r, 3000))
+              const retry = await fetch('https://api.ocr.space/parse/image', {
+                method: 'POST', headers: { 'apikey': OCR_KEY }, body: formData,
+              })
+              const rdata = await retry.json()
+              if (!rdata.IsErroredOnProcessing) {
+                fullText += '\n' + (rdata.ParsedResults?.[0]?.ParsedText || '')
+              }
+              continue
+            }
+
+            const data = await resp.json()
+            if (data.IsErroredOnProcessing) {
+              console.warn('Slice', i, 'error:', data.ErrorMessage)
+              continue
+            }
+            const t = data.ParsedResults?.[0]?.ParsedText || ''
+            fullText += '\n' + t
+          } catch(sliceErr) {
+            console.warn('Slice', i, 'fetch error:', sliceErr)
           }
-          const t = data.ParsedResults?.[0]?.ParsedText || ''
-          fullText += '\n' + t
         }
 
         console.log('=== OCR FULL TEXT ===\n' + fullText + '\n===============')
@@ -1701,8 +1723,8 @@ function RelaxFitModal({ C, onSave, onClose }) {
           return resolve([r])
         }
 
-        // Tall image: split into slices with overlap
-        const numSlices = Math.ceil(aspect / 1.5) // each slice ~1.5:1 ratio
+        // Tall image: split into fewer, taller slices to minimize API calls
+        const numSlices = Math.min(3, Math.ceil(aspect / 2.5)) // max 3 slices
         const sliceHeight = Math.ceil(ih / numSlices)
         const overlap = Math.floor(sliceHeight * 0.12) // 12% overlap to not cut text
         const slices = []
