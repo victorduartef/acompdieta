@@ -201,10 +201,10 @@ export default function App() {
     })
   }, [])
 
-  const persist = useCallback((nd, nt, nth, ncf, nw, ndm) => {
+  const persist = useCallback((nd, nt, nth, ncf, nw, ndm, nbd) => {
     if (!uid) return
-    saveToFirebase(uid, { days:nd, targets:nt, targetsHistory:nth, customFoods:ncf, weights:nw, darkMode:ndm })
-  }, [uid])
+    saveToFirebase(uid, { days:nd, targets:nt, targetsHistory:nth, customFoods:ncf, weights:nw, darkMode:ndm, bodyData: nbd !== undefined ? nbd : bodyData })
+  }, [uid, bodyData])
 
   const updateDays = (nd) => { setDays(nd); persist(nd, targets, targetsHistory, customFoods, weights, darkMode) }
   const updateTargets = (nt, nth) => {
@@ -215,7 +215,7 @@ export default function App() {
   }
   const updateCustomFoods = (cf) => { setCustomFoods(cf); persist(days, targets, targetsHistory, cf, weights, darkMode) }
   const updateWeights = (w) => { setWeights(w); persist(days, targets, targetsHistory, customFoods, w, darkMode) }
-  const updateBodyData = (bd) => { setBodyData(bd); persist(days, targets, targetsHistory, customFoods, weights, darkMode) }
+  const updateBodyData = (bd) => { setBodyData(bd); persist(days, targets, targetsHistory, customFoods, weights, darkMode, bd) }
   const toggleDarkMode = () => { const nm = !darkMode; setDarkMode(nm); persist(days, targets, targetsHistory, customFoods, weights, nm) }
 
   const activeKey = editingDay || todayKey()
