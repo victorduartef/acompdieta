@@ -1516,33 +1516,57 @@ function RelaxFitModal({ C, onSave, onClose }) {
   }
 
   function extractFromText(text) {
-    const patterns = [
-      { key: 'weight', label: 'Peso', regex: /Peso[\s\S]*?(\d+\.?\d*)\s*kg/i },
-      { key: 'bmi', label: 'IMC', regex: /IMC[\s\S]*?(\d+\.?\d*)/i },
-      { key: 'bodyFat', label: 'Gordura corporal', regex: /Gordura corporal[\s\S]*?(\d+\.?\d*)\s*%/i },
-      { key: 'muscleMass', label: 'Taxa muscular', regex: /Taxa muscular[\s\S]*?(\d+\.?\d*)\s*%/i },
-      { key: 'leanMass', label: 'Massa Corporal Magra', regex: /Massa Corporal Magra[\s\S]*?(\d+\.?\d*)\s*kg/i },
-      { key: 'subcutFat', label: 'Gordura Subcutânea', regex: /Gordura Subcut[aâ]nea[\s\S]*?(\d+\.?\d*)\s*%/i },
-      { key: 'visceralFat', label: 'Gordura Visceral', regex: /Gordura Visceral[\s\S]*?(\d+\.?\d*)/i },
-      { key: 'bodyWater', label: 'Água Corporal', regex: /[ÁA]gua Corporal[\s\S]*?(\d+\.?\d*)\s*%/i },
-      { key: 'skeletalMuscle', label: 'Músculo Esquelético', regex: /M[úu]sculo Esquel[eé]tico[\s\S]*?(\d+\.?\d*)\s*%/i },
-      { key: 'muscleMassKg', label: 'Massa Muscular', regex: /Massa Muscular[\s\S]*?(\d+\.?\d*)\s*kg/i },
-      { key: 'boneMass', label: 'Massa Óssea', regex: /Massa [ÓO]ssea[\s\S]*?(\d+\.?\d*)\s*kg/i },
-      { key: 'protein', label: 'Proteína', regex: /Prote[íi]na[\s\S]*?(\d+\.?\d*)\s*%/i },
-      { key: 'bmr', label: 'TMB', regex: /TMB[\s\S]*?(\d+\.?\d*)\s*kcal/i },
-      { key: 'bodyAge', label: 'Idade do corpo', regex: /Idade do corpo[\s\S]*?(\d+)/i },
-      { key: 'fatMass', label: 'Massa Gorda', regex: /Massa Gorda[\s\S]*?(\d+\.?\d*)\s*kg/i },
-      { key: 'bodyType', label: 'Tipo de corpo', regex: /Tipo de corpo[\s\S]*?([A-Za-záàãâéêíóôõúçÁÀÃÂÉÊÍÓÔÕÚÇ]+)/i },
-    ]
+    // Normalize: unify decimal separator, collapse whitespace
+    const lines = text.split('\n').map(l => l.trim()).filter(Boolean)
+    const full = text.replace(/\r/g,'').replace(/[ \t]+/g,' ')
+
+    // Helper: find a number near a label
+    const grab = (labels, wantPercent, wantKg, wantKcal) => {
+      for (const label of labels) {
+        // search each line for the label, then a number
+        const re = new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g,'\\$&') + '[^0-9]{0,25}(\\d+[.,]?\\d*)', 'i')
+        const m = full.match(re)
+        if (m) {
+          const val = parseFloat(m[1].replace(',','.'))
+          if (!isNaN(val)) return val
+        }
+      }
+      return undefined
+    }
+
     const out = {}
-    patterns.forEach(({ key, regex }) => {
-      const m = text.match(regex)
-      if (m) out[key] = isNaN(m[1]) ? m[1] : parseFloat(m[1])
+    const map = [
+      { key:'weight',         labels:['Peso'],                           },
+      { key:'bmi',            labels:['IMC','BMI'],                      },
+      { key:'bodyFat',        labels:['Gordura corporal','Gordura corpora'] },
+      { key:'muscleMass',     labels:['Taxa muscular'],                  },
+      { key:'leanMass',       labels:['Massa Corporal Magra','Corporal Magra'] },
+      { key:'subcutFat',      labels:['Gordura Subcut','Subcutanea','Subcutânea'] },
+      { key:'visceralFat',    labels:['Gordura Visceral','Visceral'],    },
+      { key:'bodyWater',      labels:['Agua Corporal','Água Corporal','gua Corporal'] },
+      { key:'skeletalMuscle', labels:['Musculo Esquel','Músculo Esquel','Esqueletico','Esquelético'] },
+      { key:'muscleMassKg',   labels:['Massa Muscular'],                 },
+      { key:'boneMass',       labels:['Massa Ossea','Massa Óssea','Óssea','Ossea'] },
+      { key:'protein',        labels:['Proteina','Proteína'],            },
+      { key:'bmr',            labels:['TMB'],                            },
+      { key:'bodyAge',        labels:['Idade do corpo','Idade'],         },
+      { key:'fatMass',        labels:['Massa Gorda'],                    },
+      { key:'waterMass',      labels:['Peso da Agua','Peso da Água'],    },
+      { key:'proteinMass',    labels:['Massa de Proteina','Massa de Proteína'] },
+    ]
+    map.forEach(({key, labels}) => {
+      const v = grab(labels)
+      if (v !== undefined) out[key] = v
     })
+
+    // Body type is textual
+    const btMatch = full.match(/Tipo de corpo[^A-Za-zÀ-ú]{0,10}([A-Za-zÀ-ú]{4,})/i)
+    if (btMatch) out.bodyType = btMatch[1]
+
     return out
   }
 
-  async function handleImage(file) {
+    async function handleImage(file) {
     if (!file) return
     setParsing(true)
     setError('')
@@ -1550,29 +1574,85 @@ function RelaxFitModal({ C, onSave, onClose }) {
 
     const reader = new FileReader()
     reader.onload = async (e) => {
-      setImg(e.target.result)
-      // Use Tesseract.js for OCR if available, otherwise manual entry
-      if (window.Tesseract) {
-        try {
-          const { data: { text } } = await window.Tesseract.recognize(e.target.result, 'por')
-          const extracted = extractFromText(text)
-          if (Object.keys(extracted).length > 0) {
-            setResult(extracted)
-          } else {
-            setError('Não consegui extrair os dados. Preencha manualmente abaixo.')
-            setResult({})
-          }
-        } catch(err) {
-          setError('Erro no OCR. Preencha manualmente.')
+      const dataUrl = e.target.result
+      setImg(dataUrl)
+
+      try {
+        // Compress/resize image to stay under 1MB (OCR.space free limit)
+        const compressed = await compressImage(dataUrl, 1000)
+
+        const formData = new FormData()
+        formData.append('base64Image', compressed)
+        formData.append('language', 'por')
+        formData.append('OCREngine', '2')
+        formData.append('scale', 'true')
+        formData.append('isTable', 'true')
+
+        const resp = await fetch('https://api.ocr.space/parse/image', {
+          method: 'POST',
+          headers: { 'apikey': 'helloworld' },
+          body: formData,
+        })
+        const data = await resp.json()
+        console.log('OCR.space response:', data)
+
+        if (data.IsErroredOnProcessing) {
+          throw new Error(data.ErrorMessage?.[0] || 'Erro no OCR')
+        }
+
+        const text = data.ParsedResults?.[0]?.ParsedText || ''
+        console.log('=== OCR TEXT ===\n' + text + '\n===============')
+
+        const extracted = extractFromText(text)
+        console.log('Extracted:', extracted)
+
+        if (Object.keys(extracted).length >= 2) {
+          setResult(extracted)
+          setError(Object.keys(extracted).length < 6 ? '⚠️ Alguns campos não foram lidos. Confira e complete abaixo.' : '')
+        } else {
+          setError('Não consegui ler os dados automaticamente. Preencha manualmente.')
           setResult({})
         }
-      } else {
-        setError('Preencha os valores manualmente conforme a imagem.')
+      } catch(err) {
+        console.error('OCR error:', err)
+        setError('Erro ao ler imagem: ' + err.message + '. Preencha manualmente.')
         setResult({})
       }
       setParsing(false)
     }
     reader.readAsDataURL(file)
+  }
+
+  // Compress image to keep under size limit for OCR API
+  function compressImage(dataUrl, maxWidth) {
+    return new Promise((resolve) => {
+      const img = new Image()
+      img.onload = () => {
+        let { width, height } = img
+        // For tall RelaxFit images, keep aspect ratio but limit width
+        if (width > maxWidth) {
+          height = height * (maxWidth / width)
+          width = maxWidth
+        }
+        const canvas = document.createElement('canvas')
+        canvas.width = width
+        canvas.height = height
+        const ctx = canvas.getContext('2d')
+        ctx.fillStyle = '#ffffff'
+        ctx.fillRect(0, 0, width, height)
+        ctx.drawImage(img, 0, 0, width, height)
+        // Try progressively lower quality until under ~1MB
+        let quality = 0.85
+        let result = canvas.toDataURL('image/jpeg', quality)
+        while (result.length > 1024*1024 && quality > 0.3) {
+          quality -= 0.15
+          result = canvas.toDataURL('image/jpeg', quality)
+        }
+        resolve(result)
+      }
+      img.onerror = () => resolve(dataUrl)
+      img.src = dataUrl
+    })
   }
 
   const fields = [
