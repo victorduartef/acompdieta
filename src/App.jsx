@@ -125,8 +125,10 @@ async function loadFromFirebase(uid) {
   try { const snap = await getDoc(doc(db,'users',uid)); if(snap.exists()) return snap.data() } catch(e) { console.error(e) }
   return null
 }
-async function saveToFirebase(uid, data) {
-  try { await setDoc(doc(db,'users',uid), data, { merge:true }) } catch(e) { console.error(e) }
+async function saveToFirebase(uid, data, fullReplace) {
+  try {
+    await setDoc(doc(db,'users',uid), data, { merge: !fullReplace })
+  } catch(e) { console.error(e) }
 }
 
 // ── THEME ────────────────────────────────────────────────────────────────────
@@ -203,7 +205,17 @@ export default function App() {
 
   const persist = useCallback((nd, nt, nth, ncf, nw, ndm, nbd) => {
     if (!uid) return
-    saveToFirebase(uid, { days:nd, targets:nt, targetsHistory:nth, customFoods:ncf, weights:nw, darkMode:ndm, bodyData: nbd !== undefined ? nbd : bodyData })
+    const payload = {
+      days: nd,
+      targets: nt,
+      targetsHistory: nth,
+      customFoods: ncf,
+      weights: nw,
+      darkMode: ndm,
+      bodyData: nbd !== undefined ? nbd : bodyData,
+    }
+    // fullReplace=true ensures deleted keys (e.g. removed weight entries) are actually removed
+    saveToFirebase(uid, payload, true)
   }, [uid, bodyData])
 
   const updateDays = (nd) => { setDays(nd); persist(nd, targets, targetsHistory, customFoods, weights, darkMode) }
@@ -252,15 +264,6 @@ export default function App() {
   }
   function saveWeight(dateKey, value) {
     updateWeights({ ...weights, [dateKey]: parseFloat(value) })
-  }
-
-  function saveTargetsWithHistory(newTargets, startDate) {
-    const newEntry = { startDate, targets: newTargets }
-    const filtered = (targetsHistory || []).filter(h => h.startDate !== startDate)
-    const newHistory = [...filtered, newEntry].sort((a, b) => a.startDate.localeCompare(b.startDate))
-    setTargetsHistory(newHistory)
-    setTargets(newTargets)
-    persist(days, newTargets, customFoods, weights, newHistory)
   }
 
   if (!loaded) return (
@@ -1517,43 +1520,97 @@ function RelaxFitModal({ C, onSave, onClose }) {
 
   function extractFromText(text) {
     const out = {}
-    // OCR reads labels reasonably well but adds noise prefixes (e.g. "6o Taxa muscular",
-    // "Le Músculo Esquelético", "1o Proteína"). We match each label flexibly and grab
-    // the number that appears right after it. Deduplicate by taking FIRST good match.
-
     const full = text.replace(/\r/g, '').replace(/[ \t]+/g, ' ')
 
-    // Each field: fuzzy label regex + expected unit. Order matters for specificity
-    // (more specific labels first to avoid "Massa" matching wrong rows).
+    // ── Strategy 1: label-based matching (tolerant to OCR noise) ──
+    // Fuzzy labels handle common OCR errors (MANSA→MASSA, etc.) via loose patterns
     const defs = [
       { key:'weight',         re:/Peso\s+(\d+[.,]?\d*)\s*kg/i },
       { key:'bmi',            re:/(?:IMC|BMI)\s*(?:IMC)?\s*(\d+[.,]?\d*)/i },
-      { key:'bodyFat',        re:/Gordura corporal?\s+(\d+[.,]?\d*)\s*%/i },
-      { key:'muscleMass',     re:/Taxa muscular\s+(\d+[.,]?\d*)\s*%/i },
-      { key:'leanMass',       re:/Corporal Magra\s+(\d+[.,]?\d*)\s*kg/i },
-      { key:'subcutFat',      re:/Subcut[aâ]nea\s+(\d+[.,]?\d*)\s*%/i },
-      { key:'visceralFat',    re:/Gordura Visceral\s+(\d+[.,]?\d*)/i },
-      { key:'bodyWater',      re:/[ÁA]gua Corporal\s+(\d+[.,]?\d*)\s*%/i },
-      { key:'skeletalMuscle', re:/Esquel[eé]tico\s+(\d+[.,]?\d*)\s*%/i },
-      { key:'muscleMassKg',   re:/Massa Muscular\s+(\d+[.,]?\d*)\s*kg/i },
-      { key:'boneMass',       re:/Massa [ÓO]ssea\s+(\d+[.,]?\d*)\s*kg/i },
-      { key:'protein',        re:/Prote[íi]na\s+(\d+[.,]?\d*)\s*%/i },
+      { key:'bodyFat',        re:/Gordura corpora\w*\s+(\d+[.,]?\d*)\s*%/i },
+      { key:'muscleMass',     re:/Taxa musc\w*\s+(\d+[.,]?\d*)\s*%/i },
+      { key:'leanMass',       re:/Corporal? Magra\s+(\d+[.,]?\d*)\s*kg/i },
+      { key:'subcutFat',      re:/Subcut[aâ]?\w*\s+(\d+[.,]?\d*)\s*%/i },
+      { key:'visceralFat',    re:/\w*\s*Visceral\s+(\d+[.,]?\d*)/i },
+      { key:'bodyWater',      re:/[ÁA]gua Corpora\w*\s+(\d+[.,]?\d*)\s*%/i },
+      { key:'skeletalMuscle', re:/Esquel[eé]?\w*\s+(\d+[.,]?\d*)\s*%/i },
+      { key:'muscleMassKg',   re:/M[a2]n?ssa Musc\w*\s+(\d+[.,]?\d*)\s*kg/i },
+      { key:'boneMass',       re:/M[a2]n?ssa [ÓO]ss\w*\s+(\d+[.,]?\d*)\s*kg/i },
+      { key:'protein',        re:/Prote[íi]?\w*\s+(\d+[.,]?\d*)\s*%/i },
       { key:'bmr',            re:/TMB\s+(\d+[.,]?\d*)\s*kcal/i },
       { key:'bodyAge',        re:/Idade do corpo\s+(\d+)/i },
-      { key:'fatMass',        re:/Massa Gorda\s+(\d+[.,]?\d*)\s*kg/i },
+      { key:'fatMass',        re:/M[a2]n?ssa Gorda\s+(\d+[.,]?\d*)\s*kg/i },
       { key:'waterMass',      re:/Peso da [ÁA]gua\s+(\d+[.,]?\d*)\s*kg/i },
-      { key:'proteinMass',    re:/Massa de Prote[íi]na\s+(\d+[.,]?\d*)\s*kg/i },
+      { key:'proteinMass',    re:/M[a2]n?ssa de Prote[íi]?\w*\s+(\d+[.,]?\d*)\s*kg/i },
     ]
-
     defs.forEach(({ key, re }) => {
       const m = full.match(re)
-      if (m) {
-        const v = parseFloat(m[1].replace(',', '.'))
-        if (!isNaN(v)) out[key] = v
-      }
+      if (m) { const v = parseFloat(m[1].replace(',', '.')); if (!isNaN(v)) out[key] = v }
     })
 
-    // Body type
+    // ── Strategy 2: sequential fallback for missing fields ──
+    // The RelaxFit body-index block always lists values in this exact order & unit.
+    // We extract all number+unit tokens from the block and fill any gaps by position.
+    const SEQUENCE = [
+      { key:'weight',        unit:'kg'   },
+      { key:'bmi',           unit:'none' },
+      { key:'bodyFat',       unit:'%'    },
+      { key:'muscleMass',    unit:'%'    },
+      { key:'leanMass',      unit:'kg'   },
+      { key:'subcutFat',     unit:'%'    },
+      { key:'visceralFat',   unit:'none' },
+      { key:'bodyWater',     unit:'%'    },
+      { key:'skeletalMuscle',unit:'%'    },
+      { key:'muscleMassKg',  unit:'kg'   },
+      { key:'boneMass',      unit:'kg'   },
+      { key:'protein',       unit:'%'    },
+      { key:'bmr',           unit:'kcal' },
+      { key:'bodyAge',       unit:'none' },
+      { key:'fatMass',       unit:'kg'   },
+      { key:'waterMass',     unit:'kg'   },
+      { key:'proteinMass',   unit:'kg'   },
+    ]
+
+    // Isolate the body-index block (starts near "Indice corporal" or first "Peso ... kg")
+    let block = full
+    const idxSec = full.search(/[ÍIíi]ndice corporal/i)
+    if (idxSec >= 0) block = full.slice(idxSec)
+    else {
+      const p = full.search(/Peso\s+\d+[.,]?\d*\s*kg/i)
+      if (p >= 0) block = full.slice(p)
+    }
+
+    // Collect tokens in order, de-duplicating consecutive repeats (from slice overlap)
+    const tokenRe = /(\d+[.,]?\d*)\s*(kg|kcal|%)?/gi
+    const tokens = []
+    let mm
+    while ((mm = tokenRe.exec(block)) !== null) {
+      const val = parseFloat(mm[1].replace(',', '.'))
+      if (isNaN(val)) continue
+      let unit = (mm[2] || '').toLowerCase()
+      if (!unit) unit = 'none'
+      // skip obvious noise: the "-10.7 kg" segment values and "114.8 %" appear BEFORE
+      // the index block, so block slicing already excludes them
+      const last = tokens[tokens.length-1]
+      if (last && last.val === val && last.unit === unit) continue // dedupe overlap
+      tokens.push({ val, unit })
+    }
+
+    // Walk sequence; for each field find next token matching its unit
+    let ti = 0
+    for (const field of SEQUENCE) {
+      let matchedIdx = -1
+      for (let k = ti; k < tokens.length; k++) {
+        if (tokens[k].unit === field.unit) { matchedIdx = k; break }
+      }
+      if (matchedIdx >= 0) {
+        // Only fill if label strategy missed it
+        if (out[field.key] === undefined) out[field.key] = tokens[matchedIdx].val
+        ti = matchedIdx + 1
+      }
+    }
+
+    // Body type (textual)
     const btMatch = full.match(/Tipo de corpo\s+([A-Za-zÀ-ú]{4,})/i)
     if (btMatch) out.bodyType = btMatch[1]
 
