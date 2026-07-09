@@ -150,6 +150,9 @@ export default function App() {
   const [targetsHistory, setTargetsHistory] = useState([])
   const [customFoods, setCustomFoods] = useState([])
   const [weights, setWeights] = useState({})
+  const [bodyData, setBodyData] = useState({}) // stores full body composition per date
+  const [showRelaxFitModal, setShowRelaxFitModal] = useState(false)
+  const [insightPeriod, setInsightPeriod] = useState('last') // 'last' | '7d' | '30d'
   const [loaded, setLoaded] = useState(false)
   const [tab, setTab] = useState('today')
   const [activeMeal, setActiveMeal] = useState('cafe_manha')
@@ -188,6 +191,7 @@ export default function App() {
             if (data.targetsHistory) setTargetsHistory(data.targetsHistory)
             if (data.customFoods) setCustomFoods(data.customFoods)
             if (data.weights) setWeights(data.weights)
+            if (data.bodyData) setBodyData(data.bodyData)
             if (data.targetsHistory) setTargetsHistory(data.targetsHistory)
             if (data.darkMode !== undefined) setDarkMode(data.darkMode)
           }
@@ -211,6 +215,7 @@ export default function App() {
   }
   const updateCustomFoods = (cf) => { setCustomFoods(cf); persist(days, targets, targetsHistory, cf, weights, darkMode) }
   const updateWeights = (w) => { setWeights(w); persist(days, targets, targetsHistory, customFoods, w, darkMode) }
+  const updateBodyData = (bd) => { setBodyData(bd); persist(days, targets, targetsHistory, customFoods, weights, darkMode) }
   const toggleDarkMode = () => { const nm = !darkMode; setDarkMode(nm); persist(days, targets, targetsHistory, customFoods, weights, nm) }
 
   const activeKey = editingDay || todayKey()
@@ -386,6 +391,12 @@ export default function App() {
 
       {showTargets&&<TargetsModal targets={targets} targetsHistory={targetsHistory} C={C} onSave={(nt,nth)=>{ updateTargets(nt,nth); setShowTargets(false) }} onClose={()=>setShowTargets(false)}/>}
       {showWeightModal&&<WeightModal C={C} onSave={(date,val)=>{ saveWeight(date,val); setShowWeightModal(false) }} onClose={()=>setShowWeightModal(false)}/>}
+      {showRelaxFitModal&&<RelaxFitModal C={C} onSave={(date,data)=>{
+        saveWeight(date, data.weight)
+        const newBD = { ...bodyData, [date]: data }
+        updateBodyData(newBD)
+        setShowRelaxFitModal(false)
+      }} onClose={()=>setShowRelaxFitModal(false)}/>}
     </div>
   )
 
@@ -649,76 +660,257 @@ export default function App() {
 
   // ── PESO ────────────────────────────────────────────────────────────────────
   function renderPeso() {
-    const weightEntries=Object.entries(weights).sort(([a],[b])=>b.localeCompare(a))
-    const latestWeight=weightEntries[0]?.[1]||null
-    const prevWeight=weightEntries[1]?.[1]||null
-    const weightDiff=latestWeight&&prevWeight?(latestWeight-prevWeight).toFixed(1):null
-    const chartEntries=[...weightEntries].reverse()
-    const wVals=chartEntries.map(([,v])=>v)
+    const weightEntries = Object.entries(weights).sort(([a],[b]) => b.localeCompare(a))
+    const latestWeight = weightEntries[0]?.[1] || null
+    const prevWeight = weightEntries[1]?.[1] || null
+    const weightDiff = latestWeight && prevWeight ? (latestWeight - prevWeight).toFixed(1) : null
+    const chartEntries = [...weightEntries].reverse()
+    const wVals = chartEntries.map(([,v]) => v)
+
+    // Body composition trends
+    const bodyEntries = Object.entries(bodyData).sort(([a],[b]) => a.localeCompare(b))
+    const latestBody = bodyEntries.length > 0 ? bodyEntries[bodyEntries.length-1][1] : null
+    const prevBody = bodyEntries.length > 1 ? bodyEntries[bodyEntries.length-2][1] : null
+
+    // Trends: positive = improved
+    const fatTrend = latestBody && prevBody && latestBody.bodyFat && prevBody.bodyFat ? (latestBody.bodyFat - prevBody.bodyFat).toFixed(1) : null
+    const muscleTrend = latestBody && prevBody && latestBody.muscleMass && prevBody.muscleMass ? (latestBody.muscleMass - prevBody.muscleMass).toFixed(1) : null
+    const leanTrend = latestBody && prevBody && latestBody.leanMass && prevBody.leanMass ? (latestBody.leanMass - prevBody.leanMass).toFixed(1) : null
+
     return (
       <div>
-        <div style={{ background:C.surface, borderRadius:14, padding:16, marginBottom:14, border:`0.5px solid ${C.border}` }}>
+        {/* Header card - peso atual */}
+        <div style={{ background:C.surface, borderRadius:14, padding:16, marginBottom:12, border:`0.5px solid ${C.border}` }}>
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
             <div style={{ fontSize:13, fontWeight:700, color:C.text }}>⚖️ Peso Corporal</div>
-            <button onClick={()=>setShowWeightModal(true)} style={{ background:`linear-gradient(135deg,${C.gold},${C.gold2})`, border:'none', borderRadius:10, padding:'7px 14px', color:'#0d1a1f', fontSize:12, cursor:'pointer', fontFamily:'inherit', fontWeight:700 }}>+ Registrar</button>
+            <div style={{ display:'flex', gap:6 }}>
+              <button onClick={()=>setShowWeightModal(true)} style={{ background:`linear-gradient(135deg,${C.gold},${C.gold2})`, border:'none', borderRadius:10, padding:'7px 12px', color:'#0d1a1f', fontSize:11, cursor:'pointer', fontFamily:'inherit', fontWeight:700 }}>+ Registrar</button>
+              <button onClick={()=>setShowRelaxFitModal(true)} style={{ background:C.surface2, border:`1px solid ${C.gold}60`, borderRadius:10, padding:'7px 12px', color:C.gold, fontSize:11, cursor:'pointer', fontFamily:'inherit', fontWeight:700 }}>📷 RelaxFit</button>
+            </div>
           </div>
-          {latestWeight?(<>
-            <div style={{ display:'flex', alignItems:'baseline', gap:10, marginBottom:4 }}>
+          {latestWeight ? (<>
+            <div style={{ display:'flex', alignItems:'baseline', gap:10, marginBottom:10 }}>
               <span style={{ fontSize:40, fontWeight:800, fontFamily:'JetBrains Mono,monospace', color:C.text }}>{latestWeight}</span>
               <span style={{ fontSize:16, color:C.text2 }}>kg</span>
-              {weightDiff!==null&&<span style={{ fontSize:13, fontWeight:700, color:parseFloat(weightDiff)<0?C.teal:parseFloat(weightDiff)>0?C.red:C.text2 }}>{parseFloat(weightDiff)>0?'+':''}{weightDiff} kg</span>}
+              {weightDiff !== null && (
+                <span style={{ fontSize:13, fontWeight:700, color:parseFloat(weightDiff)<0?C.teal:parseFloat(weightDiff)>0?C.red:C.text2 }}>
+                  {parseFloat(weightDiff)>0?'+':''}{weightDiff} kg
+                </span>
+              )}
             </div>
-            {weightEntries.length>=2&&(()=>{
-              const first=weightEntries[weightEntries.length-1][1], last=weightEntries[0][1], diff=(last-first).toFixed(1)
-              return <div style={{ display:'flex', gap:8, marginTop:10 }}>
-                {[{l:'INICIAL',v:`${first} kg`},{l:'VARIAÇÃO',v:`${parseFloat(diff)>0?'+':''}${diff} kg`,c:parseFloat(diff)<0?C.teal:parseFloat(diff)>0?C.red:C.text2},{l:'REGISTROS',v:`${weightEntries.length}x`}].map(s=>(
-                  <div key={s.l} style={{ flex:1, background:C.bg, borderRadius:10, padding:'8px', textAlign:'center' }}>
-                    <div style={{ fontSize:9, color:C.text2, marginBottom:3, fontFamily:'JetBrains Mono,monospace' }}>{s.l}</div>
-                    <div style={{ fontSize:15, fontWeight:700, fontFamily:'JetBrains Mono,monospace', color:s.c||C.text }}>{s.v}</div>
+            {weightEntries.length >= 2 && (() => {
+              const first = weightEntries[weightEntries.length-1][1]
+              const last = weightEntries[0][1]
+              const diff = (last - first).toFixed(1)
+              return (
+                <div style={{ display:'flex', gap:8 }}>
+                  {[
+                    { l:'INICIAL', v:`${first} kg` },
+                    { l:'VARIAÇÃO', v:`${parseFloat(diff)>0?'+':''}${diff} kg`, c:parseFloat(diff)<0?C.teal:parseFloat(diff)>0?C.red:C.text2 },
+                    { l:'REGISTROS', v:`${weightEntries.length}x` },
+                  ].map(s => (
+                    <div key={s.l} style={{ flex:1, background:C.bg, borderRadius:10, padding:'8px', textAlign:'center' }}>
+                      <div style={{ fontSize:9, color:C.text2, marginBottom:3, fontFamily:'JetBrains Mono,monospace' }}>{s.l}</div>
+                      <div style={{ fontSize:15, fontWeight:700, fontFamily:'JetBrains Mono,monospace', color:s.c||C.text }}>{s.v}</div>
+                    </div>
+                  ))}
+                </div>
+              )
+            })()}
+          </>) : (
+            <div style={{ textAlign:'center', padding:'20px 0', color:C.text3, fontSize:13 }}>
+              <div style={{ fontSize:32, marginBottom:8 }}>⚖️</div>
+              Nenhum peso registrado.<br/>Use RelaxFit para importar!
+            </div>
+          )}
+        </div>
+
+        {/* Composição corporal atual */}
+        {latestBody && (
+          <div style={{ background:C.surface, borderRadius:14, padding:14, marginBottom:12, border:`0.5px solid ${C.border}` }}>
+            <div style={{ fontSize:13, fontWeight:700, marginBottom:12, color:C.text }}>🧬 Composição Corporal</div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:8 }}>
+              {[
+                { label:'% Gordura', val:latestBody.bodyFat, unit:'%', color:C.terra, trend:fatTrend, goodDown:true },
+                { label:'% Músculo', val:latestBody.muscleMass, unit:'%', color:C.teal, trend:muscleTrend, goodDown:false },
+                { label:'Massa Magra', val:latestBody.leanMass, unit:'kg', color:C.teal, trend:leanTrend, goodDown:false },
+                { label:'% Água', val:latestBody.bodyWater, unit:'%', color:'#60a5fa', trend:null },
+                { label:'Gordura Visceral', val:latestBody.visceralFat, unit:'', color:C.terra, trend:null },
+                { label:'Massa Óssea', val:latestBody.boneMass, unit:'kg', color:C.text2, trend:null },
+              ].filter(x => x.val).map(x => {
+                const trendNum = x.trend ? parseFloat(x.trend) : 0
+                const trendGood = x.goodDown ? trendNum < 0 : trendNum > 0
+                const trendBad = x.goodDown ? trendNum > 0 : trendNum < 0
+                return (
+                  <div key={x.label} style={{ background:C.bg, borderRadius:10, padding:'10px 12px' }}>
+                    <div style={{ fontSize:10, color:C.text2, marginBottom:4 }}>{x.label}</div>
+                    <div style={{ display:'flex', alignItems:'baseline', gap:6 }}>
+                      <span style={{ fontSize:20, fontWeight:800, fontFamily:'JetBrains Mono,monospace', color:x.color }}>{x.val}</span>
+                      <span style={{ fontSize:11, color:C.text2 }}>{x.unit}</span>
+                      {x.trend && <span style={{ fontSize:10, fontWeight:700, color:trendGood?C.teal:trendBad?C.red:C.text2 }}>
+                        {trendNum>0?'+':''}{x.trend}
+                      </span>}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+            {[
+              { label:'TMB', val:latestBody.bmr, unit:'kcal/dia' },
+              { label:'Tipo de Corpo', val:latestBody.bodyType, unit:'' },
+              { label:'Idade Corporal', val:latestBody.bodyAge, unit:'anos' },
+            ].filter(x => x.val).length > 0 && (
+              <div style={{ display:'flex', gap:8 }}>
+                {[
+                  { label:'TMB', val:latestBody.bmr, unit:'kcal' },
+                  { label:'Idade Corp.', val:latestBody.bodyAge, unit:'anos' },
+                  { label:'Tipo', val:latestBody.bodyType, unit:'' },
+                ].filter(x => x.val).map(x => (
+                  <div key={x.label} style={{ flex:1, background:C.bg, borderRadius:8, padding:'6px 8px', textAlign:'center' }}>
+                    <div style={{ fontSize:8, color:C.text2, marginBottom:2 }}>{x.label}</div>
+                    <div style={{ fontSize:12, fontWeight:700, color:C.gold, fontFamily:'JetBrains Mono,monospace' }}>{x.val} {x.unit}</div>
                   </div>
                 ))}
               </div>
-            })()}
-          </>):<div style={{ textAlign:'center', padding:'20px 0', color:C.text3, fontSize:13 }}>Nenhum peso registrado.<br/>Registre toda segunda de manhã!</div>}
-        </div>
-        {wVals.length>=2&&(()=>{
-          const W=340,H=100,PL=8,PR=8,PT=12,PB=20
-          const maxV=Math.max(...wVals)+0.5, minV=Math.min(...wVals)-0.5
-          const cx=i=>PL+(i/Math.max(wVals.length-1,1))*(W-PL-PR)
-          const cy=v=>PT+(1-(v-minV)/(maxV-minV))*(H-PT-PB)
-          const pts=wVals.map((v,i)=>`${cx(i)},${cy(v)}`).join(' ')
-          const trend=wVals[wVals.length-1]<wVals[0]?C.teal:C.red
-          return <div style={{ background:C.surface, borderRadius:14, padding:14, marginBottom:14, border:`0.5px solid ${C.border}` }}>
-            <div style={{ fontSize:13, fontWeight:500, marginBottom:10, color:C.text }}>📈 Evolução</div>
-            <svg viewBox={`0 0 ${W} ${H}`} style={{ width:'100%', height:H }}>
-              <polyline points={pts} fill="none" stroke={trend} strokeWidth="2" strokeLinejoin="round"/>
-              {wVals.map((v,i)=>(<g key={i}><circle cx={cx(i)} cy={cy(v)} r="4" fill={trend}/><text x={cx(i)} y={cy(v)-6} fontSize="8" fill={C.text2} textAnchor="middle">{v}</text></g>))}
-            </svg>
+            )}
           </div>
+        )}
+
+        {/* Gráfico de peso */}
+        {wVals.length >= 2 && (() => {
+          const W=340, H=100, PL=8, PR=8, PT=12, PB=28
+          const maxV = Math.max(...wVals)+0.5, minV = Math.min(...wVals)-0.5
+          const cx = i => PL+(i/Math.max(wVals.length-1,1))*(W-PL-PR)
+          const cy = v => PT+(1-(v-minV)/(maxV-minV))*(H-PT-PB)
+          const trend = wVals[wVals.length-1] < wVals[0] ? C.teal : C.red
+          const pts = wVals.map((v,i) => `${cx(i)},${cy(v)}`).join(' ')
+          return (
+            <div style={{ background:C.surface, borderRadius:14, padding:14, marginBottom:12, border:`0.5px solid ${C.border}` }}>
+              <div style={{ fontSize:13, fontWeight:500, marginBottom:10, color:C.text }}>📈 Evolução do Peso</div>
+              <svg viewBox={`0 0 ${W} ${H}`} style={{ width:'100%', height:H }}>
+                <polyline points={pts} fill="none" stroke={trend} strokeWidth="2" strokeLinejoin="round"/>
+                {wVals.map((v,i) => (
+                  <g key={i}>
+                    <circle cx={cx(i)} cy={cy(v)} r="4" fill={trend}/>
+                    <text x={cx(i)} y={H-4} fontSize="8" fill={C.text2} textAnchor="middle" fontFamily="JetBrains Mono,monospace">
+                      {chartEntries[i]?.[0]?.slice(5).replace('-','/')}
+                    </text>
+                  </g>
+                ))}
+              </svg>
+            </div>
+          )
         })()}
+
+        {/* Gráfico % Gordura */}
+        {bodyEntries.filter(([,d]) => d.bodyFat).length >= 2 && (() => {
+          const fatEntries = bodyEntries.filter(([,d]) => d.bodyFat)
+          const fVals = fatEntries.map(([,d]) => d.bodyFat)
+          const W=340, H=80, PL=8, PR=8, PT=8, PB=24
+          const maxV = Math.max(...fVals)+1, minV = Math.max(0, Math.min(...fVals)-1)
+          const cx = i => PL+(i/Math.max(fVals.length-1,1))*(W-PL-PR)
+          const cy = v => PT+(1-(v-minV)/(maxV-minV))*(H-PT-PB)
+          const trend = fVals[fVals.length-1] < fVals[0] ? C.teal : C.terra
+          const pts = fVals.map((v,i) => `${cx(i)},${cy(v)}`).join(' ')
+          return (
+            <div style={{ background:C.surface, borderRadius:14, padding:14, marginBottom:12, border:`0.5px solid ${C.border}` }}>
+              <div style={{ fontSize:13, fontWeight:500, marginBottom:10, color:C.text }}>🔥 Evolução % Gordura</div>
+              <svg viewBox={`0 0 ${W} ${H}`} style={{ width:'100%', height:H }}>
+                <polyline points={pts} fill="none" stroke={trend} strokeWidth="2" strokeLinejoin="round"/>
+                {fVals.map((v,i) => (
+                  <g key={i}>
+                    <circle cx={cx(i)} cy={cy(v)} r="4" fill={trend}/>
+                    <text x={cx(i)} y={H-2} fontSize="7.5" fill={C.text2} textAnchor="middle" fontFamily="JetBrains Mono,monospace">
+                      {fatEntries[i]?.[0]?.slice(5).replace('-','/')}
+                    </text>
+                    <text x={cx(i)} y={cy(v)-6} fontSize="7.5" fill={trend} textAnchor="middle" fontFamily="JetBrains Mono,monospace">{v}%</text>
+                  </g>
+                ))}
+              </svg>
+            </div>
+          )
+        })()}
+
+        {/* Gráfico Massa Magra */}
+        {bodyEntries.filter(([,d]) => d.leanMass).length >= 2 && (() => {
+          const leanEntries = bodyEntries.filter(([,d]) => d.leanMass)
+          const lVals = leanEntries.map(([,d]) => d.leanMass)
+          const W=340, H=80, PL=8, PR=8, PT=8, PB=24
+          const maxV = Math.max(...lVals)+0.5, minV = Math.min(...lVals)-0.5
+          const cx = i => PL+(i/Math.max(lVals.length-1,1))*(W-PL-PR)
+          const cy = v => PT+(1-(v-minV)/(maxV-minV))*(H-PT-PB)
+          const trend = lVals[lVals.length-1] > lVals[0] ? C.teal : C.gold
+          const pts = lVals.map((v,i) => `${cx(i)},${cy(v)}`).join(' ')
+          return (
+            <div style={{ background:C.surface, borderRadius:14, padding:14, marginBottom:12, border:`0.5px solid ${C.border}` }}>
+              <div style={{ fontSize:13, fontWeight:500, marginBottom:10, color:C.text }}>💪 Evolução Massa Magra</div>
+              <svg viewBox={`0 0 ${W} ${H}`} style={{ width:'100%', height:H }}>
+                <polyline points={pts} fill="none" stroke={trend} strokeWidth="2" strokeLinejoin="round"/>
+                {lVals.map((v,i) => (
+                  <g key={i}>
+                    <circle cx={cx(i)} cy={cy(v)} r="4" fill={trend}/>
+                    <text x={cx(i)} y={H-2} fontSize="7.5" fill={C.text2} textAnchor="middle" fontFamily="JetBrains Mono,monospace">
+                      {leanEntries[i]?.[0]?.slice(5).replace('-','/')}
+                    </text>
+                    <text x={cx(i)} y={cy(v)-6} fontSize="7.5" fill={trend} textAnchor="middle" fontFamily="JetBrains Mono,monospace">{v}kg</text>
+                  </g>
+                ))}
+              </svg>
+            </div>
+          )
+        })()}
+
+        {/* Histórico completo */}
         <div style={{ background:C.surface, borderRadius:14, padding:14, border:`0.5px solid ${C.border}` }}>
           <div style={{ fontSize:13, fontWeight:500, marginBottom:12, color:C.text }}>Histórico</div>
-          {weightEntries.length===0&&<div style={{ textAlign:'center', padding:'16px 0', color:C.text3, fontSize:13 }}>Nenhum registro ainda</div>}
-          {weightEntries.map(([date,val],idx)=>{
-            const prev=weightEntries[idx+1]?.[1]; const diff=prev?(val-prev).toFixed(1):null
-            return <div key={date} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 0', borderBottom:idx<weightEntries.length-1?`0.5px solid ${C.border}`:'none' }}>
-              <div>
-                <div style={{ fontSize:13, fontWeight:500, color:C.text }}>{formatDateFull(date)}</div>
-                {diff!==null&&<div style={{ fontSize:11, color:parseFloat(diff)<0?C.teal:parseFloat(diff)>0?C.red:C.text2, marginTop:2 }}>{parseFloat(diff)>0?'+':''}{diff} kg vs anterior</div>}
+          {weightEntries.length === 0 && <div style={{ textAlign:'center', padding:'16px 0', color:C.text3, fontSize:13 }}>Nenhum registro ainda</div>}
+          {weightEntries.map(([date, val], idx) => {
+            const prev = weightEntries[idx+1]?.[1]
+            const diff = prev ? (val - prev).toFixed(1) : null
+            const bd = bodyData[date]
+            return (
+              <div key={date} style={{ padding:'10px 0', borderBottom:idx<weightEntries.length-1?`0.5px solid ${C.border}`:'none' }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:bd?6:0 }}>
+                  <div>
+                    <div style={{ fontSize:13, fontWeight:500, color:C.text }}>{formatDateFull(date)}</div>
+                    {diff !== null && (
+                      <div style={{ fontSize:11, color:parseFloat(diff)<0?C.teal:parseFloat(diff)>0?C.red:C.text2, marginTop:2 }}>
+                        {parseFloat(diff)>0?'+':''}{diff} kg vs anterior
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                    <span style={{ fontSize:18, fontWeight:800, fontFamily:'JetBrains Mono,monospace', color:C.text }}>{val} kg</span>
+                    <button onClick={()=>{ if(window.confirm('Remover?')){ const w={...weights}; delete w[date]; updateWeights(w) } }}
+                      style={{ background:`${C.red}18`, border:'none', borderRadius:8, width:26, height:26, color:C.red, cursor:'pointer', fontSize:14 }}>×</button>
+                  </div>
+                </div>
+                {bd && (
+                  <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:4 }}>
+                    {[
+                      { label:'Gordura', v:bd.bodyFat, u:'%', c:C.terra },
+                      { label:'Músculo', v:bd.muscleMass, u:'%', c:C.teal },
+                      { label:'Água', v:bd.bodyWater, u:'%', c:'#60a5fa' },
+                      { label:'M.Magra', v:bd.leanMass, u:'kg', c:C.teal },
+                      { label:'M.Gorda', v:bd.fatMass, u:'kg', c:C.terra },
+                      { label:'TMB', v:bd.bmr, u:'kcal', c:C.amber },
+                    ].filter(x=>x.v).map(x=>(
+                      <div key={x.label} style={{ background:C.surface2, borderRadius:6, padding:'4px 6px', textAlign:'center' }}>
+                        <div style={{ fontSize:8, color:C.text2 }}>{x.label}</div>
+                        <div style={{ fontSize:11, fontWeight:700, color:x.c, fontFamily:'JetBrains Mono,monospace' }}>{x.v}{x.u}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
-              <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                <span style={{ fontSize:18, fontWeight:800, fontFamily:'JetBrains Mono,monospace', color:C.text }}>{val} kg</span>
-                <button onClick={()=>{ if(window.confirm('Remover?')){ const w={...weights}; delete w[date]; updateWeights(w) } }}
-                  style={{ background:`${C.red}18`, border:'none', borderRadius:8, width:26, height:26, color:C.red, cursor:'pointer', fontSize:14 }}>×</button>
-              </div>
-            </div>
+            )
           })}
         </div>
       </div>
     )
   }
 
-  // ── ANALYSIS ────────────────────────────────────────────────────────────────
+
   function renderAnalysis() {
     const today = todayKey()
     const allEntries=Object.entries(days).filter(([d])=>d!==today).sort(([a],[b])=>a.localeCompare(b))
@@ -938,6 +1130,197 @@ export default function App() {
               {compWe.n>0&&compWd.n>0&&!analysisFilters.includes('weekday')&&!analysisFilters.includes('weekend')&&<span style={{ display:'block', marginTop:6 }}>{compWe.cal>compWd.cal?`🎉 Fim de semana: +${compWe.cal-compWd.cal} kcal vs dias úteis.`:`🎉 Fim de semana: −${compWd.cal-compWe.cal} kcal vs dias úteis.`}</span>}
             </div>
           </div>}
+
+          {/* Body composition cross-insights - 3 periods */}
+          {(() => {
+            const bdEntries = Object.entries(bodyData).sort(([a],[b]) => a.localeCompare(b))
+            if (bdEntries.length < 1) return null
+
+            // Helper to compute insights for a period
+            const computeInsights = (startDate, endDate, latestBd, prevBd, periodLabel) => {
+              const weightLatest = weights[endDate]
+              const weightPrev = weights[startDate]
+              const weightChange = weightLatest && weightPrev ? (weightLatest - weightPrev).toFixed(1) : null
+              const fatChange = latestBd?.bodyFat && prevBd?.bodyFat ? (latestBd.bodyFat - prevBd.bodyFat).toFixed(1) : null
+              const muscleChange = latestBd?.muscleMass && prevBd?.muscleMass ? (latestBd.muscleMass - prevBd.muscleMass).toFixed(1) : null
+              const leanChange = latestBd?.leanMass && prevBd?.leanMass ? (latestBd.leanMass - prevBd.leanMass).toFixed(1) : null
+              const entriesBetween = allEntries.filter(([d]) => d >= startDate && d <= endDate)
+              const avgBetween = avgMacros(entriesBetween)
+              const trainDays = entriesBetween.filter(([d]) => (days[d]?.activities||[]).length > 0).length
+              const strengthDays = entriesBetween.filter(([d]) => (days[d]?.activities||[]).some(a => ACTIVITIES.find(x=>x.id===a)?.type==='strength')).length
+              const cardioDays = entriesBetween.filter(([d]) => (days[d]?.activities||[]).some(a => ACTIVITIES.find(x=>x.id===a)?.type==='cardio')).length
+
+              const ins = []
+
+              // Weight insights
+              if (weightChange) {
+                const wNum = parseFloat(weightChange)
+                if (wNum > 0.5 && avgBetween.cal > activeTargets.cal + 100)
+                  ins.push({ icon:'⚠️', text:`Ganho de ${weightChange}kg — média de ${avgBetween.cal} kcal/dia (${avgBetween.cal - activeTargets.cal} kcal acima da meta).`, color:C.red })
+                else if (wNum < -0.5 && avgBetween.cal <= activeTargets.max)
+                  ins.push({ icon:'✅', text:`Perda de ${Math.abs(wNum).toFixed(1)}kg com média de ${avgBetween.cal} kcal/dia. Bom progresso!`, color:C.teal })
+                else if (wNum > 0.3 && fatChange && parseFloat(fatChange) > 0)
+                  ins.push({ icon:'🔴', text:`Peso (+${wNum}kg) e gordura (+${fatChange}%) subiram. Possível excesso calórico ou retenção hídrica.`, color:C.red })
+                else if (wNum > 0.3 && muscleChange && parseFloat(muscleChange) > 0)
+                  ins.push({ icon:'💪', text:`Peso subiu ${weightChange}kg mas músculo aumentou ${muscleChange}% — possível ganho de massa magra!`, color:C.teal })
+                else if (Math.abs(wNum) < 0.3 && fatChange && parseFloat(fatChange) < -0.3 && muscleChange && parseFloat(muscleChange) > 0.3)
+                  ins.push({ icon:'🎯', text:`Recomposição corporal! Peso estável mas gordura caiu ${fatChange}% e músculo subiu ${muscleChange}%.`, color:C.teal })
+              }
+
+              // Fat insights
+              if (fatChange) {
+                const fNum = parseFloat(fatChange)
+                if (fNum < -0.5 && strengthDays >= 3)
+                  ins.push({ icon:'🔥', text:`Gordura caiu ${Math.abs(fNum).toFixed(1)}% com ${strengthDays} treinos de força. Excelente!`, color:C.teal })
+                else if (fNum > 0.5 && trainDays < 2)
+                  ins.push({ icon:'⚠️', text:`Gordura subiu ${fNum}% — apenas ${trainDays} treino(s) no período. Mais atividade pode ajudar.`, color:C.amber })
+              }
+
+              // Lean mass insights
+              if (leanChange) {
+                const lNum = parseFloat(leanChange)
+                if (lNum > 0.3 && strengthDays >= 3)
+                  ins.push({ icon:'💪', text:`Massa magra +${leanChange}kg com ${strengthDays} treinos de força. Continue assim!`, color:C.teal })
+                else if (lNum < -0.3 && avgBetween.prot < (activeTargets.protMin || 138))
+                  ins.push({ icon:'🥩', text:`Massa magra caiu ${Math.abs(lNum).toFixed(1)}kg e proteína abaixo da meta (${avgBetween.prot}g vs ${activeTargets.protMin}g mín). Aumente a proteína!`, color:C.terra })
+                else if (lNum < -0.3)
+                  ins.push({ icon:'⚠️', text:`Massa magra caiu ${Math.abs(lNum).toFixed(1)}kg. Verifique proteína (média: ${avgBetween.prot}g) e frequência de treinos.`, color:C.amber })
+              }
+
+              // Protein insight
+              if (avgBetween.n > 0 && avgBetween.prot < (activeTargets.protMin || 138))
+                ins.push({ icon:'🥩', text:`Proteína abaixo da meta no período — média ${avgBetween.prot}g vs mínimo ${activeTargets.protMin}g.`, color:C.terra })
+
+              // Training insights
+              if (trainDays === 0 && entriesBetween.length >= 5)
+                ins.push({ icon:'🛋️', text:`Nenhum treino registrado no período. Atividade física é fundamental para a composição corporal.`, color:C.amber })
+              else if (strengthDays === 0 && entriesBetween.length >= 7)
+                ins.push({ icon:'🏋️', text:`Sem musculação no período (${cardioDays} cardio). Treino de força ajuda a preservar massa magra.`, color:C.amber })
+
+              // Calorie consistency
+              if (avgBetween.n >= 5) {
+                const daysOver = entriesBetween.filter(([d,dd]) => calcMacros(Object.values(dd.meals||{}).flat(),allFoods).cal > activeTargets.max).length
+                if (daysOver > entriesBetween.length * 0.4)
+                  ins.push({ icon:'📈', text:`${daysOver} de ${entriesBetween.length} dias acima da meta calórica (${Math.round(daysOver/entriesBetween.length*100)}%). Consistência é chave!`, color:C.amber })
+              }
+
+              return { ins, entriesBetween, trainDays, strengthDays, cardioDays, avgBetween, weightChange, fatChange, leanChange, startDate, endDate, periodLabel }
+            }
+
+            // Compute data for each period
+            const latest = bdEntries[bdEntries.length-1]
+            const prev = bdEntries.length >= 2 ? bdEntries[bdEntries.length-2] : null
+
+            const todayD = todayKey()
+            const d7 = new Date(); d7.setDate(d7.getDate()-7)
+            const d30 = new Date(); d30.setDate(d30.getDate()-30)
+            const date7 = `${d7.getFullYear()}-${String(d7.getMonth()+1).padStart(2,'0')}-${String(d7.getDate()).padStart(2,'0')}`
+            const date30 = `${d30.getFullYear()}-${String(d30.getMonth()+1).padStart(2,'0')}-${String(d30.getDate()).padStart(2,'0')}`
+
+            const bd7Start = [...bdEntries].reverse().find(([d]) => d <= date7)
+            const bd30Start = [...bdEntries].reverse().find(([d]) => d <= date30)
+
+            const periods = [
+              { id:'last', label:'Última medição', available: prev !== null },
+              { id:'7d', label:'7 dias', available: bd7Start !== null },
+              { id:'30d', label:'30 dias', available: bd30Start !== null },
+            ]
+
+            let data = null
+            if (insightPeriod === 'last' && prev) {
+              data = computeInsights(prev[0], latest[0], latest[1], prev[1], `${prev[0]} → ${latest[0]}`)
+            } else if (insightPeriod === '7d' && bd7Start) {
+              data = computeInsights(bd7Start[0], latest[0], latest[1], bd7Start[1], 'últimos 7 dias')
+            } else if (insightPeriod === '30d' && bd30Start) {
+              data = computeInsights(bd30Start[0], latest[0], latest[1], bd30Start[1], 'últimos 30 dias')
+            }
+
+            return (
+              <div style={{ background:C.surface, borderRadius:14, padding:14, marginBottom:12, border:`0.5px solid ${C.border}` }}>
+                <div style={{ fontSize:13, fontWeight:500, marginBottom:12, color:C.text }}>🧬 Insights — Corpo + Dieta + Treino</div>
+
+                {/* Period selector */}
+                <div style={{ display:'flex', gap:6, marginBottom:14 }}>
+                  {periods.map(p => (
+                    <button key={p.id} onClick={()=>setInsightPeriod(p.id)} disabled={!p.available}
+                      style={{ flex:1, padding:'7px 4px', border:'none', borderRadius:10, fontSize:10, fontWeight:insightPeriod===p.id?700:400, cursor:p.available?'pointer':'not-allowed', fontFamily:'inherit',
+                        background: insightPeriod===p.id ? `linear-gradient(135deg,${C.gold},${C.gold2})` : C.surface2,
+                        color: insightPeriod===p.id ? '#0d1a1f' : p.available ? C.text2 : C.text3 }}>
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+
+                {data ? (<>
+                  {/* Summary stats */}
+                  <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:6, marginBottom:12 }}>
+                    {[
+                      { label:'Dias', v:data.entriesBetween.length, c:C.text },
+                      { label:'Treinos', v:data.trainDays, c:C.gold },
+                      { label:'Força', v:data.strengthDays, c:C.teal },
+                      { label:'Cardio', v:data.cardioDays, c:C.amber },
+                    ].map(s => (
+                      <div key={s.label} style={{ background:C.bg, borderRadius:8, padding:'6px', textAlign:'center' }}>
+                        <div style={{ fontSize:8, color:C.text2, marginBottom:2, fontFamily:'JetBrains Mono,monospace' }}>{s.label}</div>
+                        <div style={{ fontSize:16, fontWeight:800, color:s.c, fontFamily:'JetBrains Mono,monospace' }}>{s.v}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Changes */}
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6, marginBottom:12 }}>
+                    {[
+                      { label:'Peso', v:data.weightChange, u:'kg', goodDown:true },
+                      { label:'% Gordura', v:data.fatChange, u:'%', goodDown:true },
+                      { label:'M. Magra', v:data.leanChange, u:'kg', goodDown:false },
+                    ].filter(x=>x.v!==null).map(s => {
+                      const n = parseFloat(s.v)
+                      const good = s.goodDown ? n < 0 : n > 0
+                      const bad = s.goodDown ? n > 0.3 : n < -0.3
+                      const col = good ? C.teal : bad ? C.red : C.text2
+                      return (
+                        <div key={s.label} style={{ background:C.bg, borderRadius:8, padding:'8px', textAlign:'center' }}>
+                          <div style={{ fontSize:9, color:C.text2, marginBottom:3 }}>{s.label}</div>
+                          <div style={{ fontSize:15, fontWeight:800, color:col, fontFamily:'JetBrains Mono,monospace' }}>
+                            {n>0?'+':''}{s.v}{s.u}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+
+                  {/* Avg diet */}
+                  {data.avgBetween.n > 0 && (
+                    <div style={{ background:C.bg, borderRadius:8, padding:'8px 12px', marginBottom:12, display:'flex', gap:12, fontSize:11, fontFamily:'JetBrains Mono,monospace' }}>
+                      <span style={{ color:C.gold }}>⚡ {data.avgBetween.cal} kcal/dia</span>
+                      <span style={{ color:C.teal }}>P:{data.avgBetween.prot}g</span>
+                      <span style={{ color:C.amber }}>C:{data.avgBetween.carb}g</span>
+                      <span style={{ color:C.terra }}>G:{data.avgBetween.fat}g</span>
+                    </div>
+                  )}
+
+                  {/* Insights */}
+                  {data.ins.length > 0 ? data.ins.map((ins, i) => (
+                    <div key={i} style={{ background:C.bg, borderRadius:10, padding:'10px 12px', marginBottom:8, borderLeft:`3px solid ${ins.color}` }}>
+                      <span style={{ fontSize:14 }}>{ins.icon} </span>
+                      <span style={{ fontSize:12, color:C.text2, lineHeight:1.6 }}>{ins.text}</span>
+                    </div>
+                  )) : (
+                    <div style={{ textAlign:'center', padding:'12px 0', color:C.text3, fontSize:12 }}>
+                      Sem dados suficientes para gerar insights neste período.
+                    </div>
+                  )}
+                </>) : (
+                  <div style={{ textAlign:'center', padding:'16px 0', color:C.text3, fontSize:12 }}>
+                    {insightPeriod === 'last' ? 'Registre pelo menos 2 medições para ver insights.' :
+                     insightPeriod === '7d' ? 'Sem medição há mais de 7 dias para comparar.' :
+                     'Sem medição há mais de 30 dias para comparar.'}
+                  </div>
+                )}
+              </div>
+            )
+          })()}
+
         </>)}
       </div>
     )
@@ -1119,6 +1502,162 @@ function LoginScreen() {
 }
 
 // ── WEIGHT MODAL ──────────────────────────────────────────────────────────────
+function RelaxFitModal({ C, onSave, onClose }) {
+  const [img, setImg] = useState(null)
+  const [parsing, setParsing] = useState(false)
+  const [result, setResult] = useState(null)
+  const [error, setError] = useState('')
+  const [date, setDate] = useState(new Date().toISOString().slice(0,10))
+
+  function parseRelaxFitImage(imgElement) {
+    // Use canvas to read text via pixel analysis - but since we can't do OCR in browser
+    // we use a form-based approach where user confirms extracted values
+    return null
+  }
+
+  function extractFromText(text) {
+    const patterns = [
+      { key: 'weight', label: 'Peso', regex: /Peso[\s\S]*?(\d+\.?\d*)\s*kg/i },
+      { key: 'bmi', label: 'IMC', regex: /IMC[\s\S]*?(\d+\.?\d*)/i },
+      { key: 'bodyFat', label: 'Gordura corporal', regex: /Gordura corporal[\s\S]*?(\d+\.?\d*)\s*%/i },
+      { key: 'muscleMass', label: 'Taxa muscular', regex: /Taxa muscular[\s\S]*?(\d+\.?\d*)\s*%/i },
+      { key: 'leanMass', label: 'Massa Corporal Magra', regex: /Massa Corporal Magra[\s\S]*?(\d+\.?\d*)\s*kg/i },
+      { key: 'subcutFat', label: 'Gordura Subcutânea', regex: /Gordura Subcut[aâ]nea[\s\S]*?(\d+\.?\d*)\s*%/i },
+      { key: 'visceralFat', label: 'Gordura Visceral', regex: /Gordura Visceral[\s\S]*?(\d+\.?\d*)/i },
+      { key: 'bodyWater', label: 'Água Corporal', regex: /[ÁA]gua Corporal[\s\S]*?(\d+\.?\d*)\s*%/i },
+      { key: 'skeletalMuscle', label: 'Músculo Esquelético', regex: /M[úu]sculo Esquel[eé]tico[\s\S]*?(\d+\.?\d*)\s*%/i },
+      { key: 'muscleMassKg', label: 'Massa Muscular', regex: /Massa Muscular[\s\S]*?(\d+\.?\d*)\s*kg/i },
+      { key: 'boneMass', label: 'Massa Óssea', regex: /Massa [ÓO]ssea[\s\S]*?(\d+\.?\d*)\s*kg/i },
+      { key: 'protein', label: 'Proteína', regex: /Prote[íi]na[\s\S]*?(\d+\.?\d*)\s*%/i },
+      { key: 'bmr', label: 'TMB', regex: /TMB[\s\S]*?(\d+\.?\d*)\s*kcal/i },
+      { key: 'bodyAge', label: 'Idade do corpo', regex: /Idade do corpo[\s\S]*?(\d+)/i },
+      { key: 'fatMass', label: 'Massa Gorda', regex: /Massa Gorda[\s\S]*?(\d+\.?\d*)\s*kg/i },
+      { key: 'bodyType', label: 'Tipo de corpo', regex: /Tipo de corpo[\s\S]*?([A-Za-záàãâéêíóôõúçÁÀÃÂÉÊÍÓÔÕÚÇ]+)/i },
+    ]
+    const out = {}
+    patterns.forEach(({ key, regex }) => {
+      const m = text.match(regex)
+      if (m) out[key] = isNaN(m[1]) ? m[1] : parseFloat(m[1])
+    })
+    return out
+  }
+
+  async function handleImage(file) {
+    if (!file) return
+    setParsing(true)
+    setError('')
+    setResult(null)
+
+    const reader = new FileReader()
+    reader.onload = async (e) => {
+      setImg(e.target.result)
+      // Use Tesseract.js for OCR if available, otherwise manual entry
+      if (window.Tesseract) {
+        try {
+          const { data: { text } } = await window.Tesseract.recognize(e.target.result, 'por')
+          const extracted = extractFromText(text)
+          if (Object.keys(extracted).length > 0) {
+            setResult(extracted)
+          } else {
+            setError('Não consegui extrair os dados. Preencha manualmente abaixo.')
+            setResult({})
+          }
+        } catch(err) {
+          setError('Erro no OCR. Preencha manualmente.')
+          setResult({})
+        }
+      } else {
+        setError('Preencha os valores manualmente conforme a imagem.')
+        setResult({})
+      }
+      setParsing(false)
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const fields = [
+    { key: 'weight', label: 'Peso (kg)', color: C.gold },
+    { key: 'bmi', label: 'IMC', color: C.text2 },
+    { key: 'bodyFat', label: '% Gordura Corporal', color: C.terra },
+    { key: 'muscleMass', label: '% Taxa Muscular', color: C.teal },
+    { key: 'leanMass', label: 'Massa Magra (kg)', color: C.teal },
+    { key: 'subcutFat', label: '% Gordura Subcutânea', color: C.terra },
+    { key: 'visceralFat', label: 'Gordura Visceral', color: C.terra },
+    { key: 'bodyWater', label: '% Água Corporal', color: '#60a5fa' },
+    { key: 'skeletalMuscle', label: '% Músculo Esquelético', color: C.teal },
+    { key: 'muscleMassKg', label: 'Massa Muscular (kg)', color: C.teal },
+    { key: 'boneMass', label: 'Massa Óssea (kg)', color: C.text2 },
+    { key: 'protein', label: '% Proteína', color: C.gold },
+    { key: 'bmr', label: 'TMB (kcal)', color: C.amber },
+    { key: 'bodyAge', label: 'Idade Corporal', color: C.text2 },
+    { key: 'fatMass', label: 'Massa Gorda (kg)', color: C.terra },
+  ]
+
+  return (
+    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.8)', display:'flex', alignItems:'flex-end', justifyContent:'center', zIndex:200 }} onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div style={{ background:C.surface, borderRadius:'16px 16px 0 0', padding:20, width:'100%', maxWidth:480, border:`0.5px solid ${C.border}`, maxHeight:'90vh', overflowY:'auto' }}>
+        <div style={{ fontSize:15, fontWeight:700, marginBottom:4, color:C.text }}>📷 Importar do RelaxFit</div>
+        <div style={{ fontSize:11, color:C.text2, marginBottom:16 }}>Suba a imagem gerada pelo RelaxFit e confira os dados extraídos</div>
+
+        {/* Date */}
+        <div style={{ marginBottom:12 }}>
+          <div style={{ fontSize:10, color:C.text2, marginBottom:4 }}>Data da medição</div>
+          <input type="date" value={date} onChange={e=>setDate(e.target.value)}
+            style={{ width:'100%', background:C.surface2, border:`0.5px solid ${C.border}`, borderRadius:8, padding:'8px', color:C.text, fontSize:13, fontFamily:'JetBrains Mono,monospace' }}/>
+        </div>
+
+        {/* Image upload */}
+        <label style={{ display:'block', width:'100%', padding:'14px', border:`1.5px dashed ${C.gold}60`, borderRadius:12, background:`${C.gold}08`, cursor:'pointer', textAlign:'center', marginBottom:12 }}>
+          <input type="file" accept="image/*" style={{ display:'none' }} onChange={e=>handleImage(e.target.files[0])}/>
+          {img
+            ? <img src={img} alt="RelaxFit" style={{ maxWidth:'100%', maxHeight:200, borderRadius:8, objectFit:'contain' }}/>
+            : <div><div style={{ fontSize:28, marginBottom:6 }}>📷</div><div style={{ fontSize:12, color:C.gold, fontWeight:600 }}>Toque para selecionar a imagem do RelaxFit</div><div style={{ fontSize:10, color:C.text2, marginTop:4 }}>Compartilhe a imagem do app e selecione aqui</div></div>
+          }
+        </label>
+
+        {parsing && <div style={{ textAlign:'center', padding:'16px 0', color:C.gold, fontSize:13 }}>⏳ Lendo imagem...</div>}
+
+        {error && <div style={{ background:`${C.red}15`, border:`0.5px solid ${C.red}40`, borderRadius:8, padding:'8px 12px', fontSize:11, color:C.red, marginBottom:12 }}>{error}</div>}
+
+        {/* Manual fields - always shown after image upload */}
+        {result !== null && (
+          <div>
+            <div style={{ fontSize:11, color:C.text2, fontWeight:700, marginBottom:10, fontFamily:'JetBrains Mono,monospace' }}>CONFIRME / PREENCHA OS DADOS:</div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:16 }}>
+              {fields.map(f => (
+                <div key={f.key}>
+                  <div style={{ fontSize:9, color:f.color, marginBottom:3, fontFamily:'JetBrains Mono,monospace' }}>{f.label}</div>
+                  <input type={f.key==='bodyType'?'text':'number'} step="0.1"
+                    value={result[f.key]||''}
+                    onChange={e=>setResult(p=>({...p, [f.key]: f.key==='bodyType'?e.target.value:parseFloat(e.target.value)||''}))}
+                    placeholder="—"
+                    style={{ width:'100%', background:C.surface2, border:`0.5px solid ${f.color}40`, borderRadius:8, padding:'7px 8px', color:C.text, fontSize:13, fontFamily:'JetBrains Mono,monospace' }}/>
+                </div>
+              ))}
+            </div>
+            <button onClick={()=>{
+              if (!result.weight) return
+              onSave(date, result)
+            }} style={{ width:'100%', padding:12, background:`linear-gradient(135deg,${C.gold},${C.gold2})`, border:'none', borderRadius:12, color:'#0d1a1f', fontWeight:700, fontSize:14, cursor:'pointer', fontFamily:'inherit' }}>
+              Salvar medição
+            </button>
+          </div>
+        )}
+
+        {/* Show manual entry button if no image yet */}
+        {result === null && !parsing && (
+          <button onClick={()=>setResult({})}
+            style={{ width:'100%', padding:10, background:'transparent', border:`0.5px solid ${C.border}`, borderRadius:10, color:C.text2, fontSize:12, cursor:'pointer', fontFamily:'inherit', marginTop:4 }}>
+            Preencher manualmente sem imagem
+          </button>
+        )}
+
+        <button onClick={onClose} style={{ width:'100%', padding:10, background:'transparent', border:'none', color:C.text2, fontSize:12, cursor:'pointer', fontFamily:'inherit', marginTop:8 }}>Cancelar</button>
+      </div>
+    </div>
+  )
+}
+
 function WeightModal({ C, onSave, onClose }) {
   const [date, setDate] = useState(new Date().toISOString().slice(0,10))
   const [weight, setWeight] = useState('')
