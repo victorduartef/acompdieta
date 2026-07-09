@@ -1633,11 +1633,11 @@ function RelaxFitModal({ C, onSave, onClose }) {
         const slices = await sliceImage(dataUrl)
         console.log('Image split into', slices.length, 'slices')
 
-        const OCR_KEY = 'helloworld' // public test key — replace with your own free key from ocr.space/ocrapi for higher limits
+        const OCR_KEY = 'K83530470088957' // chave própria OCR.space (25.000 leituras/mês)
         let fullText = ''
         for (let i = 0; i < slices.length; i++) {
           // Delay between requests to avoid 429 rate limiting
-          if (i > 0) await new Promise(r => setTimeout(r, 1200))
+          if (i > 0) await new Promise(r => setTimeout(r, 600))
 
           try {
             const formData = new FormData()
