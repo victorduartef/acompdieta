@@ -62,8 +62,10 @@ const ACTIVITIES = [
 const DEFAULT_TARGETS = {
   cal: 1562, prot: 150, carb: 151, fat: 43,
   min: 1460, max: 1680, protMin: 138, protMax: 163, fatMax: 52,
+  controlCarb: false, carbMin: 130, carbMax: 170,
+  fatMin: 35,
   dualMode: false,
-  targets2: { cal: 1800, prot: 150, carb: 220, fat: 50, min: 1700, max: 1900, protMin: 138, protMax: 163, fatMax: 60 },
+  targets2: { cal: 1800, prot: 150, carb: 220, fat: 50, min: 1700, max: 1900, protMin: 138, protMax: 163, fatMax: 60, carbMin: 190, carbMax: 240, fatMin: 40 },
   variableDays: [1, 3, 5],
   validFrom: '2020-01-01',
 }
@@ -119,7 +121,19 @@ function calcMacros(items, allFoods) {
 
 function farolCal(c,t) { return c<=t.cal?'#2ab8b8':c<=t.max?'#e8a040':'#e05555' }
 function farolProt(p,t) { return (p>=(t.protMin||138)&&p<=(t.protMax||163))?'#2ab8b8':'#e05555' }
-function farolFat(f,t) { return f<=t.fat?'#2ab8b8':f<=(t.fatMax||52)?'#e8a040':'#e05555' }
+function farolFat(f,t) {
+  const fmin = t.fatMin
+  const fmax = t.fatMax||52
+  if (fmin && f < fmin) return '#e8a040' // below min = amber
+  return f<=fmax?'#2ab8b8':'#e05555'
+}
+function farolCarb(c,t) {
+  if (!t.controlCarb) return null
+  const cmin = t.carbMin, cmax = t.carbMax
+  if (cmin && c < cmin) return '#e8a040'
+  if (cmax && c > cmax) return '#e05555'
+  return '#2ab8b8'
+}
 
 async function loadFromFirebase(uid) {
   try { const snap = await getDoc(doc(db,'users',uid)); if(snap.exists()) return snap.data() } catch(e) { console.error(e) }
@@ -357,7 +371,7 @@ export default function App() {
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8 }}>
               {[
                 { label:'Proteína', val:dayMacros.prot, target:activeTargets.prot, color:C.teal, farol:hasData?farolProt(dayMacros.prot,activeTargets):null },
-                { label:'Carb', val:dayMacros.carb, target:activeTargets.carb, color:C.gold2, farol:null },
+                { label:'Carb', val:dayMacros.carb, target:activeTargets.carb, color:C.gold2, farol:hasData?farolCarb(dayMacros.carb,activeTargets):null },
                 { label:'Gordura', val:dayMacros.fat, target:activeTargets.fat, color:C.terra, farol:hasData?farolFat(dayMacros.fat,activeTargets):null },
               ].map(m => {
                 const diff = r(m.val - m.target)
@@ -593,6 +607,8 @@ export default function App() {
                 <div style={{ display:'flex', alignItems:'center', gap:6 }}>
                   {acts.length>0&&<span style={{ fontSize:11 }}>{acts.slice(0,2).map(id=>ACTIVITIES.find(a=>a.id===id)?.icon||'').join('')}</span>}
                   <span style={{ fontSize:11, fontWeight:700, color:col, fontFamily:'JetBrains Mono,monospace' }}>{lbl}</span>
+                  <button onClick={(e)=>{ e.stopPropagation(); if(window.confirm(`Excluir o dia ${formatDateFull(day)}? Esta ação remove todos os registros deste dia.`)){ const nd={...days}; delete nd[day]; updateDays(nd) } }}
+                    style={{ background:`${C.red}18`, border:'none', borderRadius:8, width:26, height:26, color:C.red, cursor:'pointer', fontSize:15, flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center' }}>×</button>
                 </div>
               </div>
               <div style={{ background:C.surface2, borderRadius:4, height:6, marginBottom:7, overflow:'hidden' }}>
@@ -1876,18 +1892,24 @@ function WeightModal({ C, onSave, onClose }) {
 function TargetsModal({ targets, targetsHistory, C, onSave, onClose }) {
   const [t, setT] = useState({
     ...targets,
-    targets2: targets.targets2||{ cal:1800, prot:150, carb:220, fat:50, min:1700, max:1900, protMin:138, protMax:163, fatMax:60 },
+    targets2: targets.targets2||{ cal:1800, prot:150, carb:220, fat:50, min:1700, max:1900, protMin:138, protMax:163, fatMax:60, carbMin:190, carbMax:240, fatMin:40 },
     variableDays: targets.variableDays||[1,3,5],
     dualMode: targets.dualMode||false,
+    controlCarb: targets.controlCarb||false,
+    carbMin: targets.carbMin ?? 130, carbMax: targets.carbMax ?? 170,
+    fatMin: targets.fatMin ?? 35,
     validFrom: targets.validFrom||'2020-01-01',
   })
   const [activeTab, setActiveTab] = useState('meta1')
   const DAYS=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb']
-  const fields=[
+  const baseFields=[
     {k:'cal',l:'Calorias alvo (kcal)',c:C.gold},{k:'min',l:'Kcal mínimo',c:C.gold2},{k:'max',l:'Kcal máximo',c:C.red},
     {k:'prot',l:'Proteína alvo (g)',c:C.teal},{k:'protMin',l:'Proteína mínima (g)',c:C.teal},{k:'protMax',l:'Proteína máxima (g)',c:C.teal},
-    {k:'carb',l:'Carboidratos (g)',c:C.gold2},{k:'fat',l:'Gordura alvo (g)',c:C.terra},{k:'fatMax',l:'Gordura máxima (g)',c:C.terra},
+    {k:'carb',l:'Carboidratos alvo (g)',c:C.gold2},
+    ...(t.controlCarb?[{k:'carbMin',l:'Carbo mínimo (g)',c:C.gold2},{k:'carbMax',l:'Carbo máximo (g)',c:C.gold2}]:[]),
+    {k:'fat',l:'Gordura alvo (g)',c:C.terra},{k:'fatMin',l:'Gordura mínima (g)',c:C.terra},{k:'fatMax',l:'Gordura máxima (g)',c:C.terra},
   ]
+  const fields=baseFields
   const toggleDay=(day)=>setT(p=>({...p,variableDays:(p.variableDays||[]).includes(day)?p.variableDays.filter(d=>d!==day):[...(p.variableDays||[]),day]}))
 
   function handleSave() {
@@ -1953,6 +1975,22 @@ function TargetsModal({ targets, targetsHistory, C, onSave, onClose }) {
           <button onClick={()=>setActiveTab('meta1')} style={{ flex:1, padding:'9px 0', border:'none', borderRadius:10, background:activeTab==='meta1'?C.gold:C.surface2, color:activeTab==='meta1'?'#0d1a1f':C.text2, fontWeight:700, fontSize:12, cursor:'pointer', fontFamily:'inherit' }}>🟡 Meta 1</button>
           <button onClick={()=>setActiveTab('meta2')} style={{ flex:1, padding:'9px 0', border:'none', borderRadius:10, background:activeTab==='meta2'?C.teal:C.surface2, color:activeTab==='meta2'?'#0d1a1f':C.text2, fontWeight:700, fontSize:12, cursor:'pointer', fontFamily:'inherit' }}>🔵 Meta 2</button>
         </div>}
+
+        {/* Carb control toggle */}
+        {(!t.dualMode||activeTab==='meta1')&&(
+          <div style={{ background:C.surface2, borderRadius:12, padding:'12px 14px', marginBottom:14, border:`0.5px solid ${C.border}` }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+              <div>
+                <div style={{ fontSize:13, fontWeight:600, color:C.text }}>Controlar carboidrato</div>
+                <div style={{ fontSize:11, color:C.text2, marginTop:2 }}>Define mínimo e máximo de carbo</div>
+              </div>
+              <div onClick={()=>setT(p=>({...p,controlCarb:!p.controlCarb}))}
+                style={{ width:44, height:24, borderRadius:12, background:t.controlCarb?C.gold:C.border, cursor:'pointer', position:'relative', transition:'background .2s', flexShrink:0 }}>
+                <div style={{ position:'absolute', top:3, left:t.controlCarb?22:3, width:18, height:18, borderRadius:'50%', background:C.text, transition:'left .2s' }}/>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Fields */}
         {(!t.dualMode||activeTab==='meta1')&&fields.map(f=>(
