@@ -259,6 +259,31 @@ export default function App() {
     updateDays({ ...days, [activeKey]: { ...day, meals: { ...day.meals, [activeMeal]: [...(day.meals[activeMeal]||[]), { id:foodId, qty:qty??f.def }] } } })
     setAddingFood(false); setSearch('')
   }
+
+  // Toggle a food as favorite for a specific meal (stored as override in customFoods)
+  function toggleMealFav(foodId, mealId) {
+    const base = DEFAULT_FOODS.find(f => f.id === foodId)
+    const existing = customFoods.find(c => c.id === foodId)
+    const src = existing || base
+    if (!src) return
+    const curFav = src.fav || []
+    const newFav = curFav.includes(mealId) ? curFav.filter(m => m !== mealId) : [...curFav, mealId]
+    const updated = { ...src, fav: newFav }
+    const newCustom = existing
+      ? customFoods.map(c => c.id === foodId ? updated : c)
+      : [...customFoods, updated]
+    updateCustomFoods(newCustom)
+  }
+
+  // Add all favorite foods of the active meal at once
+  function addFavoriteMeal() {
+    const favs = allFoods.filter(f => f.fav && f.fav.includes(activeMeal))
+    if (favs.length === 0) return
+    const day = getDay(activeKey)
+    const newItems = favs.map(f => ({ id:f.id, qty:f.def }))
+    updateDays({ ...days, [activeKey]: { ...day, meals: { ...day.meals, [activeMeal]: [...(day.meals[activeMeal]||[]), ...newItems] } } })
+    setAddingFood(false); setSearch('')
+  }
   function removeFood(mealId, idx) {
     const day = days[activeKey]; if (!day) return
     updateDays({ ...days, [activeKey]: { ...day, meals: { ...day.meals, [mealId]: day.meals[mealId].filter((_,i)=>i!==idx) } } })
@@ -489,7 +514,14 @@ export default function App() {
         })}
         {/* Add food */}
         {!addingFood
-          ? <button onClick={()=>setAddingFood(true)} style={{ width:'100%', padding:12, border:`1.5px dashed ${C.border}`, borderRadius:12, background:'transparent', color:C.text2, fontSize:13, cursor:'pointer', fontFamily:'inherit', marginTop:4 }}>+ Adicionar alimento</button>
+          ? <div style={{ marginTop:4 }}>
+              {allFoods.filter(f=>f.fav&&f.fav.includes(activeMeal)).length>0 && (
+                <button onClick={addFavoriteMeal} style={{ width:'100%', padding:12, border:'none', borderRadius:12, background:`linear-gradient(135deg,${C.gold},${C.gold2})`, color:'#0d1a1f', fontSize:13, cursor:'pointer', fontFamily:'inherit', fontWeight:700, marginBottom:8, display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
+                  ⭐ Add refeição favorita ({allFoods.filter(f=>f.fav&&f.fav.includes(activeMeal)).length} itens)
+                </button>
+              )}
+              <button onClick={()=>setAddingFood(true)} style={{ width:'100%', padding:12, border:`1.5px dashed ${C.border}`, borderRadius:12, background:'transparent', color:C.text2, fontSize:13, cursor:'pointer', fontFamily:'inherit' }}>+ Adicionar alimento</button>
+            </div>
           : <div style={{ background:C.surface, borderRadius:14, padding:14, border:`0.5px solid ${C.border}`, marginTop:8 }}>
               <div style={{ display:'flex', gap:8, marginBottom:10 }}>
                 <input autoFocus value={search} onChange={e=>{ setSearch(e.target.value); setAvulso(false) }} placeholder="Buscar alimento..."
@@ -532,12 +564,12 @@ export default function App() {
               {!avulso&&<div style={{ maxHeight:280, overflowY:'auto' }}>
                 {!search&&favFoods.length>0&&(<>
                   <div style={{ fontSize:10, fontWeight:700, color:C.text2, textTransform:'uppercase', letterSpacing:1, margin:'4px 0 8px', fontFamily:'JetBrains Mono,monospace' }}>⭐ Favoritos</div>
-                  {favFoods.map(f=><FoodRow key={f.id} food={f} onAdd={addFoodToMeal} mealId={activeMeal} C={C}/>)}
+                  {favFoods.map(f=><FoodRow key={f.id} food={f} onAdd={addFoodToMeal} mealId={activeMeal} C={C} onToggleFav={toggleMealFav}/>)}
                   <div style={{ fontSize:10, fontWeight:700, color:C.text2, textTransform:'uppercase', letterSpacing:1, margin:'12px 0 8px', fontFamily:'JetBrains Mono,monospace' }}>Todos</div>
-                  {otherFoods.map(f=><FoodRow key={f.id} food={f} onAdd={addFoodToMeal} mealId={activeMeal} C={C}/>)}
+                  {otherFoods.map(f=><FoodRow key={f.id} food={f} onAdd={addFoodToMeal} mealId={activeMeal} C={C} onToggleFav={toggleMealFav}/>)}
                 </>)}
-                {!search&&favFoods.length===0&&allFoods.map(f=><FoodRow key={f.id} food={f} onAdd={addFoodToMeal} mealId={activeMeal} C={C}/>)}
-                {search&&(filtered.length>0?filtered.map(f=><FoodRow key={f.id} food={f} onAdd={addFoodToMeal} mealId={activeMeal} C={C}/>):<div style={{ padding:'20px', textAlign:'center', color:C.text3, fontSize:13 }}>Nenhum resultado</div>)}
+                {!search&&favFoods.length===0&&allFoods.map(f=><FoodRow key={f.id} food={f} onAdd={addFoodToMeal} mealId={activeMeal} C={C} onToggleFav={toggleMealFav}/>)}
+                {search&&(filtered.length>0?filtered.map(f=><FoodRow key={f.id} food={f} onAdd={addFoodToMeal} mealId={activeMeal} C={C} onToggleFav={toggleMealFav}/>):<div style={{ padding:'20px', textAlign:'center', color:C.text3, fontSize:13 }}>Nenhum resultado</div>)}
               </div>}
             </div>
         }
@@ -1347,6 +1379,137 @@ export default function App() {
             )
           })()}
 
+          {/* Weekly body composition + diet comparison */}
+          {(() => {
+            const CUTOFF = '2026-07-08' // start of body composition tracking
+
+            // Get ISO week key (Monday-Sunday), returns the Monday date string
+            const getMonday = (dateStr) => {
+              const d = new Date(dateStr + 'T12:00:00')
+              const day = d.getDay() // 0=Sun..6=Sat
+              const diff = day === 0 ? -6 : 1 - day // shift to Monday
+              d.setDate(d.getDate() + diff)
+              return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+            }
+
+            // Group body data by week (only from cutoff)
+            const bodyByWeek = {}
+            Object.entries(bodyData).filter(([d]) => d >= CUTOFF).forEach(([date, bd]) => {
+              const wk = getMonday(date)
+              if (!bodyByWeek[wk]) bodyByWeek[wk] = []
+              bodyByWeek[wk].push({ date, ...bd })
+            })
+
+            // Group diet by week (only from cutoff)
+            const dietByWeek = {}
+            Object.entries(days).filter(([d]) => d >= CUTOFF && d !== today).forEach(([date, dd]) => {
+              const wk = getMonday(date)
+              const m = calcMacros(Object.values(dd.meals||{}).flat(), allFoods)
+              if (m.cal <= 0) return
+              if (!dietByWeek[wk]) dietByWeek[wk] = []
+              dietByWeek[wk].push(m)
+            })
+
+            const allWeeks = [...new Set([...Object.keys(bodyByWeek), ...Object.keys(dietByWeek)])].sort()
+            if (allWeeks.length === 0) return null
+
+            const avg = (arr, key) => {
+              const vals = arr.map(x => x[key]).filter(v => v != null && !isNaN(v))
+              return vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : null
+            }
+
+            // Build week summaries
+            const weekData = allWeeks.map((wk, i) => {
+              const body = bodyByWeek[wk] || []
+              const diet = dietByWeek[wk] || []
+              const mondayD = new Date(wk + 'T12:00:00')
+              const label = `${String(mondayD.getDate()).padStart(2,'0')}/${String(mondayD.getMonth()+1).padStart(2,'0')}`
+              return {
+                wk, label, weekNum: i+1,
+                weight: avg(body, 'weight'),
+                fatMass: avg(body, 'fatMass'),
+                leanMass: avg(body, 'leanMass'),
+                bodyFat: avg(body, 'bodyFat'),
+                cal: diet.length ? Math.round(avg(diet, 'cal')) : null,
+                prot: diet.length ? Math.round(avg(diet, 'prot')) : null,
+                carb: diet.length ? Math.round(avg(diet, 'carb')) : null,
+                fat: diet.length ? Math.round(avg(diet, 'fat')) : null,
+                bodyDays: body.length,
+                dietDays: diet.length,
+              }
+            })
+
+            // Comparison bars component
+            const CompareRow = ({ label, dataKey, unit, color, goodDown }) => {
+              const vals = weekData.map(w => w[dataKey]).filter(v => v != null)
+              if (vals.length === 0) return null
+              const maxV = Math.max(...vals)
+              const minV = Math.min(...vals) * 0.95
+              return (
+                <div style={{ marginBottom:14 }}>
+                  <div style={{ fontSize:11, color:C.text2, marginBottom:6, fontWeight:600 }}>{label}</div>
+                  {weekData.map((w, i) => {
+                    const v = w[dataKey]
+                    if (v == null) return (
+                      <div key={i} style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
+                        <span style={{ fontSize:9, color:C.text3, width:52, fontFamily:'JetBrains Mono,monospace' }}>S{w.weekNum} {w.label}</span>
+                        <span style={{ fontSize:10, color:C.text3 }}>—</span>
+                      </div>
+                    )
+                    const pct = maxV > minV ? ((v - minV) / (maxV - minV)) * 100 : 50
+                    const prev = i > 0 ? weekData[i-1][dataKey] : null
+                    const delta = prev != null ? (v - prev) : null
+                    const deltaGood = delta != null ? (goodDown ? delta < 0 : delta > 0) : null
+                    return (
+                      <div key={i} style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
+                        <span style={{ fontSize:9, color:C.text2, width:52, fontFamily:'JetBrains Mono,monospace', flexShrink:0 }}>S{w.weekNum} {w.label}</span>
+                        <div style={{ flex:1, background:C.surface2, borderRadius:4, height:20, position:'relative', overflow:'hidden' }}>
+                          <div style={{ height:'100%', width:Math.max(15,pct)+'%', background:color, borderRadius:4, transition:'width .3s' }}/>
+                          <span style={{ position:'absolute', right:6, top:'50%', transform:'translateY(-50%)', fontSize:10, fontWeight:700, color:C.text, fontFamily:'JetBrains Mono,monospace' }}>
+                            {typeof v === 'number' ? v.toFixed(dataKey==='cal'||dataKey==='prot'||dataKey==='carb'||dataKey==='fat'?0:1) : v}{unit}
+                          </span>
+                        </div>
+                        {delta != null && Math.abs(delta) > 0.05 && (
+                          <span style={{ fontSize:9, fontWeight:700, width:42, textAlign:'right', color:deltaGood?C.teal:C.red, fontFamily:'JetBrains Mono,monospace', flexShrink:0 }}>
+                            {delta>0?'+':''}{delta.toFixed(dataKey==='cal'?0:1)}
+                          </span>
+                        )}
+                        {(delta == null || Math.abs(delta) <= 0.05) && <span style={{ width:42, flexShrink:0 }}/>}
+                      </div>
+                    )
+                  })}
+                </div>
+              )
+            }
+
+            return (
+              <div style={{ background:C.surface, borderRadius:14, padding:14, marginBottom:12, border:`0.5px solid ${C.border}` }}>
+                <div style={{ fontSize:13, fontWeight:500, marginBottom:4, color:C.text }}>📅 Comparativo Semanal</div>
+                <div style={{ fontSize:10, color:C.text2, marginBottom:14, fontFamily:'JetBrains Mono,monospace' }}>
+                  Seg–Dom · a partir de 08/07 · {weekData.length} semana(s)
+                </div>
+
+                {/* Body composition section */}
+                <div style={{ fontSize:11, fontWeight:700, color:C.gold, marginBottom:10, fontFamily:'JetBrains Mono,monospace', textTransform:'uppercase', letterSpacing:1 }}>🧬 Composição Corporal</div>
+                <CompareRow label="Peso (kg)" dataKey="weight" unit="" color={C.gold} goodDown={true} />
+                <CompareRow label="% Gordura" dataKey="bodyFat" unit="%" color={C.terra} goodDown={true} />
+                <CompareRow label="Massa Gorda (kg)" dataKey="fatMass" unit="" color={C.terra} goodDown={true} />
+                <CompareRow label="Massa Magra (kg)" dataKey="leanMass" unit="" color={C.teal} goodDown={false} />
+
+                {/* Diet section */}
+                <div style={{ fontSize:11, fontWeight:700, color:C.gold, margin:'18px 0 10px', fontFamily:'JetBrains Mono,monospace', textTransform:'uppercase', letterSpacing:1 }}>⚡ Dieta Média</div>
+                <CompareRow label="Calorias (kcal/dia)" dataKey="cal" unit="" color={C.gold} goodDown={false} />
+                <CompareRow label="Proteína (g/dia)" dataKey="prot" unit="" color={C.teal} goodDown={false} />
+                <CompareRow label="Carboidrato (g/dia)" dataKey="carb" unit="" color={C.gold2} goodDown={false} />
+                <CompareRow label="Gordura (g/dia)" dataKey="fat" unit="" color={C.terra} goodDown={false} />
+
+                <div style={{ fontSize:9, color:C.text3, marginTop:10, lineHeight:1.5, fontFamily:'JetBrains Mono,monospace' }}>
+                  As setas mostram a variação vs semana anterior. Verde = melhora (peso/gordura ↓, massa magra ↑).
+                </div>
+              </div>
+            )
+          })()}
+
         </>)}
       </div>
     )
@@ -1476,14 +1639,23 @@ export default function App() {
 }
 
 // ── FOOD ROW ─────────────────────────────────────────────────────────────────
-function FoodRow({ food:f, onAdd, mealId, C }) {
+function FoodRow({ food:f, onAdd, mealId, C, onToggleFav }) {
   const [qty, setQty] = useState(f.def)
   useEffect(()=>{ setQty(f.def) },[mealId,f.id,f.def])
   const fixed=['unid','dose','porção'].includes(f.unit)
   const m=fixed?qty:qty/100
+  const isFav = f.fav && f.fav.includes(mealId)
   return (
     <div style={{ padding:'10px 0', borderBottom:`0.5px solid ${C.border}` }}>
-      <div style={{ fontSize:13, fontWeight:600, lineHeight:1.3, color:C.text }}>{f.name}</div>
+      <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+        {onToggleFav && (
+          <button onClick={()=>onToggleFav(f.id, mealId)} title={isFav?'Remover dos favoritos':'Marcar como favorito desta refeição'}
+            style={{ background:'none', border:'none', cursor:'pointer', fontSize:15, padding:0, flexShrink:0, opacity:isFav?1:0.3, filter:isFav?'none':'grayscale(1)' }}>
+            {isFav?'⭐':'☆'}
+          </button>
+        )}
+        <div style={{ fontSize:13, fontWeight:600, lineHeight:1.3, color:C.text, flex:1 }}>{f.name}</div>
+      </div>
       {f.note&&<div style={{ fontSize:11, color:C.text2, marginTop:1 }}>{f.note}</div>}
       <div style={{ display:'flex', alignItems:'center', gap:8, marginTop:6 }}>
         <div style={{ fontSize:11, color:C.text2, fontFamily:'JetBrains Mono,monospace', flex:1 }}>{Math.round(f.cal*m)} kcal · P:{Math.round(f.prot*m*10)/10}g · C:{Math.round(f.carb*m*10)/10}g · G:{Math.round(f.fat*m*10)/10}g</div>
