@@ -59,6 +59,8 @@ const ACTIVITIES = [
   { id: 'outro', label: 'Outro', icon: '🏃', color: '#6b7280', type: 'other' },
 ]
 
+const HEALTH_CUTOFF = '2026-08-19' // início do monitoramento de passos e sono (relógio usado a partir daqui)
+
 const DEFAULT_TARGETS = {
   cal: 1562, prot: 150, carb: 151, fat: 43,
   min: 1460, max: 1680, protMin: 138, protMax: 163, fatMax: 52,
@@ -149,12 +151,12 @@ async function saveToFirebase(uid, data, fullReplace) {
 const DARK = {
   bg:'#0d1a1f', surface:'#122028', surface2:'#1a2d35', border:'#1e3540',
   gold:'#c8873a', gold2:'#e8a040', teal:'#2ab8b8', red:'#e05555', terra:'#e07060',
-  text:'#f0e8d8', text2:'#7a9aa8', text3:'#3d5a68',
+  text:'#f0e8d8', text2:'#7a9aa8', text3:'#3d5a68', btnText:'#0d1a1f',
 }
 const LIGHT = {
-  bg:'#f4f0eb', surface:'#ffffff', surface2:'#ede8e2', border:'#d4ccc4',
-  gold:'#b5702a', gold2:'#c8873a', teal:'#1a9090', red:'#cc3333', terra:'#c05040',
-  text:'#1a1008', text2:'#5a4a38', text3:'#8a7a68',
+  bg:'#f7f8fa', surface:'#ffffff', surface2:'#f0f2f5', border:'#e3e7ec',
+  gold:'#4f46e5', gold2:'#6366f1', teal:'#0ea5a5', red:'#ef4444', terra:'#f59e0b',
+  text:'#111827', text2:'#6b7280', text3:'#9ca3af', btnText:'#ffffff',
 }
 
 // ── APP ──────────────────────────────────────────────────────────────────────
@@ -168,6 +170,8 @@ export default function App() {
   const [weights, setWeights] = useState({})
   const [bodyData, setBodyData] = useState({}) // stores full body composition per date
   const [showRelaxFitModal, setShowRelaxFitModal] = useState(false)
+  const [healthData, setHealthData] = useState({}) // { 'YYYY-MM-DD': { steps, sleepHours, ... } }
+  const [showHealthImport, setShowHealthImport] = useState(false)
   const [insightPeriod, setInsightPeriod] = useState('last') // 'last' | '7d' | '30d'
   const [loaded, setLoaded] = useState(false)
   const [tab, setTab] = useState('today')
@@ -208,6 +212,7 @@ export default function App() {
             if (data.customFoods) setCustomFoods(data.customFoods)
             if (data.weights) setWeights(data.weights)
             if (data.bodyData) setBodyData(data.bodyData)
+            if (data.healthData) setHealthData(data.healthData)
             if (data.targetsHistory) setTargetsHistory(data.targetsHistory)
             if (data.darkMode !== undefined) setDarkMode(data.darkMode)
           }
@@ -227,10 +232,11 @@ export default function App() {
       weights: nw,
       darkMode: ndm,
       bodyData: nbd !== undefined ? nbd : bodyData,
+      healthData,
     }
     // fullReplace=true ensures deleted keys (e.g. removed weight entries) are actually removed
     saveToFirebase(uid, payload, true)
-  }, [uid, bodyData])
+  }, [uid, bodyData, healthData])
 
   const updateDays = (nd) => { setDays(nd); persist(nd, targets, targetsHistory, customFoods, weights, darkMode) }
   const updateTargets = (nt, nth) => {
@@ -242,6 +248,11 @@ export default function App() {
   const updateCustomFoods = (cf) => { setCustomFoods(cf); persist(days, targets, targetsHistory, cf, weights, darkMode) }
   const updateWeights = (w) => { setWeights(w); persist(days, targets, targetsHistory, customFoods, w, darkMode) }
   const updateBodyData = (bd) => { setBodyData(bd); persist(days, targets, targetsHistory, customFoods, weights, darkMode, bd) }
+  const updateHealthData = (hd) => {
+    setHealthData(hd)
+    if (!uid) return
+    saveToFirebase(uid, { days, targets, targetsHistory, customFoods, weights, darkMode, bodyData, healthData: hd }, true)
+  }
   const toggleDarkMode = () => { const nm = !darkMode; setDarkMode(nm); persist(days, targets, targetsHistory, customFoods, weights, nm) }
 
   const activeKey = editingDay || todayKey()
@@ -446,6 +457,10 @@ export default function App() {
         saveWeightAndBody(date, data)
         setShowRelaxFitModal(false)
       }} onClose={()=>setShowRelaxFitModal(false)}/>}
+      {showHealthImport&&<HealthImportModal C={C} healthData={healthData} onSave={(hd)=>{
+        updateHealthData(hd)
+        setShowHealthImport(false)
+      }} onClose={()=>setShowHealthImport(false)}/>}
     </div>
   )
 
@@ -516,7 +531,7 @@ export default function App() {
         {!addingFood
           ? <div style={{ marginTop:4 }}>
               {allFoods.filter(f=>f.fav&&f.fav.includes(activeMeal)).length>0 && (
-                <button onClick={addFavoriteMeal} style={{ width:'100%', padding:12, border:'none', borderRadius:12, background:`linear-gradient(135deg,${C.gold},${C.gold2})`, color:'#0d1a1f', fontSize:13, cursor:'pointer', fontFamily:'inherit', fontWeight:700, marginBottom:8, display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
+                <button onClick={addFavoriteMeal} style={{ width:'100%', padding:12, border:'none', borderRadius:12, background:`linear-gradient(135deg,${C.gold},${C.gold2})`, color:C.btnText, fontSize:13, cursor:'pointer', fontFamily:'inherit', fontWeight:700, marginBottom:8, display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
                   ⭐ Add refeição favorita ({allFoods.filter(f=>f.fav&&f.fav.includes(activeMeal)).length} itens)
                 </button>
               )}
@@ -556,7 +571,7 @@ export default function App() {
                   const item={ id:'avulso_'+Date.now(), qty:1, avulso:true, name:avulsoData.name||'Entrada avulsa', cal:parseFloat(avulsoData.cal)||0, prot:parseFloat(avulsoData.prot)||0, carb:parseFloat(avulsoData.carb)||0, fat:parseFloat(avulsoData.fat)||0 }
                   updateDays({...days,[activeKey]:{...day,meals:{...day.meals,[activeMeal]:[...(day.meals[activeMeal]||[]),item]}}})
                   setAvulsoData({name:'',cal:'',prot:'',carb:'',fat:''}); setAvulso(false); setAddingFood(false)
-                }} style={{ width:'100%', padding:'10px', background:`linear-gradient(135deg,${C.gold},${C.gold2})`, border:'none', borderRadius:10, color:'#0d1a1f', fontSize:13, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>
+                }} style={{ width:'100%', padding:'10px', background:`linear-gradient(135deg,${C.gold},${C.gold2})`, border:'none', borderRadius:10, color:C.btnText, fontSize:13, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>
                   Adicionar à refeição
                 </button>
               </div>}
@@ -614,7 +629,7 @@ export default function App() {
             input.style.cssText='position:fixed;opacity:0;top:50%;left:50%'; document.body.appendChild(input); input.showPicker?.()
             input.addEventListener('change',e=>{ const chosen=e.target.value; if(chosen){ if(!days[chosen]) updateDays({...days,[chosen]:emptyDay()}); setEditingDay(chosen); setActiveMeal('cafe_manha'); setAddingFood(false); setSearch('') }; try{document.body.removeChild(input)}catch(e){} })
             input.addEventListener('blur',()=>{ try{document.body.removeChild(input)}catch(e){} })
-          }} style={{ background:`linear-gradient(135deg,${C.gold},${C.gold2})`, border:'none', borderRadius:10, padding:'6px 12px', color:'#0d1a1f', fontSize:11, cursor:'pointer', fontFamily:'inherit', fontWeight:700 }}>+ Dia anterior</button>
+          }} style={{ background:`linear-gradient(135deg,${C.gold},${C.gold2})`, border:'none', borderRadius:10, padding:'6px 12px', color:C.btnText, fontSize:11, cursor:'pointer', fontFamily:'inherit', fontWeight:700 }}>+ Dia anterior</button>
         </div>
         {entries.length===0&&<div style={{ textAlign:'center', padding:'32px 0', color:C.text3, fontSize:13 }}>
           <div style={{ fontSize:32, marginBottom:8 }}>📅</div>Nenhum dia registrado ainda.
@@ -742,7 +757,7 @@ export default function App() {
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
             <div style={{ fontSize:13, fontWeight:700, color:C.text }}>⚖️ Peso Corporal</div>
             <div style={{ display:'flex', gap:6 }}>
-              <button onClick={()=>setShowWeightModal(true)} style={{ background:`linear-gradient(135deg,${C.gold},${C.gold2})`, border:'none', borderRadius:10, padding:'7px 12px', color:'#0d1a1f', fontSize:11, cursor:'pointer', fontFamily:'inherit', fontWeight:700 }}>+ Registrar</button>
+              <button onClick={()=>setShowWeightModal(true)} style={{ background:`linear-gradient(135deg,${C.gold},${C.gold2})`, border:'none', borderRadius:10, padding:'7px 12px', color:C.btnText, fontSize:11, cursor:'pointer', fontFamily:'inherit', fontWeight:700 }}>+ Registrar</button>
               <button onClick={()=>setShowRelaxFitModal(true)} style={{ background:C.surface2, border:`1px solid ${C.gold}60`, borderRadius:10, padding:'7px 12px', color:C.gold, fontSize:11, cursor:'pointer', fontFamily:'inherit', fontWeight:700 }}>📷 RelaxFit</button>
             </div>
           </div>
@@ -781,6 +796,59 @@ export default function App() {
               Nenhum peso registrado.<br/>Use RelaxFit para importar!
             </div>
           )}
+        </div>
+
+        {/* Saúde - Samsung Health */}
+        <div style={{ background:C.surface, borderRadius:14, padding:14, marginBottom:12, border:`0.5px solid ${C.border}` }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:(() => { const hEntries = Object.entries(healthData).filter(([,d])=>d.steps||d.sleep); return hEntries.length>0?12:0 })() }}>
+            <div style={{ fontSize:13, fontWeight:700, color:C.text }}>👟 Atividade & Sono</div>
+            <button onClick={()=>setShowHealthImport(true)} style={{ background:C.surface2, border:`1px solid ${C.gold}60`, borderRadius:10, padding:'7px 12px', color:C.gold, fontSize:11, cursor:'pointer', fontFamily:'inherit', fontWeight:700 }}>📥 Importar</button>
+          </div>
+          {(() => {
+            const hEntries = Object.entries(healthData).filter(([,d])=>d.steps||d.sleep).sort(([a],[b])=>b.localeCompare(a))
+            if (hEntries.length === 0) return (
+              <div style={{ textAlign:'center', padding:'8px 0 0', color:C.text3, fontSize:12 }}>
+                Importe seus dados de passos e sono do Samsung Health
+              </div>
+            )
+            // Latest values + 7-day averages
+            const last7 = hEntries.slice(0, 7)
+            const avgOf = (key) => { const s = last7.map(([,d])=>d[key]).filter(v=>v!=null); return s.length?s.reduce((a,b)=>a+b,0)/s.length:null }
+            const avgSteps = (() => { const v = avgOf('steps'); return v?Math.round(v):null })()
+            const avgSleep = (() => { const v = avgOf('sleep'); return v?v.toFixed(1):null })()
+            const avgScore = (() => { const v = avgOf('sleepScore'); return v?Math.round(v):null })()
+            const latestSteps = hEntries.find(([,d])=>d.steps)?.[1]?.steps
+            const latestSleepE = hEntries.find(([,d])=>d.sleep)?.[1]
+            return (
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                {latestSteps != null && (
+                  <div style={{ background:C.bg, borderRadius:10, padding:'10px 12px' }}>
+                    <div style={{ fontSize:10, color:C.text2, marginBottom:4 }}>👟 Passos (último)</div>
+                    <div style={{ fontSize:20, fontWeight:800, color:C.teal, fontFamily:'JetBrains Mono,monospace' }}>{latestSteps.toLocaleString()}</div>
+                    {avgSteps && <div style={{ fontSize:10, color:C.text3, marginTop:2, fontFamily:'JetBrains Mono,monospace' }}>média 7d: {avgSteps.toLocaleString()}</div>}
+                  </div>
+                )}
+                {latestSleepE?.sleep != null && (
+                  <div style={{ background:C.bg, borderRadius:10, padding:'10px 12px' }}>
+                    <div style={{ fontSize:10, color:C.text2, marginBottom:4 }}>😴 Sono (último)</div>
+                    <div style={{ fontSize:20, fontWeight:800, color:'#8b7fd4', fontFamily:'JetBrains Mono,monospace' }}>{latestSleepE.sleep}h</div>
+                    {avgSleep && <div style={{ fontSize:10, color:C.text3, marginTop:2, fontFamily:'JetBrains Mono,monospace' }}>média 7d: {avgSleep}h</div>}
+                  </div>
+                )}
+                {avgScore != null && (
+                  <div style={{ background:C.bg, borderRadius:10, padding:'10px 12px', gridColumn:'1 / -1' }}>
+                    <div style={{ fontSize:10, color:C.text2, marginBottom:4 }}>⭐ Nota do Sono (média 7d)</div>
+                    <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                      <div style={{ fontSize:20, fontWeight:800, color:avgScore>=70?C.teal:avgScore>=50?C.gold:C.red, fontFamily:'JetBrains Mono,monospace' }}>{avgScore}<span style={{ fontSize:11, color:C.text3 }}>/100</span></div>
+                      <div style={{ flex:1, background:C.surface2, borderRadius:4, height:8, overflow:'hidden' }}>
+                        <div style={{ height:'100%', width:avgScore+'%', background:avgScore>=70?C.teal:avgScore>=50?C.gold:C.red, borderRadius:4 }}/>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )
+          })()}
         </div>
 
         {/* Composição corporal atual */}
@@ -1510,6 +1578,85 @@ export default function App() {
             )
           })()}
 
+          {/* Weekly health (steps, sleep) comparison */}
+          {Object.keys(healthData).length > 0 && (() => {
+            const getMonday = (dateStr) => {
+              const d = new Date(dateStr + 'T12:00:00')
+              const day = d.getDay()
+              const diff = day === 0 ? -6 : 1 - day
+              d.setDate(d.getDate() + diff)
+              return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+            }
+
+            const byWeek = {}
+            Object.entries(healthData).forEach(([date, hd]) => {
+              const wk = getMonday(date)
+              if (!byWeek[wk]) byWeek[wk] = { steps:[], sleep:[], score:[] }
+              if (hd.steps) byWeek[wk].steps.push(hd.steps)
+              if (hd.sleep) byWeek[wk].sleep.push(hd.sleep)
+              if (hd.sleepScore) byWeek[wk].score.push(hd.sleepScore)
+            })
+
+            const weeks = Object.keys(byWeek).sort()
+            if (weeks.length === 0) return null
+            const avg = (arr) => arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : null
+
+            const weekData = weeks.map((wk, i) => {
+              const mondayD = new Date(wk + 'T12:00:00')
+              const label = `${String(mondayD.getDate()).padStart(2,'0')}/${String(mondayD.getMonth()+1).padStart(2,'0')}`
+              return {
+                weekNum: i+1, label,
+                steps: byWeek[wk].steps.length ? Math.round(avg(byWeek[wk].steps)) : null,
+                sleep: byWeek[wk].sleep.length ? Math.round(avg(byWeek[wk].sleep)*10)/10 : null,
+                score: byWeek[wk].score.length ? Math.round(avg(byWeek[wk].score)) : null,
+              }
+            }).slice(-8) // last 8 weeks max
+
+            const HealthRow = ({ label, dataKey, unit, color, fmt }) => {
+              const vals = weekData.map(w => w[dataKey]).filter(v => v != null)
+              if (vals.length === 0) return null
+              const maxV = Math.max(...vals)
+              const minV = Math.min(...vals) * 0.9
+              return (
+                <div style={{ marginBottom:14 }}>
+                  <div style={{ fontSize:11, color:C.text2, marginBottom:6, fontWeight:600 }}>{label}</div>
+                  {weekData.map((w, i) => {
+                    const v = w[dataKey]
+                    if (v == null) return null
+                    const pct = maxV > minV ? ((v - minV) / (maxV - minV)) * 100 : 50
+                    const prev = i > 0 ? weekData[i-1][dataKey] : null
+                    const delta = prev != null ? (v - prev) : null
+                    return (
+                      <div key={i} style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
+                        <span style={{ fontSize:9, color:C.text2, width:52, fontFamily:'JetBrains Mono,monospace', flexShrink:0 }}>S{w.weekNum} {w.label}</span>
+                        <div style={{ flex:1, background:C.surface2, borderRadius:4, height:20, position:'relative', overflow:'hidden' }}>
+                          <div style={{ height:'100%', width:Math.max(15,pct)+'%', background:color, borderRadius:4 }}/>
+                          <span style={{ position:'absolute', right:6, top:'50%', transform:'translateY(-50%)', fontSize:10, fontWeight:700, color:C.text, fontFamily:'JetBrains Mono,monospace' }}>{fmt?fmt(v):v}{unit}</span>
+                        </div>
+                        {delta != null && Math.abs(delta) > 0.05 && (
+                          <span style={{ fontSize:9, fontWeight:700, width:42, textAlign:'right', color:delta>0?C.teal:C.red, fontFamily:'JetBrains Mono,monospace', flexShrink:0 }}>{delta>0?'+':''}{fmt?fmt(delta):Math.round(delta)}</span>
+                        )}
+                        {(delta == null || Math.abs(delta) <= 0.05) && <span style={{ width:42, flexShrink:0 }}/>}
+                      </div>
+                    )
+                  })}
+                </div>
+              )
+            }
+
+            return (
+              <div style={{ background:C.surface, borderRadius:14, padding:14, marginBottom:12, border:`0.5px solid ${C.border}` }}>
+                <div style={{ fontSize:13, fontWeight:500, marginBottom:4, color:C.text }}>👟 Saúde Semanal</div>
+                <div style={{ fontSize:10, color:C.text2, marginBottom:14, fontFamily:'JetBrains Mono,monospace' }}>
+                  Passos, sono e nota · Seg–Dom · {weekData.length} semana(s)
+                </div>
+                <HealthRow label="Passos (média/dia)" dataKey="steps" unit="" color={C.teal} fmt={v=>Math.round(v).toLocaleString()} />
+                <HealthRow label="Sono (horas/dia)" dataKey="sleep" unit="h" color="#8b7fd4" fmt={v=>v.toFixed(1)} />
+                <HealthRow label="Nota do Sono (0-100)" dataKey="score" unit="" color={C.gold} fmt={v=>Math.round(v)} />
+              </div>
+            )
+          })()}
+
         </>)}
       </div>
     )
@@ -1582,7 +1729,7 @@ export default function App() {
               updateCustomFoods([...customFoods,{id:'custom_'+Date.now(),...foodData}])
             }
             setRegisterMode(false); setEditingFoodIdx(null); setNewFood({name:'',cal:'',prot:'',carb:'',fat:'',unit:'g',def:'100',fav:[]})
-          }} style={{ width:'100%', padding:12, background:`linear-gradient(135deg,${C.gold},${C.gold2})`, border:'none', borderRadius:12, color:'#0d1a1f', cursor:'pointer', fontFamily:'inherit', fontWeight:700, fontSize:14 }}>
+          }} style={{ width:'100%', padding:12, background:`linear-gradient(135deg,${C.gold},${C.gold2})`, border:'none', borderRadius:12, color:C.btnText, cursor:'pointer', fontFamily:'inherit', fontWeight:700, fontSize:14 }}>
             {editingFoodIdx!==null?'Salvar alterações':'Salvar alimento'}
           </button>
         </div>
@@ -1594,7 +1741,7 @@ export default function App() {
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
           <div style={{ fontSize:15, fontWeight:700, color:C.text }}>Alimentos</div>
           <button onClick={()=>{ setEditingFoodIdx(null); setNewFood({name:'',cal:'',prot:'',carb:'',fat:'',unit:'g',def:'100',fav:[]}); setRegisterMode(true) }}
-            style={{ background:`linear-gradient(135deg,${C.gold},${C.gold2})`, border:'none', borderRadius:10, padding:'7px 12px', color:'#0d1a1f', fontSize:12, cursor:'pointer', fontFamily:'inherit', fontWeight:700 }}>+ Novo</button>
+            style={{ background:`linear-gradient(135deg,${C.gold},${C.gold2})`, border:'none', borderRadius:10, padding:'7px 12px', color:C.btnText, fontSize:12, cursor:'pointer', fontFamily:'inherit', fontWeight:700 }}>+ Novo</button>
         </div>
         <input value={foodSearch} onChange={e=>setFoodSearch(e.target.value)} placeholder="🔍 Buscar na lista..."
           style={{ width:'100%', background:C.surface2, border:`0.5px solid ${C.border}`, borderRadius:10, padding:'10px 12px', color:C.text, fontSize:13, fontFamily:'inherit', marginBottom:14 }}/>
@@ -1662,7 +1809,7 @@ function FoodRow({ food:f, onAdd, mealId, C, onToggleFav }) {
         <input type="number" value={qty} onChange={e=>setQty(parseFloat(e.target.value)||0)}
           style={{ width:52, textAlign:'center', fontFamily:'JetBrains Mono,monospace', fontSize:13, padding:'5px 4px', border:`0.5px solid ${C.border}`, borderRadius:8, background:C.surface2, color:C.text }}/>
         <span style={{ fontSize:10, color:C.text2, minWidth:26 }}>{f.unit}</span>
-        <button onClick={()=>onAdd(f.id,qty)} style={{ background:`linear-gradient(135deg,${C.gold},${C.gold2})`, border:'none', borderRadius:10, padding:'7px 14px', color:'#0d1a1f', fontSize:12, cursor:'pointer', fontWeight:700, fontFamily:'inherit', flexShrink:0 }}>Add</button>
+        <button onClick={()=>onAdd(f.id,qty)} style={{ background:`linear-gradient(135deg,${C.gold},${C.gold2})`, border:'none', borderRadius:10, padding:'7px 14px', color:C.btnText, fontSize:12, cursor:'pointer', fontWeight:700, fontFamily:'inherit', flexShrink:0 }}>Add</button>
       </div>
     </div>
   )
@@ -2014,7 +2161,7 @@ function RelaxFitModal({ C, onSave, onClose }) {
             <button onClick={()=>{
               if (!result.weight) return
               onSave(date, result)
-            }} style={{ width:'100%', padding:12, background:`linear-gradient(135deg,${C.gold},${C.gold2})`, border:'none', borderRadius:12, color:'#0d1a1f', fontWeight:700, fontSize:14, cursor:'pointer', fontFamily:'inherit' }}>
+            }} style={{ width:'100%', padding:12, background:`linear-gradient(135deg,${C.gold},${C.gold2})`, border:'none', borderRadius:12, color:C.btnText, fontWeight:700, fontSize:14, cursor:'pointer', fontFamily:'inherit' }}>
               Salvar medição
             </button>
           </div>
@@ -2026,6 +2173,182 @@ function RelaxFitModal({ C, onSave, onClose }) {
             style={{ width:'100%', padding:10, background:'transparent', border:`0.5px solid ${C.border}`, borderRadius:10, color:C.text2, fontSize:12, cursor:'pointer', fontFamily:'inherit', marginTop:4 }}>
             Preencher manualmente sem imagem
           </button>
+        )}
+
+        <button onClick={onClose} style={{ width:'100%', padding:10, background:'transparent', border:'none', color:C.text2, fontSize:12, cursor:'pointer', fontFamily:'inherit', marginTop:8 }}>Cancelar</button>
+      </div>
+    </div>
+  )
+}
+
+function HealthImportModal({ C, healthData, onSave, onClose }) {
+  const [parsing, setParsing] = useState(false)
+  const [preview, setPreview] = useState(null)
+  const [error, setError] = useState('')
+  const [dataType, setDataType] = useState('steps')
+
+  // Parse Samsung Health step_daily_trend CSV
+  function parseStepsCsv(text) {
+    const lines = text.split('\n')
+    // Line 0 = metadata, line 1 = header
+    if (lines.length < 3) return {}
+    const header = lines[1].split(',')
+    const idxCount = header.indexOf('count')
+    const idxDay = header.indexOf('day_time')
+    const idxSource = header.indexOf('source_type')
+    if (idxCount < 0 || idxDay < 0) return {}
+
+    // For each day, take source_type -2 (the representative daily total)
+    const byDay = {}
+    for (let i = 2; i < lines.length; i++) {
+      const cols = lines[i].split(',')
+      if (cols.length < header.length) continue
+      const day = (cols[idxDay] || '').slice(0, 10)
+      const count = parseInt(cols[idxCount])
+      const src = cols[idxSource]
+      if (!day || isNaN(count)) continue
+      // Prefer source_type -2; fallback to max
+      if (src === '-2') {
+        byDay[day] = count
+      } else if (byDay[day] === undefined || count > byDay[day]) {
+        if (byDay['__hasNeg2_'+day] !== true) byDay[day] = Math.max(byDay[day]||0, count)
+      }
+      if (src === '-2') byDay['__hasNeg2_'+day] = true
+    }
+    // Clean up helper keys and apply cutoff date
+    const result = {}
+    Object.keys(byDay).forEach(k => { if (!k.startsWith('__') && k >= HEALTH_CUTOFF) result[k] = byDay[k] })
+    return result
+  }
+
+  // Parse Samsung Health sleep_combined CSV — extracts duration + score
+  function parseSleepCsv(text) {
+    const lines = text.split('\n')
+    if (lines.length < 3) return {}
+    const header = lines[1].split(',')
+    const idxEnd = header.indexOf('end_time')
+    const idxDur = header.indexOf('sleep_duration')
+    const idxScore = header.indexOf('sleep_score')
+    const idxEff = header.indexOf('efficiency')
+    if (idxEnd < 0 || idxDur < 0) return {}
+
+    const byDay = {}
+    for (let i = 2; i < lines.length; i++) {
+      const cols = lines[i].split(',')
+      if (cols.length < header.length) continue
+      const end = cols[idxEnd]
+      const durMin = parseFloat(cols[idxDur])
+      if (!end || isNaN(durMin)) continue
+      const day = end.slice(0, 10)
+      if (day < HEALTH_CUTOFF) continue
+      const hours = Math.round((durMin/60)*10)/10
+      const score = idxScore >= 0 ? parseFloat(cols[idxScore]) : null
+      const eff = idxEff >= 0 ? parseFloat(cols[idxEff]) : null
+      // If multiple sleep sessions in a day, sum hours and keep best score
+      if (byDay[day]) {
+        byDay[day].sleep = Math.round((byDay[day].sleep + hours)*10)/10
+        if (score && (!byDay[day].sleepScore || score > byDay[day].sleepScore)) byDay[day].sleepScore = score
+      } else {
+        byDay[day] = { sleep: hours }
+        if (score && !isNaN(score)) byDay[day].sleepScore = score
+        if (eff && !isNaN(eff)) byDay[day].sleepEff = eff
+      }
+    }
+    return byDay
+  }
+
+  async function handleFile(file) {
+    if (!file) return
+    setParsing(true)
+    setError('')
+    setPreview(null)
+    try {
+      const text = await file.text()
+      let parsed = {}
+      // Auto-detect type from filename or content
+      const isSteps = file.name.includes('step') || text.includes('step_daily_trend')
+      const isSleep = file.name.includes('sleep') || text.includes('sleep_combined') || text.includes('shealth.sleep')
+
+      if (isSteps) { parsed = parseStepsCsv(text); setDataType('steps') }
+      else if (isSleep) { parsed = parseSleepCsv(text); setDataType('sleep') }
+      else {
+        parsed = parseStepsCsv(text); setDataType('steps')
+      }
+
+      const count = Object.keys(parsed).length
+      if (count === 0) {
+        setError('Não consegui ler os dados. Verifique se é o CSV correto do Samsung Health.')
+      } else {
+        setPreview(parsed)
+      }
+    } catch(err) {
+      console.error(err)
+      setError('Erro ao ler arquivo: ' + err.message)
+    }
+    setParsing(false)
+  }
+
+  const previewEntries = preview ? Object.entries(preview).sort(([a],[b]) => b.localeCompare(a)) : []
+
+  return (
+    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.8)', display:'flex', alignItems:'flex-end', justifyContent:'center', zIndex:200 }} onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div style={{ background:C.surface, borderRadius:'16px 16px 0 0', padding:20, width:'100%', maxWidth:480, border:`0.5px solid ${C.border}`, maxHeight:'88vh', overflowY:'auto' }}>
+        <div style={{ fontSize:15, fontWeight:700, marginBottom:4, color:C.text }}>👟 Importar do Samsung Health</div>
+        <div style={{ fontSize:11, color:C.text2, marginBottom:12, lineHeight:1.5 }}>
+          No Samsung Health: ⋮ → Configurações → Baixar dados pessoais. Extraia o ZIP e envie o CSV de passos ou sono.
+        </div>
+        <div style={{ fontSize:10, color:C.gold, marginBottom:16, background:`${C.gold}12`, borderRadius:8, padding:'8px 10px', lineHeight:1.4 }}>
+          📅 Apenas dados a partir de {HEALTH_CUTOFF.split('-').reverse().join('/')} serão importados (início do monitoramento).
+        </div>
+
+        <label style={{ display:'block', width:'100%', padding:'14px', border:`1.5px dashed ${C.gold}60`, borderRadius:12, background:`${C.gold}08`, cursor:'pointer', textAlign:'center', marginBottom:12 }}>
+          <input type="file" accept=".csv" style={{ display:'none' }} onChange={e=>handleFile(e.target.files[0])}/>
+          <div style={{ fontSize:28, marginBottom:6 }}>📄</div>
+          <div style={{ fontSize:12, color:C.gold, fontWeight:600 }}>Selecionar arquivo CSV</div>
+          <div style={{ fontSize:10, color:C.text2, marginTop:4 }}>step_daily_trend ou sleep</div>
+        </label>
+
+        {parsing && <div style={{ textAlign:'center', padding:'16px 0', color:C.gold, fontSize:13 }}>⏳ Lendo arquivo...</div>}
+        {error && <div style={{ background:`${C.red}15`, border:`0.5px solid ${C.red}40`, borderRadius:8, padding:'8px 12px', fontSize:11, color:C.red, marginBottom:12 }}>{error}</div>}
+
+        {preview && (
+          <div>
+            <div style={{ background:`${C.teal}15`, border:`0.5px solid ${C.teal}40`, borderRadius:8, padding:'10px 12px', marginBottom:12 }}>
+              <div style={{ fontSize:12, color:C.teal, fontWeight:700 }}>✓ {previewEntries.length} dias de {dataType==='steps'?'passos':'sono'} encontrados</div>
+              <div style={{ fontSize:10, color:C.text2, marginTop:2, fontFamily:'JetBrains Mono,monospace' }}>
+                {previewEntries[previewEntries.length-1]?.[0]} até {previewEntries[0]?.[0]}
+              </div>
+            </div>
+
+            <div style={{ maxHeight:200, overflowY:'auto', marginBottom:12 }}>
+              {previewEntries.slice(0,8).map(([date, val]) => (
+                <div key={date} style={{ display:'flex', justifyContent:'space-between', padding:'6px 0', borderBottom:`0.5px solid ${C.border}`, fontSize:12, fontFamily:'JetBrains Mono,monospace' }}>
+                  <span style={{ color:C.text2 }}>{date}</span>
+                  <span style={{ color:C.text, fontWeight:700 }}>
+                    {dataType==='steps'
+                      ? `${val.toLocaleString()} passos`
+                      : `${val.sleep}h${val.sleepScore?` · nota ${val.sleepScore}`:''}`}
+                  </span>
+                </div>
+              ))}
+              {previewEntries.length > 8 && <div style={{ textAlign:'center', fontSize:10, color:C.text3, padding:'8px 0' }}>+ {previewEntries.length-8} dias</div>}
+            </div>
+
+            <button onClick={()=>{
+              const merged = { ...healthData }
+              Object.entries(preview).forEach(([date, val]) => {
+                if (dataType === 'steps') {
+                  merged[date] = { ...(merged[date]||{}), steps: val }
+                } else {
+                  // sleep returns an object {sleep, sleepScore, sleepEff}
+                  merged[date] = { ...(merged[date]||{}), ...val }
+                }
+              })
+              onSave(merged)
+            }} style={{ width:'100%', padding:12, background:`linear-gradient(135deg,${C.gold},${C.gold2})`, border:'none', borderRadius:12, color:C.btnText, fontWeight:700, fontSize:14, cursor:'pointer', fontFamily:'inherit' }}>
+              Importar {previewEntries.length} dias
+            </button>
+          </div>
         )}
 
         <button onClick={onClose} style={{ width:'100%', padding:10, background:'transparent', border:'none', color:C.text2, fontSize:12, cursor:'pointer', fontFamily:'inherit', marginTop:8 }}>Cancelar</button>
@@ -2053,7 +2376,7 @@ function WeightModal({ C, onSave, onClose }) {
         </div>
         <div style={{ display:'flex', gap:10 }}>
           <button onClick={onClose} style={{ flex:1, padding:12, background:C.surface2, border:'none', borderRadius:12, color:C.text2, cursor:'pointer', fontFamily:'inherit' }}>Cancelar</button>
-          <button onClick={()=>{ if(weight) onSave(date,weight) }} style={{ flex:2, padding:12, background:`linear-gradient(135deg,${C.gold},${C.gold2})`, border:'none', borderRadius:12, color:'#0d1a1f', cursor:'pointer', fontFamily:'inherit', fontWeight:700, fontSize:14 }}>Salvar</button>
+          <button onClick={()=>{ if(weight) onSave(date,weight) }} style={{ flex:2, padding:12, background:`linear-gradient(135deg,${C.gold},${C.gold2})`, border:'none', borderRadius:12, color:C.btnText, cursor:'pointer', fontFamily:'inherit', fontWeight:700, fontSize:14 }}>Salvar</button>
         </div>
       </div>
     </div>
@@ -2193,7 +2516,7 @@ function TargetsModal({ targets, targetsHistory, C, onSave, onClose }) {
         )}
         <div style={{ display:'flex', gap:10, marginTop:8 }}>
           <button onClick={onClose} style={{ flex:1, padding:12, background:C.surface2, border:'none', borderRadius:12, color:C.text2, cursor:'pointer', fontFamily:'inherit' }}>Cancelar</button>
-          <button onClick={handleSave} style={{ flex:2, padding:12, background:`linear-gradient(135deg,${C.gold},${C.gold2})`, border:'none', borderRadius:12, color:'#0d1a1f', cursor:'pointer', fontFamily:'inherit', fontWeight:700, fontSize:14 }}>Salvar</button>
+          <button onClick={handleSave} style={{ flex:2, padding:12, background:`linear-gradient(135deg,${C.gold},${C.gold2})`, border:'none', borderRadius:12, color:C.btnText, cursor:'pointer', fontFamily:'inherit', fontWeight:700, fontSize:14 }}>Salvar</button>
         </div>
       </div>
     </div>
