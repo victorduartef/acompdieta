@@ -172,6 +172,8 @@ export default function App() {
   const [showRelaxFitModal, setShowRelaxFitModal] = useState(false)
   const [healthData, setHealthData] = useState({}) // { 'YYYY-MM-DD': { steps, sleepHours, ... } }
   const [showHealthImport, setShowHealthImport] = useState(false)
+  const [showHealthManual, setShowHealthManual] = useState(false)
+  const [healthEditDate, setHealthEditDate] = useState(null)
   const [insightPeriod, setInsightPeriod] = useState('last') // 'last' | '7d' | '30d'
   const [loaded, setLoaded] = useState(false)
   const [tab, setTab] = useState('today')
@@ -193,6 +195,16 @@ export default function App() {
   const [darkMode, setDarkMode] = useState(true)
 
   const C = darkMode ? DARK : LIGHT
+
+  // Sync browser chrome (status bar tint + color-scheme) with the in-app theme,
+  // so Chrome Android doesn't force its own auto dark mode over our colors.
+  useEffect(() => {
+    document.documentElement.style.colorScheme = darkMode ? 'dark' : 'light'
+    document.body.style.background = C.bg
+    let meta = document.querySelector('meta[name="theme-color"]')
+    if (!meta) { meta = document.createElement('meta'); meta.name = 'theme-color'; document.head.appendChild(meta) }
+    meta.content = C.bg
+  }, [darkMode, C.bg])
 
   const allFoods = DEFAULT_FOODS.map(f => {
     const ov = customFoods.find(c => c.id === f.id)
@@ -430,7 +442,7 @@ export default function App() {
 
           {/* Nav tabs */}
           <div style={{ display:'flex', marginTop:14, overflowX:'auto' }}>
-            {[{id:'today',label:'Hoje',icon:'🏠'},{id:'treino',label:'Treino',icon:'💪'},{id:'peso',label:'Peso',icon:'⚖️'},{id:'history',label:'Histórico',icon:'📅'},{id:'analysis',label:'Análise',icon:'📊'},{id:'foods',label:'Alimentos',icon:'🥗'}].map(t=>(
+            {[{id:'today',label:'Hoje',icon:'🏠'},{id:'treino',label:'Treino',icon:'💪'},{id:'peso',label:'Peso',icon:'⚖️'},{id:'saude',label:'Saúde',icon:'❤️'},{id:'history',label:'Histórico',icon:'📅'},{id:'analysis',label:'Análise',icon:'📊'},{id:'foods',label:'Alimentos',icon:'🥗'}].map(t=>(
               <button key={t.id} onClick={()=>{ setTab(t.id); setEditingDay(null); setAddingFood(false); setSearch(''); setRegisterMode(false); setAvulso(false) }}
                 style={{ flex:1, minWidth:52, padding:'8px 0', border:'none', background:'transparent', color:tab===t.id?C.text:C.text2, fontWeight:tab===t.id?700:500, fontSize:10, cursor:'pointer', fontFamily:'inherit', borderBottom:`2px solid ${tab===t.id?C.gold:'transparent'}`, transition:'all .2s', display:'flex', flexDirection:'column', alignItems:'center', gap:2 }}>
                 <span style={{ fontSize:16 }}>{t.icon}</span>
@@ -445,6 +457,7 @@ export default function App() {
           {(tab==='today'||editingDay)&&renderDayEditor()}
           {tab==='treino'&&!editingDay&&renderTreino()}
           {tab==='peso'&&!editingDay&&renderPeso()}
+          {tab==='saude'&&!editingDay&&renderSaude()}
           {tab==='history'&&!editingDay&&renderHistory()}
           {tab==='analysis'&&!editingDay&&renderAnalysis()}
           {tab==='foods'&&!editingDay&&renderFoods()}
@@ -461,6 +474,11 @@ export default function App() {
         updateHealthData(hd)
         setShowHealthImport(false)
       }} onClose={()=>setShowHealthImport(false)}/>}
+      {showHealthManual&&<HealthManualModal C={C} healthData={healthData} initialDate={healthEditDate} onSave={(hd)=>{
+        updateHealthData(hd)
+        setShowHealthManual(false)
+        setHealthEditDate(null)
+      }} onClose={()=>{ setShowHealthManual(false); setHealthEditDate(null) }}/>}
     </div>
   )
 
@@ -732,6 +750,151 @@ export default function App() {
   }
 
   // ── PESO ────────────────────────────────────────────────────────────────────
+  function renderSaude() {
+    const hEntries = Object.entries(healthData).filter(([,d])=>d.steps||d.sleep||d.sleepScore).sort(([a],[b])=>b.localeCompare(a))
+    return (
+      <div>
+        {/* Saúde - Samsung Health */}
+        <div style={{ background:C.surface, borderRadius:14, padding:14, marginBottom:12, border:`0.5px solid ${C.border}` }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:(() => { const hEntries = Object.entries(healthData).filter(([,d])=>d.steps||d.sleep); return hEntries.length>0?12:0 })() }}>
+            <div style={{ fontSize:13, fontWeight:700, color:C.text }}>👟 Atividade & Sono</div>
+            <div style={{ display:'flex', gap:6 }}>
+              <button onClick={()=>setShowHealthManual(true)} style={{ background:`linear-gradient(135deg,${C.gold},${C.gold2})`, border:'none', borderRadius:10, padding:'7px 12px', color:C.btnText, fontSize:11, cursor:'pointer', fontFamily:'inherit', fontWeight:700 }}>+ Registrar</button>
+              <button onClick={()=>setShowHealthImport(true)} style={{ background:C.surface2, border:`1px solid ${C.gold}60`, borderRadius:10, padding:'7px 12px', color:C.gold, fontSize:11, cursor:'pointer', fontFamily:'inherit', fontWeight:700 }}>📥 CSV</button>
+            </div>
+          </div>
+          {(() => {
+            const hEntries = Object.entries(healthData).filter(([,d])=>d.steps||d.sleep).sort(([a],[b])=>b.localeCompare(a))
+            if (hEntries.length === 0) return (
+              <div style={{ textAlign:'center', padding:'8px 0 0', color:C.text3, fontSize:12 }}>
+                Importe seus dados de passos e sono do Samsung Health
+              </div>
+            )
+            // Latest values + 7-day averages
+            const last7 = hEntries.slice(0, 7)
+            const avgOf = (key) => { const s = last7.map(([,d])=>d[key]).filter(v=>v!=null); return s.length?s.reduce((a,b)=>a+b,0)/s.length:null }
+            const avgSteps = (() => { const v = avgOf('steps'); return v?Math.round(v):null })()
+            const avgSleep = (() => { const v = avgOf('sleep'); return v?v.toFixed(1):null })()
+            const avgScore = (() => { const v = avgOf('sleepScore'); return v?Math.round(v):null })()
+            const latestSteps = hEntries.find(([,d])=>d.steps)?.[1]?.steps
+            const latestSleepE = hEntries.find(([,d])=>d.sleep)?.[1]
+            return (
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                {latestSteps != null && (
+                  <div style={{ background:C.bg, borderRadius:10, padding:'10px 12px' }}>
+                    <div style={{ fontSize:10, color:C.text2, marginBottom:4 }}>👟 Passos (último)</div>
+                    <div style={{ fontSize:20, fontWeight:800, color:C.teal, fontFamily:'JetBrains Mono,monospace' }}>{latestSteps.toLocaleString()}</div>
+                    {avgSteps && <div style={{ fontSize:10, color:C.text3, marginTop:2, fontFamily:'JetBrains Mono,monospace' }}>média 7d: {avgSteps.toLocaleString()}</div>}
+                  </div>
+                )}
+                {latestSleepE?.sleep != null && (
+                  <div style={{ background:C.bg, borderRadius:10, padding:'10px 12px' }}>
+                    <div style={{ fontSize:10, color:C.text2, marginBottom:4 }}>😴 Sono (último)</div>
+                    <div style={{ fontSize:20, fontWeight:800, color:'#8b7fd4', fontFamily:'JetBrains Mono,monospace' }}>{latestSleepE.sleep}h</div>
+                    {avgSleep && <div style={{ fontSize:10, color:C.text3, marginTop:2, fontFamily:'JetBrains Mono,monospace' }}>média 7d: {avgSleep}h</div>}
+                  </div>
+                )}
+                {avgScore != null && (
+                  <div style={{ background:C.bg, borderRadius:10, padding:'10px 12px', gridColumn:'1 / -1' }}>
+                    <div style={{ fontSize:10, color:C.text2, marginBottom:4 }}>⭐ Nota do Sono (média 7d)</div>
+                    <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                      <div style={{ fontSize:20, fontWeight:800, color:avgScore>=70?C.teal:avgScore>=50?C.gold:C.red, fontFamily:'JetBrains Mono,monospace' }}>{avgScore}<span style={{ fontSize:11, color:C.text3 }}>/100</span></div>
+                      <div style={{ flex:1, background:C.surface2, borderRadius:4, height:8, overflow:'hidden' }}>
+                        <div style={{ height:'100%', width:avgScore+'%', background:avgScore>=70?C.teal:avgScore>=50?C.gold:C.red, borderRadius:4 }}/>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )
+          })()}
+        </div>
+
+        {/* Histórico de saúde (passos/sono) - editável */}
+        {Object.keys(healthData).filter(d=>healthData[d].steps||healthData[d].sleep||healthData[d].sleepScore).length > 0 && (
+          <div style={{ background:C.surface, borderRadius:14, padding:14, marginBottom:12, border:`0.5px solid ${C.border}` }}>
+            <div style={{ fontSize:13, fontWeight:500, marginBottom:12, color:C.text }}>📋 Registros de Saúde</div>
+            {Object.entries(healthData)
+              .filter(([,d])=>d.steps||d.sleep||d.sleepScore)
+              .sort(([a],[b])=>b.localeCompare(a))
+              .slice(0, 30)
+              .map(([date, d], idx, arr) => (
+                <div key={date} onClick={()=>{ setHealthEditDate(date); setShowHealthManual(true) }}
+                  style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 0', borderBottom:idx<arr.length-1?`0.5px solid ${C.border}`:'none', cursor:'pointer' }}>
+                  <div>
+                    <div style={{ fontSize:13, fontWeight:600, color:C.text }}>{formatDateFull(date)}</div>
+                    <div style={{ display:'flex', gap:10, marginTop:3, fontSize:11, fontFamily:'JetBrains Mono,monospace' }}>
+                      {d.steps != null && <span style={{ color:C.teal }}>👟 {d.steps.toLocaleString()}</span>}
+                      {d.sleep != null && <span style={{ color:'#8b7fd4' }}>😴 {d.sleep}h</span>}
+                      {d.sleepScore != null && <span style={{ color:C.gold }}>⭐ {d.sleepScore}</span>}
+                    </div>
+                  </div>
+                  <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                    <span style={{ fontSize:11, color:C.text3 }}>editar ›</span>
+                    <button onClick={(e)=>{ e.stopPropagation(); if(window.confirm(`Excluir registro de ${formatDateFull(date)}?`)){ const hd={...healthData}; delete hd[date]; updateHealthData(hd) } }}
+                      style={{ background:`${C.red}18`, border:'none', borderRadius:8, width:26, height:26, color:C.red, cursor:'pointer', fontSize:14, flexShrink:0 }}>×</button>
+                  </div>
+                </div>
+              ))}
+          </div>
+        )}
+
+
+        {/* Gráficos de evolução */}
+        {(() => {
+          const stepsEntries = Object.entries(healthData).filter(([,d])=>d.steps).sort(([a],[b])=>a.localeCompare(b))
+          if (stepsEntries.length < 2) return null
+          const sVals = stepsEntries.map(([,d])=>d.steps)
+          const W=340, H=90, PL=8, PR=8, PT=8, PB=24
+          const maxV=Math.max(...sVals)*1.1, minV=0
+          const cx=i=>PL+(i/Math.max(sVals.length-1,1))*(W-PL-PR)
+          const cy=v=>PT+(1-(v-minV)/(maxV-minV))*(H-PT-PB)
+          const pts=sVals.map((v,i)=>`${cx(i)},${cy(v)}`).join(' ')
+          return (
+            <div style={{ background:C.surface, borderRadius:14, padding:14, marginBottom:12, border:`0.5px solid ${C.border}` }}>
+              <div style={{ fontSize:13, fontWeight:500, marginBottom:10, color:C.text }}>👟 Evolução de Passos</div>
+              <svg viewBox={`0 0 ${W} ${H}`} style={{ width:'100%', height:H }}>
+                <polyline points={pts} fill="none" stroke={C.teal} strokeWidth="2" strokeLinejoin="round"/>
+                {sVals.map((v,i)=>(
+                  <g key={i}>
+                    <circle cx={cx(i)} cy={cy(v)} r="3.5" fill={C.teal}/>
+                    <text x={cx(i)} y={H-2} fontSize="7.5" fill={C.text2} textAnchor="middle" fontFamily="JetBrains Mono,monospace">{stepsEntries[i]?.[0]?.slice(5).replace('-','/')}</text>
+                  </g>
+                ))}
+              </svg>
+            </div>
+          )
+        })()}
+
+        {(() => {
+          const sleepEntries = Object.entries(healthData).filter(([,d])=>d.sleep).sort(([a],[b])=>a.localeCompare(b))
+          if (sleepEntries.length < 2) return null
+          const sVals = sleepEntries.map(([,d])=>d.sleep)
+          const W=340, H=90, PL=8, PR=8, PT=8, PB=24
+          const maxV=Math.max(...sVals)+1, minV=Math.max(0,Math.min(...sVals)-1)
+          const cx=i=>PL+(i/Math.max(sVals.length-1,1))*(W-PL-PR)
+          const cy=v=>PT+(1-(v-minV)/(maxV-minV))*(H-PT-PB)
+          const pts=sVals.map((v,i)=>`${cx(i)},${cy(v)}`).join(' ')
+          return (
+            <div style={{ background:C.surface, borderRadius:14, padding:14, marginBottom:12, border:`0.5px solid ${C.border}` }}>
+              <div style={{ fontSize:13, fontWeight:500, marginBottom:10, color:C.text }}>😴 Evolução do Sono</div>
+              <svg viewBox={`0 0 ${W} ${H}`} style={{ width:'100%', height:H }}>
+                <polyline points={pts} fill="none" stroke="#8b7fd4" strokeWidth="2" strokeLinejoin="round"/>
+                {sVals.map((v,i)=>(
+                  <g key={i}>
+                    <circle cx={cx(i)} cy={cy(v)} r="3.5" fill="#8b7fd4"/>
+                    <text x={cx(i)} y={cy(v)-6} fontSize="7.5" fill="#8b7fd4" textAnchor="middle" fontFamily="JetBrains Mono,monospace">{v}h</text>
+                    <text x={cx(i)} y={H-2} fontSize="7.5" fill={C.text2} textAnchor="middle" fontFamily="JetBrains Mono,monospace">{sleepEntries[i]?.[0]?.slice(5).replace('-','/')}</text>
+                  </g>
+                ))}
+              </svg>
+            </div>
+          )
+        })()}
+      </div>
+    )
+  }
+
   function renderPeso() {
     const weightEntries = Object.entries(weights).sort(([a],[b]) => b.localeCompare(a))
     const latestWeight = weightEntries[0]?.[1] || null
@@ -796,59 +959,6 @@ export default function App() {
               Nenhum peso registrado.<br/>Use RelaxFit para importar!
             </div>
           )}
-        </div>
-
-        {/* Saúde - Samsung Health */}
-        <div style={{ background:C.surface, borderRadius:14, padding:14, marginBottom:12, border:`0.5px solid ${C.border}` }}>
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:(() => { const hEntries = Object.entries(healthData).filter(([,d])=>d.steps||d.sleep); return hEntries.length>0?12:0 })() }}>
-            <div style={{ fontSize:13, fontWeight:700, color:C.text }}>👟 Atividade & Sono</div>
-            <button onClick={()=>setShowHealthImport(true)} style={{ background:C.surface2, border:`1px solid ${C.gold}60`, borderRadius:10, padding:'7px 12px', color:C.gold, fontSize:11, cursor:'pointer', fontFamily:'inherit', fontWeight:700 }}>📥 Importar</button>
-          </div>
-          {(() => {
-            const hEntries = Object.entries(healthData).filter(([,d])=>d.steps||d.sleep).sort(([a],[b])=>b.localeCompare(a))
-            if (hEntries.length === 0) return (
-              <div style={{ textAlign:'center', padding:'8px 0 0', color:C.text3, fontSize:12 }}>
-                Importe seus dados de passos e sono do Samsung Health
-              </div>
-            )
-            // Latest values + 7-day averages
-            const last7 = hEntries.slice(0, 7)
-            const avgOf = (key) => { const s = last7.map(([,d])=>d[key]).filter(v=>v!=null); return s.length?s.reduce((a,b)=>a+b,0)/s.length:null }
-            const avgSteps = (() => { const v = avgOf('steps'); return v?Math.round(v):null })()
-            const avgSleep = (() => { const v = avgOf('sleep'); return v?v.toFixed(1):null })()
-            const avgScore = (() => { const v = avgOf('sleepScore'); return v?Math.round(v):null })()
-            const latestSteps = hEntries.find(([,d])=>d.steps)?.[1]?.steps
-            const latestSleepE = hEntries.find(([,d])=>d.sleep)?.[1]
-            return (
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
-                {latestSteps != null && (
-                  <div style={{ background:C.bg, borderRadius:10, padding:'10px 12px' }}>
-                    <div style={{ fontSize:10, color:C.text2, marginBottom:4 }}>👟 Passos (último)</div>
-                    <div style={{ fontSize:20, fontWeight:800, color:C.teal, fontFamily:'JetBrains Mono,monospace' }}>{latestSteps.toLocaleString()}</div>
-                    {avgSteps && <div style={{ fontSize:10, color:C.text3, marginTop:2, fontFamily:'JetBrains Mono,monospace' }}>média 7d: {avgSteps.toLocaleString()}</div>}
-                  </div>
-                )}
-                {latestSleepE?.sleep != null && (
-                  <div style={{ background:C.bg, borderRadius:10, padding:'10px 12px' }}>
-                    <div style={{ fontSize:10, color:C.text2, marginBottom:4 }}>😴 Sono (último)</div>
-                    <div style={{ fontSize:20, fontWeight:800, color:'#8b7fd4', fontFamily:'JetBrains Mono,monospace' }}>{latestSleepE.sleep}h</div>
-                    {avgSleep && <div style={{ fontSize:10, color:C.text3, marginTop:2, fontFamily:'JetBrains Mono,monospace' }}>média 7d: {avgSleep}h</div>}
-                  </div>
-                )}
-                {avgScore != null && (
-                  <div style={{ background:C.bg, borderRadius:10, padding:'10px 12px', gridColumn:'1 / -1' }}>
-                    <div style={{ fontSize:10, color:C.text2, marginBottom:4 }}>⭐ Nota do Sono (média 7d)</div>
-                    <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                      <div style={{ fontSize:20, fontWeight:800, color:avgScore>=70?C.teal:avgScore>=50?C.gold:C.red, fontFamily:'JetBrains Mono,monospace' }}>{avgScore}<span style={{ fontSize:11, color:C.text3 }}>/100</span></div>
-                      <div style={{ flex:1, background:C.surface2, borderRadius:4, height:8, overflow:'hidden' }}>
-                        <div style={{ height:'100%', width:avgScore+'%', background:avgScore>=70?C.teal:avgScore>=50?C.gold:C.red, borderRadius:4 }}/>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )
-          })()}
         </div>
 
         {/* Composição corporal atual */}
@@ -2176,6 +2286,71 @@ function RelaxFitModal({ C, onSave, onClose }) {
         )}
 
         <button onClick={onClose} style={{ width:'100%', padding:10, background:'transparent', border:'none', color:C.text2, fontSize:12, cursor:'pointer', fontFamily:'inherit', marginTop:8 }}>Cancelar</button>
+      </div>
+    </div>
+  )
+}
+
+function HealthManualModal({ C, healthData, initialDate, onSave, onClose }) {
+  const todayStr = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` })()
+  const [date, setDate] = useState(initialDate || todayStr)
+  const [steps, setSteps] = useState('')
+  const [sleep, setSleep] = useState('')
+  const [sleepScore, setSleepScore] = useState('')
+
+  // Pre-fill if data already exists for the chosen date
+  useEffect(() => {
+    const d = healthData[date]
+    setSteps(d?.steps != null ? String(d.steps) : '')
+    setSleep(d?.sleep != null ? String(d.sleep) : '')
+    setSleepScore(d?.sleepScore != null ? String(d.sleepScore) : '')
+  }, [date])
+
+  const canSave = steps !== '' || sleep !== '' || sleepScore !== ''
+
+  return (
+    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.8)', display:'flex', alignItems:'flex-end', justifyContent:'center', zIndex:200 }} onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div style={{ background:C.surface, borderRadius:'16px 16px 0 0', padding:20, width:'100%', maxWidth:480, border:`0.5px solid ${C.border}`, maxHeight:'88vh', overflowY:'auto' }}>
+        <div style={{ fontSize:15, fontWeight:700, marginBottom:16, color:C.text }}>👟 {(healthData[date]&&(healthData[date].steps||healthData[date].sleep||healthData[date].sleepScore))?'Editar':'Registrar'} Atividade & Sono</div>
+
+        <div style={{ marginBottom:14 }}>
+          <div style={{ fontSize:10, color:C.text2, marginBottom:4, fontFamily:'JetBrains Mono,monospace' }}>DATA</div>
+          <input type="date" value={date} onChange={e=>setDate(e.target.value)}
+            style={{ width:'100%', background:C.surface2, border:`0.5px solid ${C.border}`, borderRadius:8, padding:'9px 12px', color:C.text, fontSize:14, fontFamily:'JetBrains Mono,monospace' }}/>
+        </div>
+
+        <div style={{ marginBottom:12 }}>
+          <div style={{ fontSize:11, color:C.teal, fontWeight:500, marginBottom:4 }}>👟 Passos</div>
+          <input type="number" value={steps} onChange={e=>setSteps(e.target.value)} placeholder="ex: 8000"
+            style={{ width:'100%', background:C.surface2, border:`0.5px solid ${C.teal}40`, borderRadius:8, padding:'10px 12px', color:C.text, fontSize:14, fontFamily:'JetBrains Mono,monospace' }}/>
+        </div>
+
+        <div style={{ marginBottom:12 }}>
+          <div style={{ fontSize:11, color:'#8b7fd4', fontWeight:500, marginBottom:4 }}>😴 Horas de sono</div>
+          <input type="number" step="0.1" value={sleep} onChange={e=>setSleep(e.target.value)} placeholder="ex: 7.5"
+            style={{ width:'100%', background:C.surface2, border:`0.5px solid #8b7fd440`, borderRadius:8, padding:'10px 12px', color:C.text, fontSize:14, fontFamily:'JetBrains Mono,monospace' }}/>
+        </div>
+
+        <div style={{ marginBottom:16 }}>
+          <div style={{ fontSize:11, color:C.gold, fontWeight:500, marginBottom:4 }}>⭐ Nota do sono (0-100)</div>
+          <input type="number" value={sleepScore} onChange={e=>setSleepScore(e.target.value)} placeholder="ex: 75"
+            style={{ width:'100%', background:C.surface2, border:`0.5px solid ${C.gold}40`, borderRadius:8, padding:'10px 12px', color:C.text, fontSize:14, fontFamily:'JetBrains Mono,monospace' }}/>
+        </div>
+
+        <div style={{ display:'flex', gap:10 }}>
+          <button onClick={onClose} style={{ flex:1, padding:12, background:C.surface2, border:'none', borderRadius:12, color:C.text2, cursor:'pointer', fontFamily:'inherit' }}>Cancelar</button>
+          <button onClick={()=>{
+            if (!canSave) return
+            const entry = { ...(healthData[date]||{}) }
+            if (steps !== '') entry.steps = parseInt(steps); else delete entry.steps
+            if (sleep !== '') entry.sleep = parseFloat(sleep); else delete entry.sleep
+            if (sleepScore !== '') entry.sleepScore = parseInt(sleepScore); else delete entry.sleepScore
+            const merged = { ...healthData }
+            if (Object.keys(entry).length > 0) merged[date] = entry
+            else delete merged[date]
+            onSave(merged)
+          }} disabled={!canSave} style={{ flex:2, padding:12, background:canSave?`linear-gradient(135deg,${C.gold},${C.gold2})`:C.surface2, border:'none', borderRadius:12, color:canSave?C.btnText:C.text3, cursor:canSave?'pointer':'not-allowed', fontFamily:'inherit', fontWeight:700, fontSize:14 }}>Salvar</button>
+        </div>
       </div>
     </div>
   )
