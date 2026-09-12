@@ -1296,8 +1296,9 @@ export default function App() {
 
         {filteredEntries.length===0
           ?<div style={{ textAlign:'center', padding:'32px 20px', color:C.text3, background:C.surface, borderRadius:14, border:`0.5px solid ${C.border}` }}><div style={{ fontSize:28, marginBottom:8 }}>🔍</div>Nenhum dia com esses filtros</div>
-          :(<div style={isWide?{ display:'flex', gap:20, alignItems:'stretch' }:{}}>
-          <div className="evo-col" style={isWide?{ flex:1, minWidth:0, overflowY:'auto', maxHeight:'calc(100vh - 300px)', paddingRight:8 }:{}}>
+          :(<>
+          <div style={isWide?{ display:'flex', gap:20, alignItems:'flex-start' }:{}}>
+          <div className="evo-col" style={isWide?{ flex:1, minWidth:0 }:{}}>
           {/* Stats */}
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginBottom:12 }}>
             {[{label:'Na meta',count:within.length,color:C.teal},{label:'Excesso',count:over.length,color:C.red},{label:'Abaixo',count:under.length,color:C.gold}].map(s=>(
@@ -1352,7 +1353,7 @@ export default function App() {
             </div>
           </div>}
           </div>
-          <div className="evo-col" style={isWide?{ flex:1, minWidth:0, overflowY:'auto', maxHeight:'calc(100vh - 300px)', paddingRight:8 }:{}}>
+          <div className="evo-col" style={isWide?{ flex:1, minWidth:0 }:{}}>
           {/* Comparativo */}
           <div style={{ background:C.surface, borderRadius:14, padding:14, marginBottom:12, border:`0.5px solid ${C.border}` }}>
             <div style={{ fontSize:13, fontWeight:500, marginBottom:4, color:C.text }}>📊 Comparativo de médias</div>
@@ -1398,6 +1399,8 @@ export default function App() {
             </div>
           })()}
 
+          </div>
+          <div className="evo-col" style={isWide?{ flex:1, minWidth:0 }:{}}>
           {/* Insights */}
           {compTr.n>0&&compNo.n>0&&<div style={{ background:C.surface, borderRadius:14, padding:14, marginBottom:12, border:`0.5px solid ${C.border}` }}>
             <div style={{ fontSize:13, fontWeight:500, marginBottom:10, color:C.text }}>💡 Insights</div>
@@ -1677,7 +1680,10 @@ export default function App() {
           })()}
 
           </div>
-          <div className="evo-col" style={isWide?{ flex:1, minWidth:0, overflowY:'auto', maxHeight:'calc(100vh - 300px)', paddingRight:8 }:{}}>
+        </div>
+
+        {/* Comparativo Semanal - largura total abaixo */}
+        <div style={{ marginTop:isWide?20:0 }}>
           {/* Weekly body composition + diet comparison */}
           {(() => {
             const CUTOFF = '2026-07-08' // start of body composition tracking
@@ -1790,17 +1796,21 @@ export default function App() {
 
                 {/* Body composition section */}
                 <div style={{ fontSize:11, fontWeight:700, color:C.gold, marginBottom:10, fontFamily:'JetBrains Mono,monospace', textTransform:'uppercase', letterSpacing:1 }}>🧬 Composição Corporal</div>
-                <CompareRow label="Peso (kg)" dataKey="weight" unit="" color={C.gold} goodDown={true} />
-                <CompareRow label="% Gordura" dataKey="bodyFat" unit="%" color={C.terra} goodDown={true} />
-                <CompareRow label="Massa Gorda (kg)" dataKey="fatMass" unit="" color={C.terra} goodDown={true} />
-                <CompareRow label="Massa Magra (kg)" dataKey="leanMass" unit="" color={C.teal} goodDown={false} />
+                <div style={{ display:'grid', gridTemplateColumns:isWide?'1fr 1fr':'1fr', gap:isWide?24:0 }}>
+                  <CompareRow label="Peso (kg)" dataKey="weight" unit="" color={C.gold} goodDown={true} />
+                  <CompareRow label="% Gordura" dataKey="bodyFat" unit="%" color={C.terra} goodDown={true} />
+                  <CompareRow label="Massa Gorda (kg)" dataKey="fatMass" unit="" color={C.terra} goodDown={true} />
+                  <CompareRow label="Massa Magra (kg)" dataKey="leanMass" unit="" color={C.teal} goodDown={false} />
+                </div>
 
                 {/* Diet section */}
                 <div style={{ fontSize:11, fontWeight:700, color:C.gold, margin:'18px 0 10px', fontFamily:'JetBrains Mono,monospace', textTransform:'uppercase', letterSpacing:1 }}>⚡ Dieta Média</div>
-                <CompareRow label="Calorias (kcal/dia)" dataKey="cal" unit="" color={C.gold} goodDown={false} />
-                <CompareRow label="Proteína (g/dia)" dataKey="prot" unit="" color={C.teal} goodDown={false} />
-                <CompareRow label="Carboidrato (g/dia)" dataKey="carb" unit="" color={C.gold2} goodDown={false} />
-                <CompareRow label="Gordura (g/dia)" dataKey="fat" unit="" color={C.terra} goodDown={false} />
+                <div style={{ display:'grid', gridTemplateColumns:isWide?'1fr 1fr':'1fr', gap:isWide?24:0 }}>
+                  <CompareRow label="Calorias (kcal/dia)" dataKey="cal" unit="" color={C.gold} goodDown={false} />
+                  <CompareRow label="Proteína (g/dia)" dataKey="prot" unit="" color={C.teal} goodDown={false} />
+                  <CompareRow label="Carboidrato (g/dia)" dataKey="carb" unit="" color={C.gold2} goodDown={false} />
+                  <CompareRow label="Gordura (g/dia)" dataKey="fat" unit="" color={C.terra} goodDown={false} />
+                </div>
 
                 <div style={{ fontSize:9, color:C.text3, marginTop:10, lineHeight:1.5, fontFamily:'JetBrains Mono,monospace' }}>
                   As setas mostram a variação vs semana anterior. Verde = melhora (peso/gordura ↓, massa magra ↑).
@@ -1810,7 +1820,7 @@ export default function App() {
           })()}
 
           </div>
-        </div>)}
+        </>)}
       </div>
     )
   }
