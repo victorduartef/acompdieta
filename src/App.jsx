@@ -63,7 +63,9 @@ const ACTIVITIES = [
 const MUSCLE_GROUPS = [
   { id: 'peito',      label: 'Peitoral',      color: '#e05555', region: 'front' },
   { id: 'costas',     label: 'Costas',        color: '#2ab8b8', region: 'back' },
-  { id: 'ombro',      label: 'Ombros',        color: '#e8a040', region: 'front' },
+  { id: 'ombro_ant',  label: 'Deltoide Ant.', color: '#e8a040', region: 'front' },
+  { id: 'ombro_lat',  label: 'Deltoide Lat.', color: '#f5b04a', region: 'front' },
+  { id: 'ombro_post', label: 'Deltoide Post.',color: '#d97706', region: 'back' },
   { id: 'biceps',     label: 'Bíceps',        color: '#8b7fd4', region: 'front' },
   { id: 'triceps',    label: 'Tríceps',       color: '#c8873a', region: 'back' },
   { id: 'antebraco',  label: 'Antebraço',     color: '#6b7280', region: 'front' },
@@ -92,16 +94,16 @@ const EQUIPMENTS = [
 // primary = músculo principal, secondary = [músculos secundários]
 const EXERCISE_LIBRARY = [
   // ── PEITO ──
-  { id:'ex_supino_reto',      name:'Supino Reto',              equipment:'barra',   primary:'peito',    secondary:['triceps','ombro'] },
-  { id:'ex_supino_inclinado', name:'Supino Inclinado',         equipment:'barra',   primary:'peito',    secondary:['triceps','ombro'] },
+  { id:'ex_supino_reto',      name:'Supino Reto',              equipment:'barra',   primary:'peito',    secondary:['triceps','ombro_ant'] },
+  { id:'ex_supino_inclinado', name:'Supino Inclinado',         equipment:'barra',   primary:'peito',    secondary:['triceps','ombro_ant'] },
   { id:'ex_supino_declinado', name:'Supino Declinado',         equipment:'barra',   primary:'peito',    secondary:['triceps'] },
-  { id:'ex_supino_halter',    name:'Supino com Halteres',      equipment:'halter',  primary:'peito',    secondary:['triceps','ombro'] },
-  { id:'ex_supino_incl_halt', name:'Supino Inclinado Halteres',equipment:'halter',  primary:'peito',    secondary:['triceps','ombro'] },
-  { id:'ex_crucifixo',        name:'Crucifixo',                equipment:'halter',  primary:'peito',    secondary:['ombro'] },
-  { id:'ex_crossover',        name:'Crossover',                equipment:'cabo',    primary:'peito',    secondary:['ombro'] },
+  { id:'ex_supino_halter',    name:'Supino com Halteres',      equipment:'halter',  primary:'peito',    secondary:['triceps','ombro_ant'] },
+  { id:'ex_supino_incl_halt', name:'Supino Inclinado Halteres',equipment:'halter',  primary:'peito',    secondary:['triceps','ombro_ant'] },
+  { id:'ex_crucifixo',        name:'Crucifixo',                equipment:'halter',  primary:'peito',    secondary:['ombro_ant'] },
+  { id:'ex_crossover',        name:'Crossover',                equipment:'cabo',    primary:'peito',    secondary:['ombro_ant'] },
   { id:'ex_peck_deck',        name:'Peck Deck (Voador)',       equipment:'maquina', primary:'peito',    secondary:[] },
-  { id:'ex_flexao',           name:'Flexão de Braço',          equipment:'corpo',   primary:'peito',    secondary:['triceps','ombro'] },
-  { id:'ex_supino_maquina',   name:'Supino na Máquina',        equipment:'maquina', primary:'peito',    secondary:['triceps','ombro'] },
+  { id:'ex_flexao',           name:'Flexão de Braço',          equipment:'corpo',   primary:'peito',    secondary:['triceps','ombro_ant'] },
+  { id:'ex_supino_maquina',   name:'Supino na Máquina',        equipment:'maquina', primary:'peito',    secondary:['triceps','ombro_ant'] },
 
   // ── COSTAS ──
   { id:'ex_puxada_frente',    name:'Puxada Frontal',           equipment:'cabo',    primary:'costas',   secondary:['biceps'] },
@@ -116,14 +118,14 @@ const EXERCISE_LIBRARY = [
   { id:'ex_remada_maquina',   name:'Remada na Máquina',        equipment:'maquina', primary:'costas',   secondary:['biceps'] },
 
   // ── OMBRO ──
-  { id:'ex_desenvolvimento',  name:'Desenvolvimento',          equipment:'barra',   primary:'ombro',    secondary:['triceps'] },
-  { id:'ex_desenv_halter',    name:'Desenvolvimento Halteres', equipment:'halter',  primary:'ombro',    secondary:['triceps'] },
-  { id:'ex_elevacao_lateral', name:'Elevação Lateral',         equipment:'halter',  primary:'ombro',    secondary:[] },
-  { id:'ex_elevacao_frontal', name:'Elevação Frontal',         equipment:'halter',  primary:'ombro',    secondary:[] },
-  { id:'ex_crucifixo_inv',    name:'Crucifixo Invertido',      equipment:'halter',  primary:'ombro',    secondary:['costas','trapezio'] },
-  { id:'ex_desenv_maquina',   name:'Desenvolvimento Máquina',  equipment:'maquina', primary:'ombro',    secondary:['triceps'] },
-  { id:'ex_arnold_press',     name:'Arnold Press',             equipment:'halter',  primary:'ombro',    secondary:['triceps'] },
-  { id:'ex_face_pull',        name:'Face Pull',                equipment:'cabo',    primary:'ombro',    secondary:['trapezio','costas'] },
+  { id:'ex_desenvolvimento',  name:'Desenvolvimento',          equipment:'barra',   primary:'ombro_ant',secondary:['triceps','ombro_lat'] },
+  { id:'ex_desenv_halter',    name:'Desenvolvimento Halteres', equipment:'halter',  primary:'ombro_ant',secondary:['triceps','ombro_lat'] },
+  { id:'ex_elevacao_lateral', name:'Elevação Lateral',         equipment:'halter',  primary:'ombro_lat',secondary:[] },
+  { id:'ex_elevacao_frontal', name:'Elevação Frontal',         equipment:'halter',  primary:'ombro_ant',secondary:[] },
+  { id:'ex_crucifixo_inv',    name:'Crucifixo Invertido',      equipment:'halter',  primary:'ombro_post',secondary:['costas','trapezio'] },
+  { id:'ex_desenv_maquina',   name:'Desenvolvimento Máquina',  equipment:'maquina', primary:'ombro_ant',secondary:['triceps','ombro_lat'] },
+  { id:'ex_arnold_press',     name:'Arnold Press',             equipment:'halter',  primary:'ombro_ant',secondary:['triceps','ombro_lat'] },
+  { id:'ex_face_pull',        name:'Face Pull',                equipment:'cabo',    primary:'ombro_post',secondary:['trapezio','costas'] },
   { id:'ex_encolhimento',     name:'Encolhimento',             equipment:'halter',  primary:'trapezio', secondary:[] },
 
   // ── BÍCEPS ──
@@ -139,7 +141,7 @@ const EXERCISE_LIBRARY = [
   { id:'ex_triceps_pulley',   name:'Tríceps Pulley',           equipment:'cabo',    primary:'triceps',  secondary:[] },
   { id:'ex_triceps_corda',    name:'Tríceps Corda',            equipment:'cabo',    primary:'triceps',  secondary:[] },
   { id:'ex_triceps_frances',  name:'Tríceps Francês',          equipment:'halter',  primary:'triceps',  secondary:[] },
-  { id:'ex_mergulho',         name:'Mergulho (Dips)',          equipment:'corpo',   primary:'triceps',  secondary:['peito','ombro'] },
+  { id:'ex_mergulho',         name:'Mergulho (Dips)',          equipment:'corpo',   primary:'triceps',  secondary:['peito','ombro_ant'] },
   { id:'ex_triceps_coice',    name:'Tríceps Coice',            equipment:'halter',  primary:'triceps',  secondary:[] },
 
   // ── QUADRÍCEPS / PERNAS ──
@@ -375,7 +377,7 @@ export default function App() {
 
   const allExercises = EXERCISE_LIBRARY.concat(customExercises)
   const getExercise = (id) => allExercises.find(e => e.id === id)
-  const getMuscle = (id) => MUSCLE_GROUPS.find(m => m.id === id)
+  const getMuscle = (id) => MUSCLE_GROUPS.find(m => m.id === id) || (id === 'ombro' ? MUSCLE_GROUPS.find(m => m.id === 'ombro_ant') : null)
   const getEquipment = (id) => EQUIPMENTS.find(e => e.id === id)
 
   useEffect(() => {
@@ -1433,9 +1435,11 @@ export default function App() {
               <circle cx="60" cy="18" r="12" fill={C.surface2}/>
               {/* trapézio */}
               <path d="M45 32 L75 32 L70 42 L50 42 Z" fill={col('trapezio')} stroke={C.border} strokeWidth="0.5"/>
-              {/* ombros */}
-              <circle cx="38" cy="45" r="10" fill={col('ombro')} stroke={C.border} strokeWidth="0.5"/>
-              <circle cx="82" cy="45" r="10" fill={col('ombro')} stroke={C.border} strokeWidth="0.5"/>
+              {/* ombros: anterior (interno) + lateral (externo) */}
+              <circle cx="41" cy="45" r="7" fill={col('ombro_ant')} stroke={C.border} strokeWidth="0.5"/>
+              <circle cx="33" cy="47" r="6" fill={col('ombro_lat')} stroke={C.border} strokeWidth="0.5"/>
+              <circle cx="79" cy="45" r="7" fill={col('ombro_ant')} stroke={C.border} strokeWidth="0.5"/>
+              <circle cx="87" cy="47" r="6" fill={col('ombro_lat')} stroke={C.border} strokeWidth="0.5"/>
               {/* peito */}
               <path d="M45 42 L75 42 L72 68 L48 68 Z" fill={col('peito')} stroke={C.border} strokeWidth="0.5"/>
               {/* abdomen */}
@@ -1461,9 +1465,11 @@ export default function App() {
               <circle cx="60" cy="18" r="12" fill={C.surface2}/>
               {/* trapézio */}
               <path d="M44 32 L76 32 L72 50 L48 50 Z" fill={col('trapezio')} stroke={C.border} strokeWidth="0.5"/>
-              {/* ombros */}
-              <circle cx="38" cy="45" r="10" fill={col('ombro')} stroke={C.border} strokeWidth="0.5"/>
-              <circle cx="82" cy="45" r="10" fill={col('ombro')} stroke={C.border} strokeWidth="0.5"/>
+              {/* ombros: posterior (interno) + lateral (externo) */}
+              <circle cx="41" cy="45" r="7" fill={col('ombro_post')} stroke={C.border} strokeWidth="0.5"/>
+              <circle cx="33" cy="47" r="6" fill={col('ombro_lat')} stroke={C.border} strokeWidth="0.5"/>
+              <circle cx="79" cy="45" r="7" fill={col('ombro_post')} stroke={C.border} strokeWidth="0.5"/>
+              <circle cx="87" cy="47" r="6" fill={col('ombro_lat')} stroke={C.border} strokeWidth="0.5"/>
               {/* costas (dorsal) */}
               <path d="M46 50 L74 50 L70 80 L50 80 Z" fill={col('costas')} stroke={C.border} strokeWidth="0.5"/>
               {/* lombar */}
