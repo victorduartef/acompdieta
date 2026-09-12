@@ -375,7 +375,7 @@ export default function App() {
 
   return (
     <div style={{ background:C.bg, minHeight:'100vh', fontFamily:"'Syne',system-ui,sans-serif", color:C.text, transition:'background .3s' }}>
-      <div style={{ maxWidth:isWide?1200:480, margin:'0 auto', minHeight:'100vh', display:'flex', flexDirection:'column' }}>
+      <div style={{ maxWidth:isWide?(tab==='analysis'?1600:1200):480, margin:'0 auto', minHeight:'100vh', display:'flex', flexDirection:'column', transition:'max-width .2s' }}>
 
         {/* ── HEADER ── */}
         <div style={{ background:darkMode?'linear-gradient(180deg,#0f2028 0%,#122028 100%)':C.surface, borderBottom:`1px solid ${C.border}`, padding:'16px 16px 0', flexShrink:0 }}>
@@ -1296,8 +1296,8 @@ export default function App() {
 
         {filteredEntries.length===0
           ?<div style={{ textAlign:'center', padding:'32px 20px', color:C.text3, background:C.surface, borderRadius:14, border:`0.5px solid ${C.border}` }}><div style={{ fontSize:28, marginBottom:8 }}>🔍</div>Nenhum dia com esses filtros</div>
-          :(<div style={isWide?{ display:'flex', gap:16, alignItems:'flex-start' }:{}}>
-          <div className="evo-col" style={isWide?{ flex:1, minWidth:0, overflowY:'auto', maxHeight:'calc(100vh - 340px)', paddingRight:6 }:{}}>
+          :(<div style={isWide?{ display:'flex', gap:20, alignItems:'stretch' }:{}}>
+          <div className="evo-col" style={isWide?{ flex:1, minWidth:0, overflowY:'auto', maxHeight:'calc(100vh - 300px)', paddingRight:8 }:{}}>
           {/* Stats */}
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginBottom:12 }}>
             {[{label:'Na meta',count:within.length,color:C.teal},{label:'Excesso',count:over.length,color:C.red},{label:'Abaixo',count:under.length,color:C.gold}].map(s=>(
@@ -1352,7 +1352,7 @@ export default function App() {
             </div>
           </div>}
           </div>
-          <div className="evo-col" style={isWide?{ flex:1, minWidth:0, overflowY:'auto', maxHeight:'calc(100vh - 340px)', paddingRight:6 }:{}}>
+          <div className="evo-col" style={isWide?{ flex:1, minWidth:0, overflowY:'auto', maxHeight:'calc(100vh - 300px)', paddingRight:8 }:{}}>
           {/* Comparativo */}
           <div style={{ background:C.surface, borderRadius:14, padding:14, marginBottom:12, border:`0.5px solid ${C.border}` }}>
             <div style={{ fontSize:13, fontWeight:500, marginBottom:4, color:C.text }}>📊 Comparativo de médias</div>
@@ -1677,7 +1677,7 @@ export default function App() {
           })()}
 
           </div>
-          <div className="evo-col" style={isWide?{ flex:1, minWidth:0, overflowY:'auto', maxHeight:'calc(100vh - 340px)', paddingRight:6 }:{}}>
+          <div className="evo-col" style={isWide?{ flex:1, minWidth:0, overflowY:'auto', maxHeight:'calc(100vh - 300px)', paddingRight:8 }:{}}>
           {/* Weekly body composition + diet comparison */}
           {(() => {
             const CUTOFF = '2026-07-08' // start of body composition tracking
