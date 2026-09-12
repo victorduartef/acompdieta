@@ -1600,85 +1600,6 @@ export default function App() {
             )
           })()}
 
-          {/* Weekly health (steps, sleep) comparison */}
-          {Object.keys(healthData).length > 0 && (() => {
-            const getMonday = (dateStr) => {
-              const d = new Date(dateStr + 'T12:00:00')
-              const day = d.getDay()
-              const diff = day === 0 ? -6 : 1 - day
-              d.setDate(d.getDate() + diff)
-              return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
-            }
-
-            const byWeek = {}
-            Object.entries(healthData).forEach(([date, hd]) => {
-              const wk = getMonday(date)
-              if (!byWeek[wk]) byWeek[wk] = { steps:[], sleep:[], score:[] }
-              if (hd.steps) byWeek[wk].steps.push(hd.steps)
-              if (hd.sleep) byWeek[wk].sleep.push(hd.sleep)
-              if (hd.sleepScore) byWeek[wk].score.push(hd.sleepScore)
-            })
-
-            const weeks = Object.keys(byWeek).sort()
-            if (weeks.length === 0) return null
-            const avg = (arr) => arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : null
-
-            const weekData = weeks.map((wk, i) => {
-              const mondayD = new Date(wk + 'T12:00:00')
-              const label = `${String(mondayD.getDate()).padStart(2,'0')}/${String(mondayD.getMonth()+1).padStart(2,'0')}`
-              return {
-                weekNum: i+1, label,
-                steps: byWeek[wk].steps.length ? Math.round(avg(byWeek[wk].steps)) : null,
-                sleep: byWeek[wk].sleep.length ? Math.round(avg(byWeek[wk].sleep)*10)/10 : null,
-                score: byWeek[wk].score.length ? Math.round(avg(byWeek[wk].score)) : null,
-              }
-            }).slice(-8) // last 8 weeks max
-
-            const HealthRow = ({ label, dataKey, unit, color, fmt }) => {
-              const vals = weekData.map(w => w[dataKey]).filter(v => v != null)
-              if (vals.length === 0) return null
-              const maxV = Math.max(...vals)
-              const minV = Math.min(...vals) * 0.9
-              return (
-                <div style={{ marginBottom:14 }}>
-                  <div style={{ fontSize:11, color:C.text2, marginBottom:6, fontWeight:600 }}>{label}</div>
-                  {weekData.map((w, i) => {
-                    const v = w[dataKey]
-                    if (v == null) return null
-                    const pct = maxV > minV ? ((v - minV) / (maxV - minV)) * 100 : 50
-                    const prev = i > 0 ? weekData[i-1][dataKey] : null
-                    const delta = prev != null ? (v - prev) : null
-                    return (
-                      <div key={i} style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
-                        <span style={{ fontSize:9, color:C.text2, width:52, fontFamily:'JetBrains Mono,monospace', flexShrink:0 }}>S{w.weekNum} {w.label}</span>
-                        <div style={{ flex:1, background:C.surface2, borderRadius:4, height:20, position:'relative', overflow:'hidden' }}>
-                          <div style={{ height:'100%', width:Math.max(15,pct)+'%', background:color, borderRadius:4 }}/>
-                          <span style={{ position:'absolute', right:6, top:'50%', transform:'translateY(-50%)', fontSize:10, fontWeight:700, color:C.text, fontFamily:'JetBrains Mono,monospace' }}>{fmt?fmt(v):v}{unit}</span>
-                        </div>
-                        {delta != null && Math.abs(delta) > 0.05 && (
-                          <span style={{ fontSize:9, fontWeight:700, width:42, textAlign:'right', color:delta>0?C.teal:C.red, fontFamily:'JetBrains Mono,monospace', flexShrink:0 }}>{delta>0?'+':''}{fmt?fmt(delta):Math.round(delta)}</span>
-                        )}
-                        {(delta == null || Math.abs(delta) <= 0.05) && <span style={{ width:42, flexShrink:0 }}/>}
-                      </div>
-                    )
-                  })}
-                </div>
-              )
-            }
-
-            return (
-              <div style={{ background:C.surface, borderRadius:14, padding:14, marginBottom:12, border:`0.5px solid ${C.border}` }}>
-                <div style={{ fontSize:13, fontWeight:500, marginBottom:4, color:C.text }}>👟 Saúde Semanal</div>
-                <div style={{ fontSize:10, color:C.text2, marginBottom:14, fontFamily:'JetBrains Mono,monospace' }}>
-                  Passos, sono e nota · Seg–Dom · {weekData.length} semana(s)
-                </div>
-                <HealthRow label="Passos (média/dia)" dataKey="steps" unit="" color={C.teal} fmt={v=>Math.round(v).toLocaleString()} />
-                <HealthRow label="Sono (horas/dia)" dataKey="sleep" unit="h" color="#8b7fd4" fmt={v=>v.toFixed(1)} />
-                <HealthRow label="Nota do Sono (0-100)" dataKey="score" unit="" color={C.gold} fmt={v=>Math.round(v)} />
-              </div>
-            )
-          })()}
-
           </div>
         </div>
 
@@ -1814,6 +1735,87 @@ export default function App() {
 
                 <div style={{ fontSize:9, color:C.text3, marginTop:10, lineHeight:1.5, fontFamily:'JetBrains Mono,monospace' }}>
                   As setas mostram a variação vs semana anterior. Verde = melhora (peso/gordura ↓, massa magra ↑).
+                </div>
+              </div>
+            )
+          })()}
+
+          {/* Weekly health (steps, sleep) comparison */}
+          {Object.keys(healthData).length > 0 && (() => {
+            const getMonday = (dateStr) => {
+              const d = new Date(dateStr + 'T12:00:00')
+              const day = d.getDay()
+              const diff = day === 0 ? -6 : 1 - day
+              d.setDate(d.getDate() + diff)
+              return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+            }
+
+            const byWeek = {}
+            Object.entries(healthData).forEach(([date, hd]) => {
+              const wk = getMonday(date)
+              if (!byWeek[wk]) byWeek[wk] = { steps:[], sleep:[], score:[] }
+              if (hd.steps) byWeek[wk].steps.push(hd.steps)
+              if (hd.sleep) byWeek[wk].sleep.push(hd.sleep)
+              if (hd.sleepScore) byWeek[wk].score.push(hd.sleepScore)
+            })
+
+            const weeks = Object.keys(byWeek).sort()
+            if (weeks.length === 0) return null
+            const avg = (arr) => arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : null
+
+            const weekData = weeks.map((wk, i) => {
+              const mondayD = new Date(wk + 'T12:00:00')
+              const label = `${String(mondayD.getDate()).padStart(2,'0')}/${String(mondayD.getMonth()+1).padStart(2,'0')}`
+              return {
+                weekNum: i+1, label,
+                steps: byWeek[wk].steps.length ? Math.round(avg(byWeek[wk].steps)) : null,
+                sleep: byWeek[wk].sleep.length ? Math.round(avg(byWeek[wk].sleep)*10)/10 : null,
+                score: byWeek[wk].score.length ? Math.round(avg(byWeek[wk].score)) : null,
+              }
+            }).slice(-8) // last 8 weeks max
+
+            const HealthRow = ({ label, dataKey, unit, color, fmt }) => {
+              const vals = weekData.map(w => w[dataKey]).filter(v => v != null)
+              if (vals.length === 0) return null
+              const maxV = Math.max(...vals)
+              const minV = Math.min(...vals) * 0.9
+              return (
+                <div style={{ marginBottom:14 }}>
+                  <div style={{ fontSize:11, color:C.text2, marginBottom:6, fontWeight:600 }}>{label}</div>
+                  {weekData.map((w, i) => {
+                    const v = w[dataKey]
+                    if (v == null) return null
+                    const pct = maxV > minV ? ((v - minV) / (maxV - minV)) * 100 : 50
+                    const prev = i > 0 ? weekData[i-1][dataKey] : null
+                    const delta = prev != null ? (v - prev) : null
+                    return (
+                      <div key={i} style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
+                        <span style={{ fontSize:9, color:C.text2, width:52, fontFamily:'JetBrains Mono,monospace', flexShrink:0 }}>S{w.weekNum} {w.label}</span>
+                        <div style={{ flex:1, background:C.surface2, borderRadius:4, height:20, position:'relative', overflow:'hidden' }}>
+                          <div style={{ height:'100%', width:Math.max(15,pct)+'%', background:color, borderRadius:4 }}/>
+                          <span style={{ position:'absolute', right:6, top:'50%', transform:'translateY(-50%)', fontSize:10, fontWeight:700, color:C.text, fontFamily:'JetBrains Mono,monospace' }}>{fmt?fmt(v):v}{unit}</span>
+                        </div>
+                        {delta != null && Math.abs(delta) > 0.05 && (
+                          <span style={{ fontSize:9, fontWeight:700, width:42, textAlign:'right', color:delta>0?C.teal:C.red, fontFamily:'JetBrains Mono,monospace', flexShrink:0 }}>{delta>0?'+':''}{fmt?fmt(delta):Math.round(delta)}</span>
+                        )}
+                        {(delta == null || Math.abs(delta) <= 0.05) && <span style={{ width:42, flexShrink:0 }}/>}
+                      </div>
+                    )
+                  })}
+                </div>
+              )
+            }
+
+            return (
+              <div style={{ background:C.surface, borderRadius:14, padding:14, marginBottom:12, border:`0.5px solid ${C.border}` }}>
+                <div style={{ fontSize:13, fontWeight:500, marginBottom:4, color:C.text }}>👟 Saúde Semanal</div>
+                <div style={{ fontSize:10, color:C.text2, marginBottom:14, fontFamily:'JetBrains Mono,monospace' }}>
+                  Passos, sono e nota · Seg–Dom · {weekData.length} semana(s)
+                </div>
+                <div style={{ display:'grid', gridTemplateColumns:isWide?'1fr 1fr 1fr':'1fr', gap:isWide?24:0 }}>
+                  <HealthRow label="Passos (média/dia)" dataKey="steps" unit="" color={C.teal} fmt={v=>Math.round(v).toLocaleString()} />
+                  <HealthRow label="Sono (horas/dia)" dataKey="sleep" unit="h" color="#8b7fd4" fmt={v=>v.toFixed(1)} />
+                  <HealthRow label="Nota do Sono (0-100)" dataKey="score" unit="" color={C.gold} fmt={v=>Math.round(v)} />
                 </div>
               </div>
             )
