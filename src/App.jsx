@@ -300,6 +300,7 @@ export default function App() {
   const [restTimer, setRestTimer] = useState(null) // { total, remaining }
   const [exSearch, setExSearch] = useState('')
   const [exMuscleFilter, setExMuscleFilter] = useState('')
+  const [expandedWorkout, setExpandedWorkout] = useState(null)
   const [pesoPeriod, setPesoPeriod] = useState('90d') // 30d | 90d | 180d | all
   const [insightPeriod, setInsightPeriod] = useState('last') // 'last' | '7d' | '30d'
   const [loaded, setLoaded] = useState(false)
@@ -895,6 +896,7 @@ export default function App() {
           {[
             { id:'resumo', label:'📊 Resumo' },
             { id:'fichas', label:'📋 Fichas' },
+            { id:'evolucao', label:'📈 Evolução' },
             { id:'exercicios', label:'🏋️ Exercícios' },
           ].map(v => (
             <button key={v.id} onClick={()=>{ setTreinoView(v.id); setActivePlanId(null); setEditingExercise(null) }}
@@ -909,6 +911,7 @@ export default function App() {
         {treinoView==='resumo' && renderTreinoResumo()}
         {treinoView==='fichas' && !activePlanId && renderFichas()}
         {treinoView==='fichas' && activePlanId && renderFichaEditor()}
+        {treinoView==='evolucao' && renderEvolucao()}
         {treinoView==='exercicios' && renderExerciciosLib()}
       </div>
     )
@@ -916,8 +919,61 @@ export default function App() {
 
   // ── FICHAS (lista) ──
   function renderFichas() {
+    // Build history of which plan was trained on each date (most recent first)
+    const planHistory = []
+    Object.entries(workoutLogs).sort(([a],[b])=>b.localeCompare(a)).forEach(([date, logs]) => {
+      const arr = Array.isArray(logs) ? logs : [logs]
+      arr.forEach(log => { if (log.planId) planHistory.push({ date, planId:log.planId, planName:log.planName }) })
+    })
+    const lastTrained = planHistory[0] || null
+    // Suggest next plan: the one trained longest ago (or never), following rotation
+    const suggestNext = (() => {
+      if (workoutPlans.length === 0) return null
+      // For each plan, find its last trained date
+      const lastByPlan = {}
+      planHistory.forEach(h => { if (!lastByPlan[h.planId]) lastByPlan[h.planId] = h.date })
+      // Plan never trained comes first, else the oldest
+      const sorted = [...workoutPlans].sort((a,b) => {
+        const da = lastByPlan[a.id] || '0000-00-00'
+        const db = lastByPlan[b.id] || '0000-00-00'
+        return da.localeCompare(db)
+      })
+      return sorted[0]
+    })()
+
     return (
       <div>
+        {/* Última ficha treinada + sugestão */}
+        {lastTrained && (() => {
+          const lastPlan = workoutPlans.find(p=>p.id===lastTrained.planId)
+          return (
+            <div style={{ background:C.surface, borderRadius:14, padding:14, marginBottom:14, border:`0.5px solid ${C.border}` }}>
+              <div style={{ display:'flex', gap:12, alignItems:'stretch' }}>
+                <div style={{ flex:1, background:C.bg, borderRadius:10, padding:'10px 12px' }}>
+                  <div style={{ fontSize:9, color:C.text2, marginBottom:4, fontFamily:'JetBrains Mono,monospace', textTransform:'uppercase', letterSpacing:1 }}>Última treinada</div>
+                  <div style={{ fontSize:15, fontWeight:800, color:C.text }}>{lastPlan?.name || lastTrained.planName || '—'}</div>
+                  <div style={{ fontSize:10, color:C.text3, marginTop:2, fontFamily:'JetBrains Mono,monospace' }}>{formatDateFull(lastTrained.date)}</div>
+                </div>
+                {suggestNext && (
+                  <div style={{ flex:1, background:`${C.teal}12`, borderRadius:10, padding:'10px 12px', border:`1px solid ${C.teal}40` }}>
+                    <div style={{ fontSize:9, color:C.teal, marginBottom:4, fontFamily:'JetBrains Mono,monospace', textTransform:'uppercase', letterSpacing:1 }}>Sugestão de hoje</div>
+                    <div style={{ fontSize:15, fontWeight:800, color:C.text }}>{suggestNext.name}</div>
+                    <button onClick={()=>{
+                      if (suggestNext.exercises.length === 0) { alert('Adicione exercícios à ficha primeiro!'); return }
+                      const session = {
+                        planId: suggestNext.id, startTime: Date.now(),
+                        exercises: suggestNext.exercises.map(ex => ({ exerciseId:ex.exerciseId, targetSets:ex.targetSets||3, targetReps:ex.targetReps||'10', restSeconds:ex.restSeconds||90, sets:[], skipped:false })),
+                        currentIdx: 0,
+                      }
+                      setLiveSession(session)
+                    }} style={{ marginTop:6, background:`linear-gradient(135deg,${C.teal},#0ea5a5)`, border:'none', borderRadius:8, padding:'6px 12px', color:'#fff', fontSize:11, cursor:'pointer', fontFamily:'inherit', fontWeight:700 }}>▶ Iniciar esta</button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )
+        })()}
+
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
           <div style={{ fontSize:15, fontWeight:700, color:C.text }}>Minhas Fichas</div>
           <button onClick={()=>{
@@ -944,6 +1000,7 @@ export default function App() {
             const e = getExercise(ex.exerciseId)
             if (e) muscles[e.primary] = (muscles[e.primary]||0) + 1
           })
+          const planLast = planHistory.find(h => h.planId === plan.id)
           const topMuscles = Object.entries(muscles).sort((a,b)=>b[1]-a[1]).slice(0,3)
           return (
             <div key={plan.id} style={{ background:C.surface, borderRadius:14, padding:14, marginBottom:isWide?0:10, border:`0.5px solid ${C.border}` }}>
@@ -951,6 +1008,7 @@ export default function App() {
                 <div onClick={()=>setActivePlanId(plan.id)} style={{ flex:1, cursor:'pointer' }}>
                   <div style={{ fontSize:15, fontWeight:700, color:C.text }}>{plan.name}</div>
                   <div style={{ fontSize:11, color:C.text2, marginTop:2 }}>{plan.exercises.length} exercício(s)</div>
+                  {planLast ? <div style={{ fontSize:10, color:C.teal, marginTop:2, fontFamily:'JetBrains Mono,monospace' }}>última: {formatDateFull(planLast.date)}</div> : <div style={{ fontSize:10, color:C.text3, marginTop:2, fontFamily:'JetBrains Mono,monospace' }}>nunca treinada</div>}
                 </div>
               </div>
               {topMuscles.length > 0 && (
@@ -1175,17 +1233,25 @@ export default function App() {
     const completedSets = curEx.sets.length
 
     // Last log for this exercise (for reference weight)
-    const lastWeights = (() => {
+    // Get last 3 sessions of this exercise for history reference
+    const exerciseSessions = (() => {
+      const sessions = []
       const allLogs = Object.entries(workoutLogs).sort(([a],[b])=>b.localeCompare(a))
-      for (const [, logs] of allLogs) {
+      for (const [date, logs] of allLogs) {
         const arr = Array.isArray(logs) ? logs : [logs]
         for (const log of arr) {
           const found = (log.exercises||[]).find(x => x.exerciseId === e.id)
-          if (found && found.sets.length) return found.sets
+          if (found && found.sets.length) {
+            const volume = found.sets.reduce((a,s)=>a+(s.weight||0)*(s.reps||0),0)
+            const maxW = Math.max(...found.sets.map(s=>s.weight||0))
+            sessions.push({ date, sets:found.sets, volume, maxW })
+          }
         }
+        if (sessions.length >= 3) break
       }
-      return null
+      return sessions
     })()
+    const lastWeights = exerciseSessions[0]?.sets || null
 
     return (
       <div>
@@ -1231,8 +1297,36 @@ export default function App() {
 
           <div style={{ fontSize:11, color:C.text2, marginBottom:10, fontFamily:'JetBrains Mono,monospace' }}>
             Meta: {targetSets} séries × {curEx.targetReps} reps · descanso {curEx.restSeconds}s
-            {lastWeights && <span style={{ color:C.gold }}> · último: {lastWeights.map(w=>`${w.weight}kg`).join(', ')}</span>}
           </div>
+
+          {/* Histórico das últimas sessões deste exercício */}
+          {exerciseSessions.length > 0 && (
+            <div style={{ background:C.bg, borderRadius:10, padding:'10px 12px', marginBottom:12 }}>
+              <div style={{ fontSize:9, color:C.text2, marginBottom:8, fontFamily:'JetBrains Mono,monospace', textTransform:'uppercase', letterSpacing:1 }}>📊 Últimas {exerciseSessions.length} vezes</div>
+              {exerciseSessions.map((sess, si) => {
+                const prevSess = exerciseSessions[si+1]
+                const volDiff = prevSess ? sess.volume - prevSess.volume : null
+                return (
+                  <div key={si} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'4px 0', borderBottom:si<exerciseSessions.length-1?`0.5px solid ${C.border}`:'none' }}>
+                    <span style={{ fontSize:10, color:C.text3, fontFamily:'JetBrains Mono,monospace', width:44 }}>{sess.date.slice(5).replace('-','/')}</span>
+                    <span style={{ flex:1, fontSize:11, color:C.text, fontFamily:'JetBrains Mono,monospace' }}>{sess.sets.map(s=>`${s.weight}×${s.reps}`).join('  ')}</span>
+                    <span style={{ fontSize:10, color:C.gold, fontFamily:'JetBrains Mono,monospace', fontWeight:700 }}>{Math.round(sess.volume)}kg</span>
+                    {volDiff !== null && Math.abs(volDiff) > 0 && (
+                      <span style={{ fontSize:9, fontWeight:700, marginLeft:6, width:38, textAlign:'right', color:volDiff>0?C.teal:C.red, fontFamily:'JetBrains Mono,monospace' }}>{volDiff>0?'↑':'↓'}{Math.abs(Math.round(volDiff))}</span>
+                    )}
+                    {(volDiff === null || volDiff === 0) && <span style={{ width:38 }}/>}
+                  </div>
+                )
+              })}
+              {exerciseSessions.length >= 2 && (() => {
+                const cur = exerciseSessions[0].volume
+                const prev = exerciseSessions[1].volume
+                if (cur > prev) return <div style={{ fontSize:10, color:C.teal, marginTop:6, fontWeight:600 }}>📈 Você evoluiu no volume! Tente manter ou superar hoje.</div>
+                if (cur < prev) return <div style={{ fontSize:10, color:C.amber, marginTop:6, fontWeight:600 }}>📉 Volume caiu na última. Bora recuperar hoje!</div>
+                return <div style={{ fontSize:10, color:C.text2, marginTop:6 }}>➡️ Volume estável. Tente progredir hoje.</div>
+              })()}
+            </div>
+          )}
 
           {/* Sets */}
           {curEx.sets.map((set, si) => (
@@ -1312,6 +1406,255 @@ export default function App() {
     )
   }
 
+  // ── MAPA MUSCULAR VISUAL ──
+  function renderMuscleMap(muscleVolume, maxVol) {
+    // Simplified body silhouette with muscle regions as colored shapes
+    const intensity = (mid) => {
+      const v = muscleVolume[mid] || 0
+      if (v === 0) return 0
+      return Math.min(1, v / maxVol)
+    }
+    const col = (mid, baseColor) => {
+      const i = intensity(mid)
+      if (i === 0) return C.surface2
+      // interpolate opacity via the muscle color
+      const alpha = Math.round((0.25 + i*0.75) * 255).toString(16).padStart(2,'0')
+      return (getMuscle(mid)?.color || baseColor) + alpha
+    }
+    return (
+      <div style={{ background:C.surface, borderRadius:14, padding:14, marginBottom:12, border:`0.5px solid ${C.border}` }}>
+        <div style={{ fontSize:13, fontWeight:700, marginBottom:4, color:C.text }}>🗺️ Mapa Muscular</div>
+        <div style={{ fontSize:10, color:C.text2, marginBottom:12, fontFamily:'JetBrains Mono,monospace' }}>Intensidade de treino (4 semanas)</div>
+        <div style={{ display:'flex', gap:12, justifyContent:'center' }}>
+          {/* FRENTE */}
+          <div style={{ textAlign:'center' }}>
+            <svg viewBox="0 0 120 220" style={{ width:120, height:220 }}>
+              {/* cabeça */}
+              <circle cx="60" cy="18" r="12" fill={C.surface2}/>
+              {/* trapézio */}
+              <path d="M45 32 L75 32 L70 42 L50 42 Z" fill={col('trapezio')} stroke={C.border} strokeWidth="0.5"/>
+              {/* ombros */}
+              <circle cx="38" cy="45" r="10" fill={col('ombro')} stroke={C.border} strokeWidth="0.5"/>
+              <circle cx="82" cy="45" r="10" fill={col('ombro')} stroke={C.border} strokeWidth="0.5"/>
+              {/* peito */}
+              <path d="M45 42 L75 42 L72 68 L48 68 Z" fill={col('peito')} stroke={C.border} strokeWidth="0.5"/>
+              {/* abdomen */}
+              <rect x="50" y="70" width="20" height="30" rx="3" fill={col('abdomen')} stroke={C.border} strokeWidth="0.5"/>
+              {/* bíceps */}
+              <ellipse cx="32" cy="65" rx="7" ry="15" fill={col('biceps')} stroke={C.border} strokeWidth="0.5"/>
+              <ellipse cx="88" cy="65" rx="7" ry="15" fill={col('biceps')} stroke={C.border} strokeWidth="0.5"/>
+              {/* antebraço */}
+              <ellipse cx="28" cy="90" rx="6" ry="14" fill={col('antebraco')} stroke={C.border} strokeWidth="0.5"/>
+              <ellipse cx="92" cy="90" rx="6" ry="14" fill={col('antebraco')} stroke={C.border} strokeWidth="0.5"/>
+              {/* quadríceps */}
+              <path d="M48 102 L59 102 L57 150 L50 150 Z" fill={col('quadriceps')} stroke={C.border} strokeWidth="0.5"/>
+              <path d="M61 102 L72 102 L70 150 L63 150 Z" fill={col('quadriceps')} stroke={C.border} strokeWidth="0.5"/>
+              {/* panturrilha frente */}
+              <ellipse cx="53" cy="175" rx="6" ry="18" fill={col('panturrilha')} stroke={C.border} strokeWidth="0.5"/>
+              <ellipse cx="67" cy="175" rx="6" ry="18" fill={col('panturrilha')} stroke={C.border} strokeWidth="0.5"/>
+              <text x="60" y="212" fontSize="9" fill={C.text3} textAnchor="middle" fontFamily="JetBrains Mono,monospace">FRENTE</text>
+            </svg>
+          </div>
+          {/* COSTAS */}
+          <div style={{ textAlign:'center' }}>
+            <svg viewBox="0 0 120 220" style={{ width:120, height:220 }}>
+              <circle cx="60" cy="18" r="12" fill={C.surface2}/>
+              {/* trapézio */}
+              <path d="M44 32 L76 32 L72 50 L48 50 Z" fill={col('trapezio')} stroke={C.border} strokeWidth="0.5"/>
+              {/* ombros */}
+              <circle cx="38" cy="45" r="10" fill={col('ombro')} stroke={C.border} strokeWidth="0.5"/>
+              <circle cx="82" cy="45" r="10" fill={col('ombro')} stroke={C.border} strokeWidth="0.5"/>
+              {/* costas (dorsal) */}
+              <path d="M46 50 L74 50 L70 80 L50 80 Z" fill={col('costas')} stroke={C.border} strokeWidth="0.5"/>
+              {/* lombar */}
+              <rect x="51" y="82" width="18" height="18" rx="3" fill={col('lombar')} stroke={C.border} strokeWidth="0.5"/>
+              {/* tríceps */}
+              <ellipse cx="32" cy="65" rx="7" ry="15" fill={col('triceps')} stroke={C.border} strokeWidth="0.5"/>
+              <ellipse cx="88" cy="65" rx="7" ry="15" fill={col('triceps')} stroke={C.border} strokeWidth="0.5"/>
+              {/* glúteo */}
+              <path d="M48 100 L59 100 L58 118 L49 118 Z" fill={col('gluteo')} stroke={C.border} strokeWidth="0.5"/>
+              <path d="M61 100 L72 100 L71 118 L62 118 Z" fill={col('gluteo')} stroke={C.border} strokeWidth="0.5"/>
+              {/* posterior */}
+              <path d="M49 120 L58 120 L56 150 L50 150 Z" fill={col('posterior')} stroke={C.border} strokeWidth="0.5"/>
+              <path d="M62 120 L71 120 L70 150 L64 150 Z" fill={col('posterior')} stroke={C.border} strokeWidth="0.5"/>
+              {/* panturrilha */}
+              <ellipse cx="53" cy="175" rx="6" ry="18" fill={col('panturrilha')} stroke={C.border} strokeWidth="0.5"/>
+              <ellipse cx="67" cy="175" rx="6" ry="18" fill={col('panturrilha')} stroke={C.border} strokeWidth="0.5"/>
+              <text x="60" y="212" fontSize="9" fill={C.text3} textAnchor="middle" fontFamily="JetBrains Mono,monospace">COSTAS</text>
+            </svg>
+          </div>
+        </div>
+        {/* Legenda */}
+        <div style={{ display:'flex', alignItems:'center', gap:8, justifyContent:'center', marginTop:8 }}>
+          <span style={{ fontSize:9, color:C.text3 }}>Menos</span>
+          <div style={{ display:'flex', gap:2 }}>
+            {[0.2,0.4,0.6,0.8,1].map(i=><div key={i} style={{ width:16, height:8, borderRadius:2, background:C.gold+Math.round(i*255).toString(16).padStart(2,'0') }}/>)}
+          </div>
+          <span style={{ fontSize:9, color:C.text3 }}>Mais</span>
+        </div>
+      </div>
+    )
+  }
+
+  // ── EVOLUÇÃO DE CARGA (Fase 2) + ANÁLISE MUSCULAR (Fase 4) ──
+  function renderEvolucao() {
+    // Build per-exercise history from workoutLogs
+    const exerciseHistory = {} // exId -> [{ date, sets, maxWeight, volume }]
+    Object.entries(workoutLogs).forEach(([date, logs]) => {
+      const arr = Array.isArray(logs) ? logs : [logs]
+      arr.forEach(log => {
+        (log.exercises||[]).forEach(ex => {
+          if (!ex.sets || ex.sets.length === 0) return
+          const maxWeight = Math.max(...ex.sets.map(s=>s.weight||0))
+          const volume = ex.sets.reduce((a,s)=>a+(s.weight||0)*(s.reps||0),0)
+          if (!exerciseHistory[ex.exerciseId]) exerciseHistory[ex.exerciseId] = []
+          exerciseHistory[ex.exerciseId].push({ date, sets:ex.sets, maxWeight, volume })
+        })
+      })
+    })
+    Object.keys(exerciseHistory).forEach(k => exerciseHistory[k].sort((a,b)=>a.date.localeCompare(b.date)))
+
+    const exercisesWithData = Object.keys(exerciseHistory)
+
+    // ── Muscle volume analysis (last 4 weeks = sets per muscle) ──
+    const d30 = new Date(); d30.setDate(d30.getDate()-28)
+    const cutoff30 = `${d30.getFullYear()}-${String(d30.getMonth()+1).padStart(2,'0')}-${String(d30.getDate()).padStart(2,'0')}`
+    const muscleVolume = {} // muscleId -> total sets (primary counts full, secondary counts half)
+    Object.entries(workoutLogs).forEach(([date, logs]) => {
+      if (date < cutoff30) return
+      const arr = Array.isArray(logs) ? logs : [logs]
+      arr.forEach(log => {
+        (log.exercises||[]).forEach(ex => {
+          const e = getExercise(ex.exerciseId)
+          if (!e || !ex.sets) return
+          const nSets = ex.sets.length
+          muscleVolume[e.primary] = (muscleVolume[e.primary]||0) + nSets
+          ;(e.secondary||[]).forEach(sid => { muscleVolume[sid] = (muscleVolume[sid]||0) + nSets*0.5 })
+        })
+      })
+    })
+    const maxMuscleVol = Math.max(1, ...Object.values(muscleVolume))
+    const sortedMuscles = MUSCLE_GROUPS.map(m => ({ ...m, vol: muscleVolume[m.id]||0 })).sort((a,b)=>b.vol-a.vol)
+    const neglected = sortedMuscles.filter(m => m.vol > 0 && m.vol < maxMuscleVol*0.3)
+    const untrained = sortedMuscles.filter(m => m.vol === 0)
+
+    if (exercisesWithData.length === 0) {
+      return (
+        <div style={{ textAlign:'center', padding:'40px 20px', color:C.text3 }}>
+          <div style={{ fontSize:36, marginBottom:12 }}>📈</div>
+          <div style={{ fontSize:14, marginBottom:6, color:C.text2 }}>Sem dados de treino ainda</div>
+          <div style={{ fontSize:12 }}>Complete treinos no modo Live para ver sua evolução</div>
+        </div>
+      )
+    }
+
+    return (
+      <div style={isWide?{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16, alignItems:'start' }:{}}>
+        {/* Coluna: Análise muscular */}
+        <div>
+          {renderMuscleMap(muscleVolume, maxMuscleVol)}
+          {/* Volume por músculo (últimas 4 semanas) */}
+          <div style={{ background:C.surface, borderRadius:14, padding:14, marginBottom:12, border:`0.5px solid ${C.border}` }}>
+            <div style={{ fontSize:13, fontWeight:700, marginBottom:4, color:C.text }}>💪 Volume por Músculo</div>
+            <div style={{ fontSize:10, color:C.text2, marginBottom:12, fontFamily:'JetBrains Mono,monospace' }}>Séries nas últimas 4 semanas</div>
+            {sortedMuscles.filter(m=>m.vol>0).map(m => (
+              <div key={m.id} style={{ marginBottom:8 }}>
+                <div style={{ display:'flex', justifyContent:'space-between', marginBottom:3 }}>
+                  <span style={{ fontSize:11, color:C.text, fontWeight:600 }}>{m.label}</span>
+                  <span style={{ fontSize:11, color:m.color, fontWeight:700, fontFamily:'JetBrains Mono,monospace' }}>{Math.round(m.vol)} séries</span>
+                </div>
+                <div style={{ background:C.surface2, borderRadius:4, height:8, overflow:'hidden' }}>
+                  <div style={{ height:'100%', width:`${(m.vol/maxMuscleVol)*100}%`, background:m.color, borderRadius:4 }}/>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Alertas de músculos esquecidos */}
+          {(neglected.length > 0 || untrained.length > 0) && (
+            <div style={{ background:C.surface, borderRadius:14, padding:14, marginBottom:12, border:`0.5px solid ${C.border}` }}>
+              <div style={{ fontSize:13, fontWeight:700, marginBottom:10, color:C.text }}>⚠️ Atenção</div>
+              {neglected.map(m => (
+                <div key={m.id} style={{ background:`${C.amber}12`, borderRadius:8, padding:'8px 10px', marginBottom:6, borderLeft:`3px solid ${C.amber}` }}>
+                  <span style={{ fontSize:12, color:C.text2 }}><b style={{ color:m.color }}>{m.label}</b> com pouco volume ({Math.round(m.vol)} séries) — pode estar ficando pra trás.</span>
+                </div>
+              ))}
+              {untrained.slice(0,5).map(m => (
+                <div key={m.id} style={{ background:`${C.red}10`, borderRadius:8, padding:'8px 10px', marginBottom:6, borderLeft:`3px solid ${C.red}` }}>
+                  <span style={{ fontSize:12, color:C.text2 }}><b style={{ color:m.color }}>{m.label}</b> sem treino nas últimas 4 semanas.</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Coluna: Evolução de carga por exercício */}
+        <div>
+          <div style={{ fontSize:13, fontWeight:700, marginBottom:10, color:C.text }}>📈 Evolução de Carga</div>
+          {exercisesWithData.map(exId => {
+            const e = getExercise(exId)
+            if (!e) return null
+            const hist = exerciseHistory[exId]
+            const pm = getMuscle(e.primary)
+            const pr = Math.max(...hist.map(h=>h.maxWeight))
+            const firstW = hist[0].maxWeight
+            const lastW = hist[hist.length-1].maxWeight
+            const progress = firstW > 0 ? ((lastW-firstW)/firstW*100).toFixed(0) : 0
+            // Mini chart of maxWeight over time
+            const vals = hist.map(h=>h.maxWeight)
+            const W=300, H=60, PL=4, PR=4, PT=8, PB=14
+            const maxV=Math.max(...vals)*1.05, minV=Math.min(...vals)*0.95
+            const cx=i=>PL+(i/Math.max(vals.length-1,1))*(W-PL-PR)
+            const cy=v=>PT+(1-(v-minV)/(maxV-minV||1))*(H-PT-PB)
+            const pts=vals.map((v,i)=>`${cx(i)},${cy(v)}`).join(' ')
+            const trend = lastW>=firstW?C.teal:C.red
+            return (
+              <div key={exId} style={{ background:C.surface, borderRadius:12, padding:12, marginBottom:10, border:`0.5px solid ${C.border}` }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:6 }}>
+                  <div>
+                    <div style={{ fontSize:13, fontWeight:700, color:C.text }}>{e.name}</div>
+                    <span style={{ fontSize:9, padding:'2px 7px', borderRadius:8, background:`${pm?.color||C.gold}20`, color:pm?.color||C.gold, fontWeight:600 }}>{pm?.label}</span>
+                  </div>
+                  <div style={{ textAlign:'right' }}>
+                    <div style={{ fontSize:16, fontWeight:800, color:trend, fontFamily:'JetBrains Mono,monospace' }}>{lastW}kg</div>
+                    <div style={{ fontSize:9, color:C.text3, fontFamily:'JetBrains Mono,monospace' }}>PR: {pr}kg</div>
+                  </div>
+                </div>
+                {vals.length >= 2 && (
+                  <svg viewBox={`0 0 ${W} ${H}`} style={{ width:'100%', height:H }}>
+                    <polyline points={pts} fill="none" stroke={trend} strokeWidth="2" strokeLinejoin="round"/>
+                    {vals.map((v,i)=>(
+                      <g key={i}>
+                        <circle cx={cx(i)} cy={cy(v)} r="3" fill={trend}/>
+                        <text x={cx(i)} y={H-2} fontSize="7" fill={C.text2} textAnchor="middle" fontFamily="JetBrains Mono,monospace">{hist[i].date.slice(5).replace('-','/')}</text>
+                      </g>
+                    ))}
+                  </svg>
+                )}
+                <div style={{ display:'flex', justifyContent:'space-between', marginTop:6, fontSize:10, fontFamily:'JetBrains Mono,monospace' }}>
+                  <span style={{ color:C.text2 }}>{hist.length} treino(s)</span>
+                  {progress != 0 && <span style={{ color:progress>0?C.teal:C.red, fontWeight:700 }}>{progress>0?'+':''}{progress}% desde o início</span>}
+                </div>
+                {/* Progression suggestion */}
+                {(() => {
+                  const lastSession = hist[hist.length-1]
+                  const allHitTarget = lastSession.sets.length >= 3 && lastSession.sets.every(s => s.reps >= 10)
+                  const stagnant = hist.length >= 3 && hist.slice(-3).every(h => h.maxWeight === lastW)
+                  if (allHitTarget && stagnant) return (
+                    <div style={{ background:`${C.teal}12`, borderRadius:8, padding:'6px 10px', marginTop:8, fontSize:11, color:C.teal }}>
+                      💡 Você bateu as reps 3x seguidas com {lastW}kg — hora de subir a carga!
+                    </div>
+                  )
+                  return null
+                })()}
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    )
+  }
+
   function renderTreinoResumo() {
     const todayActivities=currentDay.activities||[]
     const d=new Date(); const dow=d.getDay(); const diff=dow===0?-6:1-dow
@@ -1364,11 +1707,62 @@ export default function App() {
             })}
           </div>
         </div>
+
+        {/* Treinos recentes */}
+        {Object.keys(workoutLogs).length > 0 && (
+          <div style={{ background:C.surface, borderRadius:14, padding:14, marginTop:12, border:`0.5px solid ${C.border}` }}>
+            <div style={{ fontSize:13, fontWeight:700, marginBottom:12, color:C.text }}>🏋️ Treinos Recentes</div>
+            {Object.entries(workoutLogs).sort(([a],[b])=>b.localeCompare(a)).slice(0,8).map(([date, logs]) => {
+              const arr = Array.isArray(logs) ? logs : [logs]
+              return arr.map((log, li) => {
+                const totalSets = (log.exercises||[]).reduce((a,e)=>a+(e.sets?.length||0),0)
+                const totalVolume = (log.exercises||[]).reduce((a,e)=>a+(e.sets||[]).reduce((s,set)=>s+(set.weight||0)*(set.reps||0),0),0)
+                const durMin = log.endTime&&log.startTime ? Math.round((log.endTime-log.startTime)/60000) : null
+                const wKey = date+'_'+li
+                const isExp = expandedWorkout === wKey
+                return (
+                  <div key={date+li} style={{ background:C.bg, borderRadius:10, padding:'10px 12px', marginBottom:8, cursor:'pointer' }} onClick={()=>setExpandedWorkout(isExp?null:wKey)}>
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4 }}>
+                      <span style={{ fontSize:13, fontWeight:700, color:C.text }}>{log.planName||'Treino'}</span>
+                      <span style={{ fontSize:11, color:C.text2, fontFamily:'JetBrains Mono,monospace' }}>{formatDateFull(date)}</span>
+                    </div>
+                    <div style={{ display:'flex', gap:12, fontSize:10, color:C.text2, fontFamily:'JetBrains Mono,monospace', alignItems:'center' }}>
+                      <span>{(log.exercises||[]).length} exercícios</span>
+                      <span>{totalSets} séries</span>
+                      <span style={{ color:C.gold }}>{Math.round(totalVolume).toLocaleString()} kg vol</span>
+                      {durMin && <span>{durMin} min</span>}
+                      <span style={{ marginLeft:'auto', color:C.text3 }}>{isExp?'▲':'▼ ver'}</span>
+                    </div>
+                    {isExp && (
+                      <div style={{ marginTop:10, paddingTop:10, borderTop:`0.5px solid ${C.border}` }}>
+                        {(log.exercises||[]).map((ex, ei) => {
+                          const e = getExercise(ex.exerciseId)
+                          const vol = (ex.sets||[]).reduce((a,s)=>a+(s.weight||0)*(s.reps||0),0)
+                          return (
+                            <div key={ei} style={{ marginBottom:8 }}>
+                              <div style={{ display:'flex', justifyContent:'space-between', marginBottom:3 }}>
+                                <span style={{ fontSize:12, fontWeight:600, color:C.text }}>{e?.name||ex.exerciseId}</span>
+                                <span style={{ fontSize:10, color:C.gold, fontFamily:'JetBrains Mono,monospace' }}>{Math.round(vol)}kg</span>
+                              </div>
+                              <div style={{ display:'flex', flexWrap:'wrap', gap:5 }}>
+                                {(ex.sets||[]).map((set, si) => (
+                                  <span key={si} style={{ fontSize:11, background:C.surface2, borderRadius:6, padding:'3px 8px', color:C.text2, fontFamily:'JetBrains Mono,monospace' }}>{set.weight}×{set.reps}</span>
+                                ))}
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )
+              })
+            })}
+          </div>
+        )}
       </div>
     )
-  }
-
-  // ── PESO ────────────────────────────────────────────────────────────────────
+  }// ── PESO ────────────────────────────────────────────────────────────────────
   function renderSaude() {
     const hEntries = Object.entries(healthData).filter(([,d])=>d.steps||d.sleep||d.sleepScore).sort(([a],[b])=>b.localeCompare(a))
     return (
