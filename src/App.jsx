@@ -196,6 +196,14 @@ export default function App() {
 
   const C = darkMode ? DARK : LIGHT
 
+  const [winW, setWinW] = useState(typeof window !== 'undefined' ? window.innerWidth : 480)
+  useEffect(() => {
+    const onResize = () => setWinW(window.innerWidth)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+  const isWide = winW >= 900 // desktop breakpoint
+
   // Sync browser chrome (status bar tint + color-scheme) with the in-app theme,
   // so Chrome Android doesn't force its own auto dark mode over our colors.
   useEffect(() => {
@@ -365,7 +373,7 @@ export default function App() {
 
   return (
     <div style={{ background:C.bg, minHeight:'100vh', fontFamily:"'Syne',system-ui,sans-serif", color:C.text, transition:'background .3s' }}>
-      <div style={{ maxWidth:480, margin:'0 auto', minHeight:'100vh', display:'flex', flexDirection:'column' }}>
+      <div style={{ maxWidth:isWide?1200:480, margin:'0 auto', minHeight:'100vh', display:'flex', flexDirection:'column' }}>
 
         {/* ── HEADER ── */}
         <div style={{ background:darkMode?'linear-gradient(180deg,#0f2028 0%,#122028 100%)':C.surface, borderBottom:`1px solid ${C.border}`, padding:'16px 16px 0', flexShrink:0 }}>
@@ -453,7 +461,9 @@ export default function App() {
         </div>
 
         {/* ── CONTENT ── */}
-        <div style={{ flex:1, padding:'16px 16px 100px', overflowY:'auto', background:C.bg }}>
+        <div className={isWide&&!editingDay&&['peso','saude','analysis','treino'].includes(tab)?'evo-columns':''}
+          style={{ flex:1, padding:isWide?'24px 24px 100px':'16px 16px 100px', overflowY:'auto', background:C.bg,
+            ...(isWide&&!editingDay&&['peso','saude','analysis','treino'].includes(tab)?{ columnWidth:360, columnGap:20 }:{}) }}>
           {(tab==='today'||editingDay)&&renderDayEditor()}
           {tab==='treino'&&!editingDay&&renderTreino()}
           {tab==='peso'&&!editingDay&&renderPeso()}
