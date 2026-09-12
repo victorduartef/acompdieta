@@ -174,6 +174,7 @@ export default function App() {
   const [showHealthImport, setShowHealthImport] = useState(false)
   const [showHealthManual, setShowHealthManual] = useState(false)
   const [healthEditDate, setHealthEditDate] = useState(null)
+  const [pesoPeriod, setPesoPeriod] = useState('90d') // 30d | 90d | 180d | all
   const [insightPeriod, setInsightPeriod] = useState('last') // 'last' | '7d' | '30d'
   const [loaded, setLoaded] = useState(false)
   const [tab, setTab] = useState('today')
@@ -203,6 +204,11 @@ export default function App() {
     return () => window.removeEventListener('resize', onResize)
   }, [])
   const isWide = winW >= 900 // desktop breakpoint
+
+  // If on dashboard tab but screen becomes narrow, fall back to 'today'
+  useEffect(() => {
+    if (!isWide && tab === 'dashboard') setTab('today')
+  }, [isWide, tab])
 
   // Sync browser chrome (status bar tint + color-scheme) with the in-app theme,
   // so Chrome Android doesn't force its own auto dark mode over our colors.
@@ -450,7 +456,7 @@ export default function App() {
 
           {/* Nav tabs */}
           <div style={{ display:'flex', marginTop:14, overflowX:'auto' }}>
-            {[{id:'today',label:'Hoje',icon:'🏠'},{id:'treino',label:'Treino',icon:'💪'},{id:'peso',label:'Peso',icon:'⚖️'},{id:'saude',label:'Saúde',icon:'❤️'},{id:'history',label:'Histórico',icon:'📅'},{id:'analysis',label:'Análise',icon:'📊'},{id:'foods',label:'Alimentos',icon:'🥗'}].map(t=>(
+            {[...(isWide?[{id:'dashboard',label:'Painel',icon:'📋'}]:[]),{id:'today',label:'Hoje',icon:'🏠'},{id:'treino',label:'Treino',icon:'💪'},{id:'peso',label:'Peso',icon:'⚖️'},{id:'saude',label:'Saúde',icon:'❤️'},{id:'history',label:'Histórico',icon:'📅'},{id:'analysis',label:'Análise',icon:'📊'},{id:'foods',label:'Alimentos',icon:'🥗'}].map(t=>(
               <button key={t.id} onClick={()=>{ setTab(t.id); setEditingDay(null); setAddingFood(false); setSearch(''); setRegisterMode(false); setAvulso(false) }}
                 style={{ flex:1, minWidth:52, padding:'8px 0', border:'none', background:'transparent', color:tab===t.id?C.text:C.text2, fontWeight:tab===t.id?700:500, fontSize:10, cursor:'pointer', fontFamily:'inherit', borderBottom:`2px solid ${tab===t.id?C.gold:'transparent'}`, transition:'all .2s', display:'flex', flexDirection:'column', alignItems:'center', gap:2 }}>
                 <span style={{ fontSize:16 }}>{t.icon}</span>
@@ -461,9 +467,16 @@ export default function App() {
         </div>
 
         {/* ── CONTENT ── */}
-        <div className={isWide&&!editingDay&&['peso','saude','analysis','treino'].includes(tab)?'evo-columns':''}
-          style={{ flex:1, padding:isWide?'24px 24px 100px':'16px 16px 100px', overflowY:'auto', background:C.bg,
-            ...(isWide&&!editingDay&&['peso','saude','analysis','treino'].includes(tab)?{ columnWidth:360, columnGap:20 }:{}) }}>
+        <div style={{ flex:1, padding:isWide?'24px 24px 100px':'16px 16px 100px', overflowY:'auto', background:C.bg }}>
+          {/* Desktop dashboard: shows Treino+Peso+Saúde+Análise in a grid */}
+          {isWide && !editingDay && tab==='dashboard' ? (
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:20, alignItems:'start' }}>
+              <div style={{ minWidth:0 }}><div style={{ fontSize:12, fontWeight:700, color:C.gold, marginBottom:10, fontFamily:'JetBrains Mono,monospace', textTransform:'uppercase', letterSpacing:1 }}>💪 Treino</div>{renderTreino()}</div>
+              <div style={{ minWidth:0 }}><div style={{ fontSize:12, fontWeight:700, color:C.gold, marginBottom:10, fontFamily:'JetBrains Mono,monospace', textTransform:'uppercase', letterSpacing:1 }}>⚖️ Peso</div>{renderPeso()}</div>
+              <div style={{ minWidth:0 }}><div style={{ fontSize:12, fontWeight:700, color:C.gold, marginBottom:10, fontFamily:'JetBrains Mono,monospace', textTransform:'uppercase', letterSpacing:1 }}>❤️ Saúde</div>{renderSaude()}</div>
+              <div style={{ minWidth:0 }}><div style={{ fontSize:12, fontWeight:700, color:C.gold, marginBottom:10, fontFamily:'JetBrains Mono,monospace', textTransform:'uppercase', letterSpacing:1 }}>📊 Análise</div>{renderAnalysis()}</div>
+            </div>
+          ) : (<>
           {(tab==='today'||editingDay)&&renderDayEditor()}
           {tab==='treino'&&!editingDay&&renderTreino()}
           {tab==='peso'&&!editingDay&&renderPeso()}
@@ -471,6 +484,7 @@ export default function App() {
           {tab==='history'&&!editingDay&&renderHistory()}
           {tab==='analysis'&&!editingDay&&renderAnalysis()}
           {tab==='foods'&&!editingDay&&renderFoods()}
+          </>)}
         </div>
       </div>
 
@@ -910,11 +924,20 @@ export default function App() {
     const latestWeight = weightEntries[0]?.[1] || null
     const prevWeight = weightEntries[1]?.[1] || null
     const weightDiff = latestWeight && prevWeight ? (latestWeight - prevWeight).toFixed(1) : null
-    const chartEntries = [...weightEntries].reverse()
+
+    // Period filter cutoff
+    const periodCutoff = (() => {
+      if (pesoPeriod === 'all') return '0000-00-00'
+      const days = pesoPeriod === '30d' ? 30 : pesoPeriod === '90d' ? 90 : 180
+      const d = new Date(); d.setDate(d.getDate() - days)
+      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+    })()
+
+    const chartEntries = [...weightEntries].reverse().filter(([date]) => date >= periodCutoff)
     const wVals = chartEntries.map(([,v]) => v)
 
     // Body composition trends
-    const bodyEntries = Object.entries(bodyData).sort(([a],[b]) => a.localeCompare(b))
+    const bodyEntries = Object.entries(bodyData).filter(([date]) => date >= periodCutoff).sort(([a],[b]) => a.localeCompare(b))
     const latestBody = bodyEntries.length > 0 ? bodyEntries[bodyEntries.length-1][1] : null
     const prevBody = bodyEntries.length > 1 ? bodyEntries[bodyEntries.length-2][1] : null
 
@@ -1019,6 +1042,25 @@ export default function App() {
                 ))}
               </div>
             )}
+          </div>
+        )}
+
+        {/* Seletor de período para os gráficos */}
+        {(weightEntries.length >= 2 || bodyEntries.length >= 2) && (
+          <div style={{ display:'flex', gap:6, marginBottom:12 }}>
+            {[
+              { id:'30d', label:'30 dias' },
+              { id:'90d', label:'90 dias' },
+              { id:'180d', label:'6 meses' },
+              { id:'all', label:'Tudo' },
+            ].map(p => (
+              <button key={p.id} onClick={()=>setPesoPeriod(p.id)}
+                style={{ flex:1, padding:'8px 4px', border:'none', borderRadius:10, fontSize:11, fontWeight:pesoPeriod===p.id?700:400, cursor:'pointer', fontFamily:'inherit',
+                  background: pesoPeriod===p.id ? `linear-gradient(135deg,${C.gold},${C.gold2})` : C.surface2,
+                  color: pesoPeriod===p.id ? C.btnText : C.text2 }}>
+                {p.label}
+              </button>
+            ))}
           </div>
         )}
 
