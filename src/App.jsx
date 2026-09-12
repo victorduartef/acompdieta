@@ -59,6 +59,122 @@ const ACTIVITIES = [
   { id: 'outro', label: 'Outro', icon: '🏃', color: '#6b7280', type: 'other' },
 ]
 
+// ── GRUPOS MUSCULARES ──
+const MUSCLE_GROUPS = [
+  { id: 'peito',      label: 'Peitoral',      color: '#e05555', region: 'front' },
+  { id: 'costas',     label: 'Costas',        color: '#2ab8b8', region: 'back' },
+  { id: 'ombro',      label: 'Ombros',        color: '#e8a040', region: 'front' },
+  { id: 'biceps',     label: 'Bíceps',        color: '#8b7fd4', region: 'front' },
+  { id: 'triceps',    label: 'Tríceps',       color: '#c8873a', region: 'back' },
+  { id: 'antebraco',  label: 'Antebraço',     color: '#6b7280', region: 'front' },
+  { id: 'quadriceps', label: 'Quadríceps',    color: '#0ea5e9', region: 'front' },
+  { id: 'posterior',  label: 'Posterior',     color: '#e07060', region: 'back' },
+  { id: 'gluteo',     label: 'Glúteos',       color: '#ec4899', region: 'back' },
+  { id: 'panturrilha',label: 'Panturrilha',   color: '#10b981', region: 'back' },
+  { id: 'abdomen',    label: 'Abdômen',       color: '#f59e0b', region: 'front' },
+  { id: 'lombar',     label: 'Lombar',        color: '#84cc16', region: 'back' },
+  { id: 'trapezio',   label: 'Trapézio',      color: '#a78bfa', region: 'back' },
+]
+
+// ── EQUIPAMENTOS ──
+const EQUIPMENTS = [
+  { id: 'barra',     label: 'Barra',        icon: '🏋️' },
+  { id: 'halter',    label: 'Halteres',     icon: '💪' },
+  { id: 'maquina',   label: 'Máquina',      icon: '⚙️' },
+  { id: 'cabo',      label: 'Cabo/Polia',   icon: '🔗' },
+  { id: 'smith',     label: 'Smith',        icon: '🏗️' },
+  { id: 'corpo',     label: 'Peso Corporal',icon: '🤸' },
+  { id: 'kettlebell',label: 'Kettlebell',   icon: '🔔' },
+  { id: 'elastico',  label: 'Elástico',     icon: '➰' },
+]
+
+// ── BIBLIOTECA DE EXERCÍCIOS (pré-cadastrada) ──
+// primary = músculo principal, secondary = [músculos secundários]
+const EXERCISE_LIBRARY = [
+  // ── PEITO ──
+  { id:'ex_supino_reto',      name:'Supino Reto',              equipment:'barra',   primary:'peito',    secondary:['triceps','ombro'] },
+  { id:'ex_supino_inclinado', name:'Supino Inclinado',         equipment:'barra',   primary:'peito',    secondary:['triceps','ombro'] },
+  { id:'ex_supino_declinado', name:'Supino Declinado',         equipment:'barra',   primary:'peito',    secondary:['triceps'] },
+  { id:'ex_supino_halter',    name:'Supino com Halteres',      equipment:'halter',  primary:'peito',    secondary:['triceps','ombro'] },
+  { id:'ex_supino_incl_halt', name:'Supino Inclinado Halteres',equipment:'halter',  primary:'peito',    secondary:['triceps','ombro'] },
+  { id:'ex_crucifixo',        name:'Crucifixo',                equipment:'halter',  primary:'peito',    secondary:['ombro'] },
+  { id:'ex_crossover',        name:'Crossover',                equipment:'cabo',    primary:'peito',    secondary:['ombro'] },
+  { id:'ex_peck_deck',        name:'Peck Deck (Voador)',       equipment:'maquina', primary:'peito',    secondary:[] },
+  { id:'ex_flexao',           name:'Flexão de Braço',          equipment:'corpo',   primary:'peito',    secondary:['triceps','ombro'] },
+  { id:'ex_supino_maquina',   name:'Supino na Máquina',        equipment:'maquina', primary:'peito',    secondary:['triceps','ombro'] },
+
+  // ── COSTAS ──
+  { id:'ex_puxada_frente',    name:'Puxada Frontal',           equipment:'cabo',    primary:'costas',   secondary:['biceps'] },
+  { id:'ex_puxada_tras',      name:'Puxada Atrás',             equipment:'cabo',    primary:'costas',   secondary:['biceps'] },
+  { id:'ex_remada_curvada',   name:'Remada Curvada',           equipment:'barra',   primary:'costas',   secondary:['biceps','lombar'] },
+  { id:'ex_remada_halter',    name:'Remada Unilateral',        equipment:'halter',  primary:'costas',   secondary:['biceps'] },
+  { id:'ex_remada_baixa',     name:'Remada Baixa (Cabo)',      equipment:'cabo',    primary:'costas',   secondary:['biceps'] },
+  { id:'ex_remada_cavalinho', name:'Remada Cavalinho',         equipment:'maquina', primary:'costas',   secondary:['biceps'] },
+  { id:'ex_barra_fixa',       name:'Barra Fixa',               equipment:'corpo',   primary:'costas',   secondary:['biceps'] },
+  { id:'ex_pulldown',         name:'Pulldown',                 equipment:'cabo',    primary:'costas',   secondary:[] },
+  { id:'ex_levantamento_terra',name:'Levantamento Terra',      equipment:'barra',   primary:'costas',   secondary:['lombar','posterior','gluteo','trapezio'] },
+  { id:'ex_remada_maquina',   name:'Remada na Máquina',        equipment:'maquina', primary:'costas',   secondary:['biceps'] },
+
+  // ── OMBRO ──
+  { id:'ex_desenvolvimento',  name:'Desenvolvimento',          equipment:'barra',   primary:'ombro',    secondary:['triceps'] },
+  { id:'ex_desenv_halter',    name:'Desenvolvimento Halteres', equipment:'halter',  primary:'ombro',    secondary:['triceps'] },
+  { id:'ex_elevacao_lateral', name:'Elevação Lateral',         equipment:'halter',  primary:'ombro',    secondary:[] },
+  { id:'ex_elevacao_frontal', name:'Elevação Frontal',         equipment:'halter',  primary:'ombro',    secondary:[] },
+  { id:'ex_crucifixo_inv',    name:'Crucifixo Invertido',      equipment:'halter',  primary:'ombro',    secondary:['costas','trapezio'] },
+  { id:'ex_desenv_maquina',   name:'Desenvolvimento Máquina',  equipment:'maquina', primary:'ombro',    secondary:['triceps'] },
+  { id:'ex_arnold_press',     name:'Arnold Press',             equipment:'halter',  primary:'ombro',    secondary:['triceps'] },
+  { id:'ex_face_pull',        name:'Face Pull',                equipment:'cabo',    primary:'ombro',    secondary:['trapezio','costas'] },
+  { id:'ex_encolhimento',     name:'Encolhimento',             equipment:'halter',  primary:'trapezio', secondary:[] },
+
+  // ── BÍCEPS ──
+  { id:'ex_rosca_direta',     name:'Rosca Direta',             equipment:'barra',   primary:'biceps',   secondary:['antebraco'] },
+  { id:'ex_rosca_alternada',  name:'Rosca Alternada',          equipment:'halter',  primary:'biceps',   secondary:['antebraco'] },
+  { id:'ex_rosca_martelo',    name:'Rosca Martelo',            equipment:'halter',  primary:'biceps',   secondary:['antebraco'] },
+  { id:'ex_rosca_scott',      name:'Rosca Scott',              equipment:'barra',   primary:'biceps',   secondary:[] },
+  { id:'ex_rosca_concentrada',name:'Rosca Concentrada',        equipment:'halter',  primary:'biceps',   secondary:[] },
+  { id:'ex_rosca_cabo',       name:'Rosca no Cabo',            equipment:'cabo',    primary:'biceps',   secondary:[] },
+
+  // ── TRÍCEPS ──
+  { id:'ex_triceps_testa',    name:'Tríceps Testa',            equipment:'barra',   primary:'triceps',  secondary:[] },
+  { id:'ex_triceps_pulley',   name:'Tríceps Pulley',           equipment:'cabo',    primary:'triceps',  secondary:[] },
+  { id:'ex_triceps_corda',    name:'Tríceps Corda',            equipment:'cabo',    primary:'triceps',  secondary:[] },
+  { id:'ex_triceps_frances',  name:'Tríceps Francês',          equipment:'halter',  primary:'triceps',  secondary:[] },
+  { id:'ex_mergulho',         name:'Mergulho (Dips)',          equipment:'corpo',   primary:'triceps',  secondary:['peito','ombro'] },
+  { id:'ex_triceps_coice',    name:'Tríceps Coice',            equipment:'halter',  primary:'triceps',  secondary:[] },
+
+  // ── QUADRÍCEPS / PERNAS ──
+  { id:'ex_agachamento',      name:'Agachamento Livre',        equipment:'barra',   primary:'quadriceps',secondary:['gluteo','posterior','lombar'] },
+  { id:'ex_leg_press',        name:'Leg Press',                equipment:'maquina', primary:'quadriceps',secondary:['gluteo','posterior'] },
+  { id:'ex_cadeira_extensora',name:'Cadeira Extensora',        equipment:'maquina', primary:'quadriceps',secondary:[] },
+  { id:'ex_agach_smith',      name:'Agachamento Smith',        equipment:'smith',   primary:'quadriceps',secondary:['gluteo'] },
+  { id:'ex_afundo',           name:'Afundo',                   equipment:'halter',  primary:'quadriceps',secondary:['gluteo','posterior'] },
+  { id:'ex_hack',             name:'Hack Squat',               equipment:'maquina', primary:'quadriceps',secondary:['gluteo'] },
+  { id:'ex_agach_bulgaro',    name:'Agachamento Búlgaro',      equipment:'halter',  primary:'quadriceps',secondary:['gluteo'] },
+
+  // ── POSTERIOR / GLÚTEO ──
+  { id:'ex_stiff',            name:'Stiff',                    equipment:'barra',   primary:'posterior',secondary:['gluteo','lombar'] },
+  { id:'ex_mesa_flexora',     name:'Mesa Flexora',             equipment:'maquina', primary:'posterior',secondary:[] },
+  { id:'ex_cadeira_flexora',  name:'Cadeira Flexora',          equipment:'maquina', primary:'posterior',secondary:[] },
+  { id:'ex_elevacao_pelvica', name:'Elevação Pélvica',         equipment:'barra',   primary:'gluteo',   secondary:['posterior'] },
+  { id:'ex_cadeira_abdutora', name:'Cadeira Abdutora',         equipment:'maquina', primary:'gluteo',   secondary:[] },
+  { id:'ex_coice_cabo',       name:'Coice no Cabo',            equipment:'cabo',    primary:'gluteo',   secondary:['posterior'] },
+
+  // ── PANTURRILHA ──
+  { id:'ex_panturrilha_pe',   name:'Panturrilha em Pé',        equipment:'maquina', primary:'panturrilha',secondary:[] },
+  { id:'ex_panturrilha_sent', name:'Panturrilha Sentado',      equipment:'maquina', primary:'panturrilha',secondary:[] },
+  { id:'ex_panturrilha_leg',  name:'Panturrilha no Leg',       equipment:'maquina', primary:'panturrilha',secondary:[] },
+
+  // ── ABDÔMEN / CORE ──
+  { id:'ex_abdominal',        name:'Abdominal',                equipment:'corpo',   primary:'abdomen',  secondary:[] },
+  { id:'ex_prancha',          name:'Prancha',                  equipment:'corpo',   primary:'abdomen',  secondary:['lombar'] },
+  { id:'ex_elevacao_pernas',  name:'Elevação de Pernas',       equipment:'corpo',   primary:'abdomen',  secondary:[] },
+  { id:'ex_abdominal_cabo',   name:'Abdominal no Cabo',        equipment:'cabo',    primary:'abdomen',  secondary:[] },
+  { id:'ex_prancha_lateral',  name:'Prancha Lateral',          equipment:'corpo',   primary:'abdomen',  secondary:[] },
+
+  // ── LOMBAR ──
+  { id:'ex_hiperextensao',    name:'Hiperextensão Lombar',     equipment:'corpo',   primary:'lombar',   secondary:['gluteo','posterior'] },
+]
+
 const HEALTH_CUTOFF = '2026-08-19' // início do monitoramento de passos e sono (relógio usado a partir daqui)
 
 const DEFAULT_TARGETS = {
@@ -174,6 +290,16 @@ export default function App() {
   const [showHealthImport, setShowHealthImport] = useState(false)
   const [showHealthManual, setShowHealthManual] = useState(false)
   const [healthEditDate, setHealthEditDate] = useState(null)
+  const [workoutPlans, setWorkoutPlans] = useState([]) // fichas de treino do usuário
+  const [customExercises, setCustomExercises] = useState([]) // exercícios criados pelo usuário
+  const [workoutLogs, setWorkoutLogs] = useState({}) // registros de treino por data
+  const [treinoView, setTreinoView] = useState('resumo') // resumo | fichas | ficha | live | exercicios
+  const [activePlanId, setActivePlanId] = useState(null)
+  const [editingExercise, setEditingExercise] = useState(null)
+  const [liveSession, setLiveSession] = useState(null) // { planId, exercises:[{exId, sets:[{weight,reps,done}], skipped}], startTime }
+  const [restTimer, setRestTimer] = useState(null) // { total, remaining }
+  const [exSearch, setExSearch] = useState('')
+  const [exMuscleFilter, setExMuscleFilter] = useState('')
   const [pesoPeriod, setPesoPeriod] = useState('90d') // 30d | 90d | 180d | all
   const [insightPeriod, setInsightPeriod] = useState('last') // 'last' | '7d' | '30d'
   const [loaded, setLoaded] = useState(false)
@@ -205,6 +331,31 @@ export default function App() {
   }, [])
   const isWide = winW >= 900 // desktop breakpoint
 
+  // Rest timer countdown
+  useEffect(() => {
+    if (!restTimer || restTimer.remaining <= 0) return
+    const t = setTimeout(() => {
+      setRestTimer(prev => {
+        if (!prev) return null
+        const rem = prev.remaining - 1
+        if (rem <= 0) {
+          // Play a beep when done
+          try {
+            const ctx = new (window.AudioContext||window.webkitAudioContext)()
+            const osc = ctx.createOscillator(); const gain = ctx.createGain()
+            osc.connect(gain); gain.connect(ctx.destination)
+            osc.frequency.value = 880; gain.gain.value = 0.3
+            osc.start(); osc.stop(ctx.currentTime + 0.3)
+          } catch(e) {}
+          if (navigator.vibrate) navigator.vibrate([200,100,200])
+          return { ...prev, remaining: 0 }
+        }
+        return { ...prev, remaining: rem }
+      })
+    }, 1000)
+    return () => clearTimeout(t)
+  }, [restTimer])
+
 
   // Sync browser chrome (status bar tint + color-scheme) with the in-app theme,
   // so Chrome Android doesn't force its own auto dark mode over our colors.
@@ -221,6 +372,11 @@ export default function App() {
     return ov ? ov : f
   }).concat(customFoods.filter(c => !DEFAULT_FOODS.find(f => f.id === c.id)))
 
+  const allExercises = EXERCISE_LIBRARY.concat(customExercises)
+  const getExercise = (id) => allExercises.find(e => e.id === id)
+  const getMuscle = (id) => MUSCLE_GROUPS.find(m => m.id === id)
+  const getEquipment = (id) => EQUIPMENTS.find(e => e.id === id)
+
   useEffect(() => {
     handleRedirectResult()
     initAuth((fu) => {
@@ -235,6 +391,9 @@ export default function App() {
             if (data.weights) setWeights(data.weights)
             if (data.bodyData) setBodyData(data.bodyData)
             if (data.healthData) setHealthData(data.healthData)
+            if (data.workoutPlans) setWorkoutPlans(data.workoutPlans)
+            if (data.customExercises) setCustomExercises(data.customExercises)
+            if (data.workoutLogs) setWorkoutLogs(data.workoutLogs)
             if (data.targetsHistory) setTargetsHistory(data.targetsHistory)
             if (data.darkMode !== undefined) setDarkMode(data.darkMode)
           }
@@ -255,10 +414,13 @@ export default function App() {
       darkMode: ndm,
       bodyData: nbd !== undefined ? nbd : bodyData,
       healthData,
+      workoutPlans,
+      customExercises,
+      workoutLogs,
     }
     // fullReplace=true ensures deleted keys (e.g. removed weight entries) are actually removed
     saveToFirebase(uid, payload, true)
-  }, [uid, bodyData, healthData])
+  }, [uid, bodyData, healthData, workoutPlans, customExercises, workoutLogs])
 
   const updateDays = (nd) => { setDays(nd); persist(nd, targets, targetsHistory, customFoods, weights, darkMode) }
   const updateTargets = (nt, nth) => {
@@ -273,8 +435,15 @@ export default function App() {
   const updateHealthData = (hd) => {
     setHealthData(hd)
     if (!uid) return
-    saveToFirebase(uid, { days, targets, targetsHistory, customFoods, weights, darkMode, bodyData, healthData: hd }, true)
+    saveToFirebase(uid, { days, targets, targetsHistory, customFoods, weights, darkMode, bodyData, healthData: hd, workoutPlans, customExercises, workoutLogs }, true)
   }
+  const saveWorkoutState = (plans, exercises, logs) => {
+    if (!uid) return
+    saveToFirebase(uid, { days, targets, targetsHistory, customFoods, weights, darkMode, bodyData, healthData, workoutPlans:plans, customExercises:exercises, workoutLogs:logs }, true)
+  }
+  const updateWorkoutPlans = (plans) => { setWorkoutPlans(plans); saveWorkoutState(plans, customExercises, workoutLogs) }
+  const updateCustomExercises = (ex) => { setCustomExercises(ex); saveWorkoutState(workoutPlans, ex, workoutLogs) }
+  const updateWorkoutLogs = (logs) => { setWorkoutLogs(logs); saveWorkoutState(workoutPlans, customExercises, logs) }
   const toggleDarkMode = () => { const nm = !darkMode; setDarkMode(nm); persist(days, targets, targetsHistory, customFoods, weights, nm) }
 
   const activeKey = editingDay || todayKey()
@@ -489,6 +658,19 @@ export default function App() {
         setShowHealthManual(false)
         setHealthEditDate(null)
       }} onClose={()=>{ setShowHealthManual(false); setHealthEditDate(null) }}/>}
+      {editingExercise&&(editingExercise.mode==='create'||editingExercise.mode==='view')&&<ExerciseModal
+        C={C}
+        mode={editingExercise.mode}
+        exercise={editingExercise.exercise}
+        onSave={(ex)=>{
+          const existing = customExercises.find(c=>c.id===ex.id)
+          if (existing) updateCustomExercises(customExercises.map(c=>c.id===ex.id?ex:c))
+          else updateCustomExercises([...customExercises, ex])
+          setEditingExercise(null)
+        }}
+        onDelete={(id)=>{ updateCustomExercises(customExercises.filter(c=>c.id!==id)); setEditingExercise(null) }}
+        onClose={()=>setEditingExercise(null)}
+      />}
     </div>
   )
 
@@ -703,7 +885,434 @@ export default function App() {
   }
 
   // ── TREINO ──────────────────────────────────────────────────────────────────
+  // ── TREINO ROUTER ──
   function renderTreino() {
+    if (liveSession) return renderLive()
+    return (
+      <div>
+        {/* Sub-navegação */}
+        <div style={{ display:'flex', gap:6, marginBottom:16, overflowX:'auto' }}>
+          {[
+            { id:'resumo', label:'📊 Resumo' },
+            { id:'fichas', label:'📋 Fichas' },
+            { id:'exercicios', label:'🏋️ Exercícios' },
+          ].map(v => (
+            <button key={v.id} onClick={()=>{ setTreinoView(v.id); setActivePlanId(null); setEditingExercise(null) }}
+              style={{ flex:isWide?'0 0 auto':1, minWidth:100, padding:'9px 14px', border:'none', borderRadius:10, fontSize:12, fontWeight:treinoView===v.id?700:400, cursor:'pointer', fontFamily:'inherit',
+                background: treinoView===v.id ? `linear-gradient(135deg,${C.gold},${C.gold2})` : C.surface2,
+                color: treinoView===v.id ? C.btnText : C.text2 }}>
+              {v.label}
+            </button>
+          ))}
+        </div>
+
+        {treinoView==='resumo' && renderTreinoResumo()}
+        {treinoView==='fichas' && !activePlanId && renderFichas()}
+        {treinoView==='fichas' && activePlanId && renderFichaEditor()}
+        {treinoView==='exercicios' && renderExerciciosLib()}
+      </div>
+    )
+  }
+
+  // ── FICHAS (lista) ──
+  function renderFichas() {
+    return (
+      <div>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
+          <div style={{ fontSize:15, fontWeight:700, color:C.text }}>Minhas Fichas</div>
+          <button onClick={()=>{
+            const id = 'plan_' + Date.now()
+            const newPlan = { id, name:'Nova Ficha', exercises:[] }
+            updateWorkoutPlans([...workoutPlans, newPlan])
+            setActivePlanId(id)
+          }} style={{ background:`linear-gradient(135deg,${C.gold},${C.gold2})`, border:'none', borderRadius:10, padding:'8px 14px', color:C.btnText, fontSize:12, cursor:'pointer', fontFamily:'inherit', fontWeight:700 }}>+ Nova Ficha</button>
+        </div>
+
+        {workoutPlans.length === 0 && (
+          <div style={{ textAlign:'center', padding:'40px 20px', color:C.text3 }}>
+            <div style={{ fontSize:36, marginBottom:12 }}>📋</div>
+            <div style={{ fontSize:14, marginBottom:6, color:C.text2 }}>Nenhuma ficha ainda</div>
+            <div style={{ fontSize:12 }}>Crie sua primeira ficha de treino (A, B, C...)</div>
+          </div>
+        )}
+
+        <div style={isWide?{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:12 }:{}}>
+        {workoutPlans.map(plan => {
+          // Muscle summary for this plan
+          const muscles = {}
+          plan.exercises.forEach(ex => {
+            const e = getExercise(ex.exerciseId)
+            if (e) muscles[e.primary] = (muscles[e.primary]||0) + 1
+          })
+          const topMuscles = Object.entries(muscles).sort((a,b)=>b[1]-a[1]).slice(0,3)
+          return (
+            <div key={plan.id} style={{ background:C.surface, borderRadius:14, padding:14, marginBottom:isWide?0:10, border:`0.5px solid ${C.border}` }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:10 }}>
+                <div onClick={()=>setActivePlanId(plan.id)} style={{ flex:1, cursor:'pointer' }}>
+                  <div style={{ fontSize:15, fontWeight:700, color:C.text }}>{plan.name}</div>
+                  <div style={{ fontSize:11, color:C.text2, marginTop:2 }}>{plan.exercises.length} exercício(s)</div>
+                </div>
+              </div>
+              {topMuscles.length > 0 && (
+                <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginBottom:12 }}>
+                  {topMuscles.map(([mid, count]) => {
+                    const m = getMuscle(mid)
+                    return <span key={mid} style={{ fontSize:9, padding:'2px 8px', borderRadius:10, background:`${m?.color||C.gold}20`, color:m?.color||C.gold, fontWeight:600 }}>{m?.label||mid} ({count})</span>
+                  })}
+                </div>
+              )}
+              <div style={{ display:'flex', gap:6 }}>
+                <button onClick={()=>{
+                  if (plan.exercises.length === 0) { alert('Adicione exercícios à ficha primeiro!'); return }
+                  const session = {
+                    planId: plan.id,
+                    startTime: Date.now(),
+                    exercises: plan.exercises.map(ex => ({
+                      exerciseId: ex.exerciseId,
+                      targetSets: ex.targetSets || 3,
+                      targetReps: ex.targetReps || '10',
+                      restSeconds: ex.restSeconds || 90,
+                      sets: [],
+                      skipped: false,
+                    })),
+                    currentIdx: 0,
+                  }
+                  setLiveSession(session)
+                }} style={{ flex:1, background:`linear-gradient(135deg,${C.teal},#0ea5a5)`, border:'none', borderRadius:10, padding:'9px', color:'#fff', fontSize:12, cursor:'pointer', fontFamily:'inherit', fontWeight:700 }}>▶ Iniciar</button>
+                <button onClick={()=>setActivePlanId(plan.id)} style={{ background:C.surface2, border:`1px solid ${C.border}`, borderRadius:10, padding:'9px 12px', color:C.text2, fontSize:12, cursor:'pointer', fontFamily:'inherit' }}>✎</button>
+                <button onClick={()=>{ if(window.confirm(`Excluir ficha "${plan.name}"?`)) updateWorkoutPlans(workoutPlans.filter(p=>p.id!==plan.id)) }} style={{ background:`${C.red}18`, border:'none', borderRadius:10, padding:'9px 12px', color:C.red, fontSize:14, cursor:'pointer' }}>×</button>
+              </div>
+            </div>
+          )
+        })}
+        </div>
+      </div>
+    )
+  }
+
+  // ── EDITOR DE FICHA ──
+  function renderFichaEditor() {
+    const plan = workoutPlans.find(p => p.id === activePlanId)
+    if (!plan) { setActivePlanId(null); return null }
+    const updatePlan = (updated) => updateWorkoutPlans(workoutPlans.map(p => p.id === plan.id ? updated : p))
+
+    return (
+      <div>
+        <button onClick={()=>setActivePlanId(null)} style={{ background:'none', border:'none', color:C.gold, fontSize:13, cursor:'pointer', fontFamily:'inherit', marginBottom:12, padding:0 }}>‹ Voltar às fichas</button>
+
+        <input value={plan.name} onChange={e=>updatePlan({ ...plan, name:e.target.value })}
+          style={{ width:'100%', background:C.surface, border:`0.5px solid ${C.border}`, borderRadius:10, padding:'12px 14px', color:C.text, fontSize:16, fontWeight:700, fontFamily:'inherit', marginBottom:14 }}/>
+
+        {plan.exercises.map((ex, idx) => {
+          const e = getExercise(ex.exerciseId)
+          if (!e) return null
+          const eq = getEquipment(e.equipment)
+          const pm = getMuscle(e.primary)
+          return (
+            <div key={idx} style={{ background:C.surface, borderRadius:12, padding:12, marginBottom:8, border:`0.5px solid ${C.border}` }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:8 }}>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontSize:14, fontWeight:700, color:C.text }}>{e.name}</div>
+                  <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginTop:4 }}>
+                    <span style={{ fontSize:9, padding:'2px 7px', borderRadius:8, background:C.surface2, color:C.text2 }}>{eq?.icon} {eq?.label}</span>
+                    <span style={{ fontSize:9, padding:'2px 7px', borderRadius:8, background:`${pm?.color||C.gold}20`, color:pm?.color||C.gold, fontWeight:600 }}>{pm?.label}</span>
+                    {(e.secondary||[]).map(sid => { const sm=getMuscle(sid); return <span key={sid} style={{ fontSize:9, padding:'2px 7px', borderRadius:8, background:C.surface2, color:C.text3 }}>{sm?.label}</span> })}
+                  </div>
+                </div>
+                <div style={{ display:'flex', gap:4 }}>
+                  {idx>0 && <button onClick={()=>{ const arr=[...plan.exercises]; [arr[idx-1],arr[idx]]=[arr[idx],arr[idx-1]]; updatePlan({...plan,exercises:arr}) }} style={{ background:C.surface2, border:'none', borderRadius:6, width:26, height:26, color:C.text2, cursor:'pointer', fontSize:12 }}>↑</button>}
+                  {idx<plan.exercises.length-1 && <button onClick={()=>{ const arr=[...plan.exercises]; [arr[idx+1],arr[idx]]=[arr[idx],arr[idx+1]]; updatePlan({...plan,exercises:arr}) }} style={{ background:C.surface2, border:'none', borderRadius:6, width:26, height:26, color:C.text2, cursor:'pointer', fontSize:12 }}>↓</button>}
+                  <button onClick={()=>updatePlan({ ...plan, exercises:plan.exercises.filter((_,i)=>i!==idx) })} style={{ background:`${C.red}18`, border:'none', borderRadius:6, width:26, height:26, color:C.red, cursor:'pointer', fontSize:14 }}>×</button>
+                </div>
+              </div>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6 }}>
+                <div>
+                  <div style={{ fontSize:9, color:C.text2, marginBottom:3 }}>Séries</div>
+                  <input type="number" value={ex.targetSets||''} onChange={ev=>{ const arr=[...plan.exercises]; arr[idx]={...ex,targetSets:parseInt(ev.target.value)||0}; updatePlan({...plan,exercises:arr}) }} placeholder="4" style={{ width:'100%', background:C.surface2, border:`0.5px solid ${C.border}`, borderRadius:6, padding:'6px 8px', color:C.text, fontSize:13, fontFamily:'JetBrains Mono,monospace' }}/>
+                </div>
+                <div>
+                  <div style={{ fontSize:9, color:C.text2, marginBottom:3 }}>Reps</div>
+                  <input value={ex.targetReps||''} onChange={ev=>{ const arr=[...plan.exercises]; arr[idx]={...ex,targetReps:ev.target.value}; updatePlan({...plan,exercises:arr}) }} placeholder="8-12" style={{ width:'100%', background:C.surface2, border:`0.5px solid ${C.border}`, borderRadius:6, padding:'6px 8px', color:C.text, fontSize:13, fontFamily:'JetBrains Mono,monospace' }}/>
+                </div>
+                <div>
+                  <div style={{ fontSize:9, color:C.text2, marginBottom:3 }}>Descanso(s)</div>
+                  <input type="number" value={ex.restSeconds||''} onChange={ev=>{ const arr=[...plan.exercises]; arr[idx]={...ex,restSeconds:parseInt(ev.target.value)||0}; updatePlan({...plan,exercises:arr}) }} placeholder="90" style={{ width:'100%', background:C.surface2, border:`0.5px solid ${C.border}`, borderRadius:6, padding:'6px 8px', color:C.text, fontSize:13, fontFamily:'JetBrains Mono,monospace' }}/>
+                </div>
+              </div>
+            </div>
+          )
+        })}
+
+        <button onClick={()=>{ setEditingExercise({ mode:'addToPlan', planId:plan.id }); setTreinoView('exercicios') }}
+          style={{ width:'100%', padding:12, border:`1.5px dashed ${C.gold}60`, borderRadius:12, background:`${C.gold}08`, color:C.gold, fontSize:13, cursor:'pointer', fontFamily:'inherit', fontWeight:600, marginTop:4 }}>
+          + Adicionar exercício
+        </button>
+      </div>
+    )
+  }
+
+  // ── BIBLIOTECA DE EXERCÍCIOS ──
+  function renderExerciciosLib() {
+    const addingToPlan = editingExercise?.mode === 'addToPlan'
+    const grouped = {}
+    allExercises.forEach(e => {
+      if (exSearch && !e.name.toLowerCase().includes(exSearch.toLowerCase())) return
+      if (exMuscleFilter && e.primary !== exMuscleFilter) return
+      if (!grouped[e.primary]) grouped[e.primary] = []
+      grouped[e.primary].push(e)
+    })
+
+    return (
+      <div>
+        {addingToPlan && (
+          <div style={{ background:`${C.gold}12`, borderRadius:10, padding:'10px 12px', marginBottom:12, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+            <span style={{ fontSize:12, color:C.gold, fontWeight:600 }}>Selecione um exercício para adicionar à ficha</span>
+            <button onClick={()=>{ setEditingExercise(null); setActivePlanId(editingExercise.planId); setTreinoView('fichas') }} style={{ background:'none', border:'none', color:C.text2, fontSize:16, cursor:'pointer' }}>×</button>
+          </div>
+        )}
+
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
+          <div style={{ fontSize:15, fontWeight:700, color:C.text }}>Exercícios</div>
+          <button onClick={()=>setEditingExercise({ mode:'create' })} style={{ background:`linear-gradient(135deg,${C.gold},${C.gold2})`, border:'none', borderRadius:10, padding:'8px 12px', color:C.btnText, fontSize:12, cursor:'pointer', fontFamily:'inherit', fontWeight:700 }}>+ Criar</button>
+        </div>
+
+        <input value={exSearch} onChange={e=>setExSearch(e.target.value)} placeholder="🔍 Buscar exercício..."
+          style={{ width:'100%', background:C.surface2, border:`0.5px solid ${C.border}`, borderRadius:10, padding:'10px 12px', color:C.text, fontSize:13, fontFamily:'inherit', marginBottom:10 }}/>
+
+        <div style={{ display:'flex', gap:5, marginBottom:14, overflowX:'auto', paddingBottom:4 }}>
+          <button onClick={()=>setExMuscleFilter('')} style={{ flexShrink:0, padding:'5px 12px', borderRadius:20, fontSize:10, fontWeight:700, cursor:'pointer', fontFamily:'inherit', border:`1.5px solid ${!exMuscleFilter?C.gold:C.border}`, background:!exMuscleFilter?`${C.gold}20`:'transparent', color:!exMuscleFilter?C.gold:C.text2 }}>Todos</button>
+          {MUSCLE_GROUPS.map(m => (
+            <button key={m.id} onClick={()=>setExMuscleFilter(m.id)} style={{ flexShrink:0, padding:'5px 12px', borderRadius:20, fontSize:10, fontWeight:700, cursor:'pointer', fontFamily:'inherit', border:`1.5px solid ${exMuscleFilter===m.id?m.color:C.border}`, background:exMuscleFilter===m.id?`${m.color}20`:'transparent', color:exMuscleFilter===m.id?m.color:C.text2 }}>{m.label}</button>
+          ))}
+        </div>
+
+        <div style={isWide?{ columnWidth:340, columnGap:16 }:{}}>
+        {MUSCLE_GROUPS.filter(m=>grouped[m.id]).map(m => (
+          <div key={m.id} style={{ marginBottom:16, breakInside:'avoid' }}>
+            <div style={{ fontSize:11, fontWeight:700, color:m.color, marginBottom:8, fontFamily:'JetBrains Mono,monospace', textTransform:'uppercase', letterSpacing:1 }}>{m.label}</div>
+            {grouped[m.id].map(e => {
+              const eq = getEquipment(e.equipment)
+              const isCustom = customExercises.find(c=>c.id===e.id)
+              return (
+                <div key={e.id} onClick={()=>{
+                  if (addingToPlan) {
+                    const plan = workoutPlans.find(p=>p.id===editingExercise.planId)
+                    if (plan) {
+                      const updated = { ...plan, exercises:[...plan.exercises, { exerciseId:e.id, targetSets:3, targetReps:'10', restSeconds:90 }] }
+                      updateWorkoutPlans(workoutPlans.map(p=>p.id===plan.id?updated:p))
+                      setEditingExercise(null); setActivePlanId(plan.id); setTreinoView('fichas')
+                    }
+                  } else {
+                    setEditingExercise({ mode:'view', exercise:e })
+                  }
+                }} style={{ background:C.surface, borderRadius:10, padding:'10px 12px', marginBottom:6, border:`0.5px solid ${C.border}`, cursor:'pointer', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:13, fontWeight:600, color:C.text }}>{e.name} {isCustom&&<span style={{ fontSize:9, color:C.gold }}>•custom</span>}</div>
+                    <div style={{ fontSize:10, color:C.text2, marginTop:2 }}>
+                      {eq?.icon} {eq?.label}
+                      {(e.secondary||[]).length>0 && <span style={{ color:C.text3 }}> · +{e.secondary.map(s=>getMuscle(s)?.label).filter(Boolean).join(', ')}</span>}
+                    </div>
+                  </div>
+                  {addingToPlan && <span style={{ fontSize:18, color:C.gold, marginLeft:8 }}>+</span>}
+                </div>
+              )
+            })}
+          </div>
+        ))}
+        </div>
+      </div>
+    )
+  }
+
+  // ── MODO LIVE ──
+  function renderLive() {
+    const s = liveSession
+    const plan = workoutPlans.find(p => p.id === s.planId)
+    const exList = s.exercises
+    const curEx = exList[s.currentIdx]
+    const e = curEx ? getExercise(curEx.exerciseId) : null
+    const totalEx = exList.length
+    const doneEx = exList.filter(x => x.sets.length > 0 || x.skipped).length
+
+    const finishLive = () => {
+      // Save to workoutLogs
+      const dateKey = todayKey()
+      const log = {
+        planId: s.planId,
+        planName: plan?.name || 'Treino',
+        startTime: s.startTime,
+        endTime: Date.now(),
+        exercises: exList.filter(x => x.sets.length > 0).map(x => ({ exerciseId: x.exerciseId, sets: x.sets })),
+      }
+      const existing = workoutLogs[dateKey] ? (Array.isArray(workoutLogs[dateKey]) ? workoutLogs[dateKey] : [workoutLogs[dateKey]]) : []
+      updateWorkoutLogs({ ...workoutLogs, [dateKey]: [...existing, log] })
+      // Also register musculação activity for the day
+      const day = getDay(dateKey)
+      if (!(day.activities||[]).includes('musculacao')) {
+        updateDays({ ...days, [dateKey]: { ...day, activities:[...(day.activities||[]), 'musculacao'] } })
+      }
+      setLiveSession(null)
+      setRestTimer(null)
+      setTreinoView('resumo')
+    }
+
+    // Suggest alternative exercises (same primary muscle, different)
+    const alternatives = e ? allExercises.filter(x => x.primary === e.primary && x.id !== e.id).slice(0, 4) : []
+
+    if (!curEx || !e) {
+      return (
+        <div style={{ textAlign:'center', padding:'40px 20px' }}>
+          <div style={{ fontSize:40, marginBottom:16 }}>🎉</div>
+          <div style={{ fontSize:18, fontWeight:800, color:C.text, marginBottom:8 }}>Treino concluído!</div>
+          <button onClick={finishLive} style={{ background:`linear-gradient(135deg,${C.gold},${C.gold2})`, border:'none', borderRadius:12, padding:'12px 24px', color:C.btnText, fontSize:14, cursor:'pointer', fontFamily:'inherit', fontWeight:700, marginTop:12 }}>Finalizar e Salvar</button>
+        </div>
+      )
+    }
+
+    const pm = getMuscle(e.primary)
+    const eq = getEquipment(e.equipment)
+    const targetSets = curEx.targetSets || 3
+    const completedSets = curEx.sets.length
+
+    // Last log for this exercise (for reference weight)
+    const lastWeights = (() => {
+      const allLogs = Object.entries(workoutLogs).sort(([a],[b])=>b.localeCompare(a))
+      for (const [, logs] of allLogs) {
+        const arr = Array.isArray(logs) ? logs : [logs]
+        for (const log of arr) {
+          const found = (log.exercises||[]).find(x => x.exerciseId === e.id)
+          if (found && found.sets.length) return found.sets
+        }
+      }
+      return null
+    })()
+
+    return (
+      <div>
+        {/* Header live */}
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
+          <div>
+            <div style={{ fontSize:11, color:C.teal, fontWeight:700, fontFamily:'JetBrains Mono,monospace' }}>🔴 AO VIVO · {plan?.name}</div>
+            <div style={{ fontSize:11, color:C.text2, marginTop:2 }}>Exercício {s.currentIdx+1} de {totalEx} · {doneEx} feitos</div>
+          </div>
+          <button onClick={()=>{ if(window.confirm('Encerrar treino? O progresso será salvo.')) finishLive() }} style={{ background:`${C.red}18`, border:'none', borderRadius:10, padding:'8px 14px', color:C.red, fontSize:12, cursor:'pointer', fontFamily:'inherit', fontWeight:700 }}>Encerrar</button>
+        </div>
+
+        {/* Progress bar */}
+        <div style={{ background:C.surface2, borderRadius:4, height:6, marginBottom:16, overflow:'hidden' }}>
+          <div style={{ height:'100%', width:`${(doneEx/totalEx)*100}%`, background:C.teal, borderRadius:4, transition:'width .3s' }}/>
+        </div>
+
+        {/* Rest timer (if active) */}
+        {restTimer && restTimer.remaining > 0 && (
+          <div style={{ background:`linear-gradient(135deg,${C.teal},#0ea5a5)`, borderRadius:14, padding:'16px', marginBottom:16, textAlign:'center' }}>
+            <div style={{ fontSize:11, color:'#fff', opacity:0.9, marginBottom:4, fontWeight:600 }}>⏱️ DESCANSO</div>
+            <div style={{ fontSize:40, fontWeight:800, color:'#fff', fontFamily:'JetBrains Mono,monospace' }}>{Math.floor(restTimer.remaining/60)}:{String(restTimer.remaining%60).padStart(2,'0')}</div>
+            <div style={{ display:'flex', gap:8, justifyContent:'center', marginTop:10 }}>
+              <button onClick={()=>setRestTimer(prev=>({...prev, remaining:prev.remaining+30}))} style={{ background:'rgba(255,255,255,0.2)', border:'none', borderRadius:8, padding:'6px 12px', color:'#fff', fontSize:12, cursor:'pointer', fontWeight:700 }}>+30s</button>
+              <button onClick={()=>setRestTimer(null)} style={{ background:'rgba(255,255,255,0.2)', border:'none', borderRadius:8, padding:'6px 12px', color:'#fff', fontSize:12, cursor:'pointer', fontWeight:700 }}>Pular descanso</button>
+            </div>
+          </div>
+        )}
+        {restTimer && restTimer.remaining === 0 && (
+          <div onClick={()=>setRestTimer(null)} style={{ background:`${C.gold}20`, border:`1px solid ${C.gold}`, borderRadius:14, padding:'14px', marginBottom:16, textAlign:'center', cursor:'pointer' }}>
+            <div style={{ fontSize:16, fontWeight:800, color:C.gold }}>✓ Descanso concluído! Toque para continuar</div>
+          </div>
+        )}
+
+        {/* Current exercise card */}
+        <div style={{ background:C.surface, borderRadius:16, padding:16, marginBottom:14, border:`1px solid ${pm?.color||C.gold}40` }}>
+          <div style={{ fontSize:20, fontWeight:800, color:C.text, marginBottom:6 }}>{e.name}</div>
+          <div style={{ display:'flex', flexWrap:'wrap', gap:5, marginBottom:14 }}>
+            <span style={{ fontSize:10, padding:'3px 9px', borderRadius:10, background:C.surface2, color:C.text2 }}>{eq?.icon} {eq?.label}</span>
+            <span style={{ fontSize:10, padding:'3px 9px', borderRadius:10, background:`${pm?.color||C.gold}20`, color:pm?.color||C.gold, fontWeight:600 }}>{pm?.label}</span>
+            {(e.secondary||[]).map(sid => { const sm=getMuscle(sid); return <span key={sid} style={{ fontSize:10, padding:'3px 9px', borderRadius:10, background:C.surface2, color:C.text3 }}>{sm?.label}</span> })}
+          </div>
+
+          <div style={{ fontSize:11, color:C.text2, marginBottom:10, fontFamily:'JetBrains Mono,monospace' }}>
+            Meta: {targetSets} séries × {curEx.targetReps} reps · descanso {curEx.restSeconds}s
+            {lastWeights && <span style={{ color:C.gold }}> · último: {lastWeights.map(w=>`${w.weight}kg`).join(', ')}</span>}
+          </div>
+
+          {/* Sets */}
+          {curEx.sets.map((set, si) => (
+            <div key={si} style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8, background:C.bg, borderRadius:10, padding:'8px 12px' }}>
+              <span style={{ fontSize:12, fontWeight:700, color:C.teal, fontFamily:'JetBrains Mono,monospace', width:24 }}>#{si+1}</span>
+              <span style={{ flex:1, fontSize:14, fontWeight:700, color:C.text, fontFamily:'JetBrains Mono,monospace' }}>{set.weight}kg × {set.reps} reps</span>
+              <span style={{ fontSize:16, color:C.teal }}>✓</span>
+            </div>
+          ))}
+
+          {/* Add set form */}
+          {completedSets < targetSets + 2 && (
+            <div style={{ display:'flex', gap:8, alignItems:'flex-end', marginTop:10 }}>
+              <div style={{ flex:1 }}>
+                <div style={{ fontSize:9, color:C.text2, marginBottom:3 }}>Peso (kg)</div>
+                <input type="number" step="0.5" id="live-weight" placeholder={lastWeights?.[completedSets]?.weight || '0'} style={{ width:'100%', background:C.surface2, border:`0.5px solid ${C.border}`, borderRadius:8, padding:'10px', color:C.text, fontSize:16, fontFamily:'JetBrains Mono,monospace', textAlign:'center' }}/>
+              </div>
+              <div style={{ flex:1 }}>
+                <div style={{ fontSize:9, color:C.text2, marginBottom:3 }}>Reps</div>
+                <input type="number" id="live-reps" placeholder={curEx.targetReps} style={{ width:'100%', background:C.surface2, border:`0.5px solid ${C.border}`, borderRadius:8, padding:'10px', color:C.text, fontSize:16, fontFamily:'JetBrains Mono,monospace', textAlign:'center' }}/>
+              </div>
+              <button onClick={()=>{
+                const w = parseFloat(document.getElementById('live-weight').value) || parseFloat(document.getElementById('live-weight').placeholder) || 0
+                const r = parseInt(document.getElementById('live-reps').value) || parseInt(curEx.targetReps) || 0
+                const arr = [...exList]
+                arr[s.currentIdx] = { ...curEx, sets:[...curEx.sets, { weight:w, reps:r, done:true }] }
+                setLiveSession({ ...s, exercises:arr })
+                document.getElementById('live-weight').value = ''
+                document.getElementById('live-reps').value = ''
+                // Start rest timer
+                setRestTimer({ total: curEx.restSeconds, remaining: curEx.restSeconds })
+              }} style={{ background:`linear-gradient(135deg,${C.teal},#0ea5a5)`, border:'none', borderRadius:8, padding:'10px 16px', color:'#fff', fontSize:14, cursor:'pointer', fontFamily:'inherit', fontWeight:700, whiteSpace:'nowrap' }}>✓ Série</button>
+            </div>
+          )}
+        </div>
+
+        {/* Actions */}
+        <div style={{ display:'flex', gap:8, marginBottom:12 }}>
+          <button onClick={()=>{
+            // Next exercise
+            if (s.currentIdx < totalEx - 1) setLiveSession({ ...s, currentIdx: s.currentIdx + 1 })
+            else setLiveSession({ ...s, currentIdx: totalEx }) // triggers finish screen
+            setRestTimer(null)
+          }} style={{ flex:2, background:`linear-gradient(135deg,${C.gold},${C.gold2})`, border:'none', borderRadius:12, padding:'12px', color:C.btnText, fontSize:14, cursor:'pointer', fontFamily:'inherit', fontWeight:700 }}>
+            {s.currentIdx < totalEx-1 ? 'Próximo exercício ›' : 'Concluir treino ✓'}
+          </button>
+          <button onClick={()=>{
+            const arr = [...exList]
+            arr[s.currentIdx] = { ...curEx, skipped:true }
+            if (s.currentIdx < totalEx - 1) setLiveSession({ ...s, exercises:arr, currentIdx: s.currentIdx + 1 })
+            else setLiveSession({ ...s, exercises:arr, currentIdx: totalEx })
+            setRestTimer(null)
+          }} style={{ flex:1, background:C.surface2, border:`1px solid ${C.border}`, borderRadius:12, padding:'12px', color:C.text2, fontSize:13, cursor:'pointer', fontFamily:'inherit' }}>Pular ⏭</button>
+        </div>
+
+        {/* Alternatives (equipment busy) */}
+        {alternatives.length > 0 && (
+          <div style={{ background:C.surface, borderRadius:12, padding:12, border:`0.5px solid ${C.border}` }}>
+            <div style={{ fontSize:11, color:C.text2, marginBottom:8, fontWeight:600 }}>🔄 Aparelho ocupado? Substitua por:</div>
+            <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+              {alternatives.map(alt => {
+                const aeq = getEquipment(alt.equipment)
+                return (
+                  <button key={alt.id} onClick={()=>{
+                    const arr = [...exList]
+                    arr[s.currentIdx] = { ...curEx, exerciseId: alt.id }
+                    setLiveSession({ ...s, exercises:arr })
+                  }} style={{ padding:'6px 10px', borderRadius:10, border:`1px solid ${C.border}`, background:C.surface2, color:C.text, fontSize:11, cursor:'pointer', fontFamily:'inherit' }}>
+                    {alt.name} <span style={{ color:C.text3 }}>{aeq?.icon}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  function renderTreinoResumo() {
     const todayActivities=currentDay.activities||[]
     const d=new Date(); const dow=d.getDay(); const diff=dow===0?-6:1-dow
     const monday=new Date(d); monday.setDate(d.getDate()+diff)
@@ -2341,6 +2950,92 @@ function RelaxFitModal({ C, onSave, onClose }) {
         )}
 
         <button onClick={onClose} style={{ width:'100%', padding:10, background:'transparent', border:'none', color:C.text2, fontSize:12, cursor:'pointer', fontFamily:'inherit', marginTop:8 }}>Cancelar</button>
+      </div>
+    </div>
+  )
+}
+
+function ExerciseModal({ C, mode, exercise, onSave, onDelete, onClose }) {
+  const [name, setName] = useState(exercise?.name || '')
+  const [equipment, setEquipment] = useState(exercise?.equipment || 'barra')
+  const [primary, setPrimary] = useState(exercise?.primary || 'peito')
+  const [secondary, setSecondary] = useState(exercise?.secondary || [])
+  const isView = mode === 'view'
+  const isCustom = exercise?.id?.startsWith('cust_')
+
+  const toggleSec = (mid) => {
+    setSecondary(prev => prev.includes(mid) ? prev.filter(m=>m!==mid) : [...prev, mid])
+  }
+
+  return (
+    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.8)', display:'flex', alignItems:'flex-end', justifyContent:'center', zIndex:200 }} onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div style={{ background:C.surface, borderRadius:'16px 16px 0 0', padding:20, width:'100%', maxWidth:480, border:`0.5px solid ${C.border}`, maxHeight:'88vh', overflowY:'auto' }}>
+        <div style={{ fontSize:15, fontWeight:700, marginBottom:16, color:C.text }}>
+          {isView ? '🏋️ ' + exercise.name : (exercise ? 'Editar Exercício' : 'Novo Exercício')}
+        </div>
+
+        {!isView && (
+          <div style={{ marginBottom:12 }}>
+            <div style={{ fontSize:10, color:C.text2, marginBottom:4, fontFamily:'JetBrains Mono,monospace' }}>NOME</div>
+            <input value={name} onChange={e=>setName(e.target.value)} placeholder="Ex: Supino Reto"
+              style={{ width:'100%', background:C.surface2, border:`0.5px solid ${C.border}`, borderRadius:8, padding:'10px 12px', color:C.text, fontSize:14, fontFamily:'inherit' }}/>
+          </div>
+        )}
+
+        <div style={{ marginBottom:12 }}>
+          <div style={{ fontSize:10, color:C.text2, marginBottom:6, fontFamily:'JetBrains Mono,monospace' }}>EQUIPAMENTO</div>
+          <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+            {EQUIPMENTS.map(eq => (
+              <button key={eq.id} disabled={isView} onClick={()=>setEquipment(eq.id)}
+                style={{ padding:'7px 12px', borderRadius:10, fontSize:11, cursor:isView?'default':'pointer', fontFamily:'inherit', fontWeight:equipment===eq.id?700:400, border:`1.5px solid ${equipment===eq.id?C.gold:C.border}`, background:equipment===eq.id?`${C.gold}20`:'transparent', color:equipment===eq.id?C.gold:C.text2 }}>
+                {eq.icon} {eq.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ marginBottom:12 }}>
+          <div style={{ fontSize:10, color:C.text2, marginBottom:6, fontFamily:'JetBrains Mono,monospace' }}>MÚSCULO PRINCIPAL</div>
+          <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+            {MUSCLE_GROUPS.map(m => (
+              <button key={m.id} disabled={isView} onClick={()=>setPrimary(m.id)}
+                style={{ padding:'7px 12px', borderRadius:10, fontSize:11, cursor:isView?'default':'pointer', fontFamily:'inherit', fontWeight:primary===m.id?700:400, border:`1.5px solid ${primary===m.id?m.color:C.border}`, background:primary===m.id?`${m.color}20`:'transparent', color:primary===m.id?m.color:C.text2 }}>
+                {m.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ marginBottom:16 }}>
+          <div style={{ fontSize:10, color:C.text2, marginBottom:6, fontFamily:'JetBrains Mono,monospace' }}>MÚSCULOS SECUNDÁRIOS</div>
+          <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+            {MUSCLE_GROUPS.filter(m=>m.id!==primary).map(m => {
+              const on = secondary.includes(m.id)
+              return (
+                <button key={m.id} disabled={isView} onClick={()=>toggleSec(m.id)}
+                  style={{ padding:'7px 12px', borderRadius:10, fontSize:11, cursor:isView?'default':'pointer', fontFamily:'inherit', fontWeight:on?700:400, border:`1.5px solid ${on?m.color:C.border}`, background:on?`${m.color}20`:'transparent', color:on?m.color:C.text2 }}>
+                  {m.label}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        {isView ? (
+          <div style={{ display:'flex', gap:10 }}>
+            {isCustom && <button onClick={()=>{ if(window.confirm('Excluir este exercício?')) onDelete(exercise.id) }} style={{ flex:1, padding:12, background:`${C.red}18`, border:'none', borderRadius:12, color:C.red, cursor:'pointer', fontFamily:'inherit', fontWeight:700 }}>Excluir</button>}
+            <button onClick={onClose} style={{ flex:2, padding:12, background:C.surface2, border:'none', borderRadius:12, color:C.text2, cursor:'pointer', fontFamily:'inherit' }}>Fechar</button>
+          </div>
+        ) : (
+          <div style={{ display:'flex', gap:10 }}>
+            <button onClick={onClose} style={{ flex:1, padding:12, background:C.surface2, border:'none', borderRadius:12, color:C.text2, cursor:'pointer', fontFamily:'inherit' }}>Cancelar</button>
+            <button onClick={()=>{
+              if (!name.trim()) return
+              const id = exercise?.id || 'cust_' + Date.now()
+              onSave({ id, name:name.trim(), equipment, primary, secondary })
+            }} style={{ flex:2, padding:12, background:`linear-gradient(135deg,${C.gold},${C.gold2})`, border:'none', borderRadius:12, color:C.btnText, cursor:'pointer', fontFamily:'inherit', fontWeight:700, fontSize:14 }}>Salvar</button>
+          </div>
+        )}
       </div>
     </div>
   )
