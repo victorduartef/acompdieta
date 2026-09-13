@@ -4,6 +4,10 @@ import { formatSleep } from '../lib/dashboardMetrics.js'
 import WeightChart from '../components/dashboard/WeightChart.jsx'
 import CaloriesChart from '../components/dashboard/CaloriesChart.jsx'
 import ComparisonTable from '../components/dashboard/ComparisonTable.jsx'
+import BodyCompositionChart from '../components/dashboard/BodyCompositionChart.jsx'
+import WeeklyHealth from '../components/dashboard/WeeklyHealth.jsx'
+import TrainingSummary from '../components/dashboard/TrainingSummary.jsx'
+import InsightsPanel from '../components/dashboard/InsightsPanel.jsx'
 
 // ── Visão Geral (Fase 2) — 12 KPIs conectados + seletor semanal ──
 // Props: T, isWide, userName, weekLabel, isCurrentWeekFlag, isPartial, onPrevWeek, onNextWeek, onResetWeek,
@@ -12,7 +16,8 @@ export default function VisaoGeral({
   T, isWide, userName, weekLabel, isCurrentWeekFlag, isPartial,
   onPrevWeek, onNextWeek, onResetWeek, kpis, prevKpis, targets,
   weightSeries, prevWeightMean, caloriesData, comparison,
-  onOpenPeso, onOpenDay,
+  bodyWeeks, healthSteps, healthSleep, healthScore, healthPrevMeans, training, prevVolume, insights,
+  onOpenPeso, onOpenDay, onOpenSaude, onOpenTreino, onInsightAction,
 }) {
   const greeting = (() => {
     const h = new Date().getHours()
@@ -138,13 +143,13 @@ export default function VisaoGeral({
         <ComparisonTable comp={comparison} T={T} />
       </div>
 
-      {/* Blocos inferiores — placeholders (próxima fase) */}
+      {/* Blocos inferiores (Fase 4) */}
       <div style={{ display: 'grid', gridTemplateColumns: isWide ? '1.15fr 1.15fr 1fr' : '1fr', gap: 14, alignItems: 'start' }}>
-        <DashboardCard title="Composição corporal" icon="🧬" accentColor={T.accentBlue} T={T} empty emptyText={placeholder} style={{ minHeight: 140 }} />
-        <DashboardCard title="Saúde semanal" icon="❤️" accentColor={T.accentPurple} T={T} empty emptyText={placeholder} style={{ minHeight: 140 }} />
+        <BodyCompositionChart weeks={bodyWeeks} T={T} onClick={onOpenPeso} />
+        <WeeklyHealth steps={healthSteps} sleep={healthSleep} score={healthScore} prevMeans={healthPrevMeans} targets={targets} T={T} onClick={onOpenSaude} />
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <DashboardCard title="Treino" icon="💪" accentColor={T.accentTeal} T={T} empty emptyText={placeholder} style={{ minHeight: 62 }} />
-          <DashboardCard title="Insights" icon="💡" accentColor={T.accentAmber} T={T} empty emptyText={placeholder} style={{ minHeight: 62 }} />
+          <TrainingSummary training={training} prevVolume={prevVolume} T={T} onClick={onOpenTreino} />
+          <InsightsPanel insights={insights} weekLabel={weekLabel} T={T} onAction={onInsightAction} />
         </div>
       </div>
     </div>

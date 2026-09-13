@@ -263,3 +263,218 @@ export function weekComparison(monday, deps) {
     semTreino: calcGroup(groups.semTreino),
   }
 }
+
+// ── Composição corporal: 4 semanas terminando na semana selecionada ──
+// deps: { bodyData, weights }. Retorna [{ label, weight, bodyFat, leanMass, fatMass, n }]
+export function fourWeekBodyComposition(monday, deps) {
+  const { bodyData, weights } = deps
+  const avg = (arr) => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null
+  const r1 = (v) => v == null ? null : Math.round(v * 10) / 10
+
+  const weeks = []
+  for (let i = 3; i >= 0; i--) {
+    const d = new Date(monday + 'T12:00:00')
+    d.setDate(d.getDate() - i * 7)
+    const wkMon = ymd(d)
+    const dates = weekDates(wkMon)
+    const collect = (obj, keyFn) => {
+      const vals = []
+      dates.forEach(dt => { const e = obj?.[dt]; if (e == null) return; const v = keyFn(e); if (v != null && !isNaN(v)) vals.push(v) })
+      return vals
+    }
+    const weightVals = collect(weights, (v) => (typeof v === 'number' ? v : parseFloat(v)))
+    const fatVals = collect(bodyData, (b) => b.bodyFat)
+    const leanVals = collect(bodyData, (b) => b.leanMass)
+    const fatMassVals = collect(bodyData, (b) => b.fatMass)
+    weeks.push({
+      monday: wkMon,
+      label: weekShortLabel(wkMon),
+      weight: r1(avg(weightVals)),
+      bodyFat: r1(avg(fatVals)),
+      leanMass: r1(avg(leanVals)),
+      fatMass: r1(avg(fatMassVals)),
+      nBody: Math.max(fatVals.length, leanVals.length, fatMassVals.length),
+      nWeight: weightVals.length,
+    })
+  }
+  return weeks
+}
+
+function weekShortLabel(monday) {
+  const dates = weekDates(monday)
+  const s = new Date(dates[0] + 'T12:00:00'), e = new Date(dates[6] + 'T12:00:00')
+  const dd = (d) => String(d.getDate()).padStart(2, '0')
+  const mm = (d) => String(d.getMonth() + 1).padStart(2, '0')
+  return `${dd(s)}/${mm(s)}`
+}
+
+// ── Saúde semanal: séries diárias + média + meta ──
+// deps: { healthData, targets }. metric: 'steps'|'sleep'|'sleepScore'
+export function weekHealthMetric(monday, healthData, metric) {
+  const dates = weekDates(monday)
+  const todayStr = ymd(new Date())
+  const days = dates.map(d => {
+    const h = healthData?.[d]
+    const v = h && h[metric] != null && !isNaN(h[metric]) ? h[metric] : null
+    return { date: d, value: v, future: d > todayStr }
+  })
+  const vals = days.filter(x => x.value != null).map(x => x.value)
+  const mean = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null
+  return { days, mean, n: vals.length }
+}
+
+// ── Treino: resumo da semana (sessões, volume, atividades por dia) ──
+// deps: { days, workoutLogs, ACTIVITIES }
+export function weekTraining(monday, deps) {
+  const { days, workoutLogs, ACTIVITIES } = deps
+  const dates = weekDates(monday)
+  const isType = (a, type) => ACTIVITIES.find(x => x.id === a)?.type === type
+
+  // Sessões por dia (via activities, mesma regra dos KPIs — evita duplicar com logs)
+  let strengthDays = 0, cardioDays = 0
+  const dayChips = dates.map(d => {
+    const acts = days?.[d]?.activities || []
+    const hasStrength = acts.some(a => isType(a, 'strength'))
+    const hasCardio = acts.some(a => isType(a, 'cardio'))
+    const hasOther = acts.some(a => isType(a, 'other'))
+    if (hasStrength) strengthDays++
+    if (hasCardio) cardioDays++
+    const labels = acts.map(a => ACTIVITIES.find(x => x.id === a)?.label).filter(Boolean)
+    return { date: d, active: acts.length > 0, hasStrength, hasCardio, hasOther, labels }
+  })
+
+  // Volume de musculação: soma dos logs concluídos (séries válidas) da semana
+  let volume = 0
+  dates.forEach(d => {
+    const logs = workoutLogs?.[d]
+    if (!logs) return
+    const arr = Array.isArray(logs) ? logs : [logs]
+    arr.forEach(log => {
+      (log.exercises || []).forEach(ex => {
+        (ex.sets || []).forEach(s => { volume += (s.weight || 0) * (s.reps || 0) })
+      })
+    })
+  })
+
+  return { strengthDays, cardioDays, volume: Math.round(volume), dayChips }
+}
+
+// Volume total de musculação de uma semana (para comparar semanas)
+export function weekVolume(monday, workoutLogs) {
+  const dates = weekDates(monday)
+  let volume = 0
+  dates.forEach(d => {
+    const logs = workoutLogs?.[d]
+    if (!logs) return
+    const arr = Array.isArray(logs) ? logs : [logs]
+    arr.forEach(log => { (log.exercises || []).forEach(ex => { (ex.sets || []).forEach(s => { volume += (s.weight || 0) * (s.reps || 0) }) }) })
+  })
+  return Math.round(volume)
+}
+
+// ── Insights determinísticos ──
+// deps: { comparison, kpis, prevKpis, targets, bodyWeeks, healthSteps, healthSleep, healthScore }
+export function buildInsights(deps) {
+  const { comparison, kpis, targets, bodyWeeks, healthSleep, healthSteps } = deps
+  const insights = []
+
+  // 1. Calorias fim de semana vs úteis (atenção) — amostra suficiente
+  const fdsCal = comparison?.fds?.cal, uteisCal = comparison?.uteis?.cal
+  if (fdsCal?.v != null && uteisCal?.v != null && fdsCal.n >= 1 && uteisCal.n >= 2) {
+    const diff = fdsCal.v - uteisCal.v
+    if (Math.abs(diff) >= 150) {
+      insights.push({
+        cat: 'atencao', icon: '🎉', color: 'amber',
+        title: `Fim de semana: ${diff > 0 ? '+' : ''}${diff} kcal`,
+        text: `Sua média no fim de semana ficou ${Math.abs(diff)} kcal ${diff > 0 ? 'acima' : 'abaixo'} dos dias úteis.`,
+        action: 'analysis',
+      })
+    }
+  }
+
+  // 2. Dias com vs sem treino (associação)
+  const comCal = comparison?.comTreino?.cal, semCal = comparison?.semTreino?.cal
+  if (comCal?.v != null && semCal?.v != null && comCal.n >= 2 && semCal.n >= 2) {
+    const diff = comCal.v - semCal.v
+    if (Math.abs(diff) >= 100) {
+      insights.push({
+        cat: 'associacao', icon: '🔗', color: 'blue',
+        title: `Treino e alimentação`,
+        text: `Nos dias com atividade, sua média calórica foi ${Math.abs(diff)} kcal ${diff < 0 ? 'menor' : 'maior'}.`,
+        action: 'analysis',
+      })
+    }
+  }
+
+  // 3. Sono abaixo da meta (atenção) — >=3 registros e >=30min abaixo
+  const sleepMean = kpis?.sleep?.value, sleepN = kpis?.sleep?.n
+  const sleepGoal = targets?.sleepGoal // pode não existir
+  if (sleepMean != null && sleepN >= 3 && sleepGoal) {
+    const diffMin = Math.round((sleepMean - sleepGoal) * 60)
+    if (diffMin <= -30) {
+      const h = Math.floor(sleepMean), m = Math.round((sleepMean - h) * 60)
+      insights.push({
+        cat: 'atencao', icon: '😴', color: 'red',
+        title: 'Sono abaixo da meta',
+        text: `Sua média foi ${h}h${String(m).padStart(2, '0')}min, ${Math.abs(diffMin)} minutos abaixo da meta.`,
+        action: 'saude',
+      })
+    }
+  }
+
+  // 4. Passos abaixo da meta (atenção)
+  const stepsMean = kpis?.steps?.value, stepsN = kpis?.steps?.n
+  const stepsGoal = targets?.stepsGoal
+  if (stepsMean != null && stepsN >= 3 && stepsGoal && stepsMean < stepsGoal * 0.7) {
+    insights.push({
+      cat: 'atencao', icon: '👟', color: 'red',
+      title: 'Passos abaixo da meta',
+      text: `Média de ${stepsMean.toLocaleString('pt-BR')} passos/dia, abaixo da meta de ${stepsGoal.toLocaleString('pt-BR')}.`,
+      action: 'saude',
+    })
+  }
+
+  // 5. Proteína atingiu a meta (progresso)
+  const protMean = kpis?.prot?.value, protN = kpis?.prot?.n
+  const protGoal = targets?.protMin || targets?.prot
+  if (protMean != null && protN >= 3 && protGoal && protMean >= protGoal) {
+    insights.push({
+      cat: 'progresso', icon: '🥩', color: 'teal',
+      title: 'Proteína na meta',
+      text: `Média de ${protMean}g/dia, atingindo a meta de ${protGoal}g.`,
+      action: 'analysis',
+    })
+  }
+
+  // 6. Tendência de gordura (progresso/associação) — >=2 semanas com medição
+  if (bodyWeeks && bodyWeeks.length >= 2) {
+    const withFat = bodyWeeks.filter(w => w.bodyFat != null)
+    if (withFat.length >= 2) {
+      const first = withFat[0].bodyFat, last = withFat[withFat.length - 1].bodyFat
+      const diff = Math.round((last - first) * 10) / 10
+      if (Math.abs(diff) >= 0.3) {
+        insights.push({
+          cat: 'associacao', icon: '🔥', color: 'blue',
+          title: `Gordura ${diff < 0 ? 'em queda' : 'em alta'}`,
+          text: `${diff > 0 ? '+' : ''}${diff} pp de gordura nas últimas ${withFat.length} semanas com medição.`,
+          action: 'peso',
+        })
+      }
+    }
+  }
+
+  // 7. Qualidade dos dados: poucos registros de sono
+  if (sleepN != null && sleepN > 0 && sleepN <= 2) {
+    insights.push({
+      cat: 'qualidade', icon: '📉', color: 'amber',
+      title: 'Poucos registros de sono',
+      text: `Há somente ${sleepN} ${sleepN === 1 ? 'noite registrada' : 'noites registradas'} nesta semana; a média ainda pode variar bastante.`,
+      action: 'saude',
+    })
+  }
+
+  // Ordenação: atenção > progresso > associação > qualidade
+  const order = { atencao: 0, progresso: 1, associacao: 2, qualidade: 3 }
+  insights.sort((a, b) => order[a.cat] - order[b.cat])
+  return insights.slice(0, 4)
+}

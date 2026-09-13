@@ -4,7 +4,7 @@ import { db, initAuth, loginWithGoogle, handleRedirectResult, logout } from './f
 import { getEvoTheme } from './theme/evoshapeTheme.js'
 import Sidebar from './components/Sidebar.jsx'
 import VisaoGeral from './screens/VisaoGeral.jsx'
-import { mondayForOffset, weekRangeLabel, elapsedDaysInWeek, isCurrentWeek as isCurWeek, computeWeekKPIs, computeWeekKPIsPartial, weekWeightSeries, weekCaloriesSeries, weekComparison } from './lib/dashboardMetrics.js'
+import { mondayForOffset, weekRangeLabel, elapsedDaysInWeek, isCurrentWeek as isCurWeek, computeWeekKPIs, computeWeekKPIsPartial, weekWeightSeries, weekCaloriesSeries, weekComparison, fourWeekBodyComposition, weekHealthMetric, weekTraining, weekVolume, buildInsights } from './lib/dashboardMetrics.js'
 
 // ── FOODS DATABASE ──────────────────────────────────────────────────────────
 const DEFAULT_FOODS = [
@@ -571,6 +571,22 @@ export default function App() {
   const overviewCaloriesData = weekCaloriesSeries(overviewMonday, { days, calcMacros, allFoods, targets, targetsHistory, getTargetsForDate })
   const overviewComparison = weekComparison(overviewMonday, { days, weights, bodyData, healthData, calcMacros, allFoods })
 
+  // Blocos inferiores (Fase 4)
+  const overviewBodyWeeks = fourWeekBodyComposition(overviewMonday, { bodyData, weights })
+  const ovSteps = weekHealthMetric(overviewMonday, healthData, 'steps')
+  const ovSleep = weekHealthMetric(overviewMonday, healthData, 'sleep')
+  const ovScore = weekHealthMetric(overviewMonday, healthData, 'sleepScore')
+  const ovPrevSteps = weekHealthMetric(overviewPrevMonday, healthData, 'steps')
+  const ovPrevSleep = weekHealthMetric(overviewPrevMonday, healthData, 'sleep')
+  const ovPrevScore = weekHealthMetric(overviewPrevMonday, healthData, 'sleepScore')
+  const overviewHealthPrevMeans = { steps: ovPrevSteps.mean, sleep: ovPrevSleep.mean, score: ovPrevScore.mean }
+  const overviewTraining = weekTraining(overviewMonday, { days, workoutLogs, ACTIVITIES })
+  const overviewPrevVolume = weekVolume(overviewPrevMonday, workoutLogs)
+  const overviewInsights = buildInsights({
+    comparison: overviewComparison, kpis: overviewKpis, targets, bodyWeeks: overviewBodyWeeks,
+    healthSleep: ovSleep, healthSteps: ovSteps,
+  })
+
   // No desktop, a Visão Geral e a navegação usam a nova sidebar + tema do redesign.
   const useNewShell = isWide
 
@@ -611,6 +627,17 @@ export default function App() {
             comparison={overviewComparison}
             onOpenPeso={()=>{ setTab('peso'); setEditingDay(null) }}
             onOpenDay={(dateKey)=>{ setEditingDay(dateKey); setTab('today'); setActiveMeal('cafe_manha') }}
+            bodyWeeks={overviewBodyWeeks}
+            healthSteps={ovSteps}
+            healthSleep={ovSleep}
+            healthScore={ovScore}
+            healthPrevMeans={overviewHealthPrevMeans}
+            training={overviewTraining}
+            prevVolume={overviewPrevVolume}
+            insights={overviewInsights}
+            onOpenSaude={()=>{ setTab('saude'); setEditingDay(null) }}
+            onOpenTreino={()=>{ setTab('treino'); setEditingDay(null) }}
+            onInsightAction={(a)=>{ setTab(a); setEditingDay(null) }}
           />
         </div>
       )}
@@ -726,6 +753,17 @@ export default function App() {
               comparison={overviewComparison}
               onOpenPeso={()=>{ setTab('peso'); setEditingDay(null) }}
               onOpenDay={(dateKey)=>{ setEditingDay(dateKey); setTab('today'); setActiveMeal('cafe_manha') }}
+              bodyWeeks={overviewBodyWeeks}
+              healthSteps={ovSteps}
+              healthSleep={ovSleep}
+              healthScore={ovScore}
+              healthPrevMeans={overviewHealthPrevMeans}
+              training={overviewTraining}
+              prevVolume={overviewPrevVolume}
+              insights={overviewInsights}
+              onOpenSaude={()=>{ setTab('saude'); setEditingDay(null) }}
+              onOpenTreino={()=>{ setTab('treino'); setEditingDay(null) }}
+              onInsightAction={(a)=>{ setTab(a); setEditingDay(null) }}
             />
           )}
           {(tab==='today'||editingDay)&&renderDayEditor()}
