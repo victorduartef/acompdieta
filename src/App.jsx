@@ -1,6 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
 import { doc, getDoc, setDoc } from 'firebase/firestore'
 import { db, initAuth, loginWithGoogle, handleRedirectResult, logout } from './firebase.js'
+import { getEvoTheme } from './theme/evoshapeTheme.js'
+import Sidebar from './components/Sidebar.jsx'
+import VisaoGeral from './screens/VisaoGeral.jsx'
 
 // ── FOODS DATABASE ──────────────────────────────────────────────────────────
 const DEFAULT_FOODS = [
@@ -325,6 +328,8 @@ export default function App() {
   const [darkMode, setDarkMode] = useState(true)
 
   const C = darkMode ? DARK : LIGHT
+  const T = getEvoTheme(darkMode) // tokens do redesign (Visão Geral / sidebar)
+  const [overviewWeekOffset, setOverviewWeekOffset] = useState(0) // 0 = semana atual
 
   const [winW, setWinW] = useState(typeof window !== 'undefined' ? window.innerWidth : 480)
   useEffect(() => {
@@ -545,9 +550,42 @@ export default function App() {
   const calDiff = activeTargets.cal - dayMacros.cal
   const hasData = dayMacros.cal > 0
 
+  // No desktop, a Visão Geral e a navegação usam a nova sidebar + tema do redesign.
+  const useNewShell = isWide
+
   return (
-    <div style={{ background:C.bg, minHeight:'100vh', fontFamily:"'Syne',system-ui,sans-serif", color:C.text, transition:'background .3s' }}>
-      <div style={{ maxWidth:isWide?(tab==='analysis'?1600:1200):480, margin:'0 auto', minHeight:'100vh', display:'flex', flexDirection:'column', transition:'max-width .2s' }}>
+    <div style={{ background: useNewShell ? T.appBackground : C.bg, minHeight:'100vh', fontFamily:"'Syne',system-ui,sans-serif", color: useNewShell ? T.textPrimary : C.text, transition:'background .3s', display: useNewShell ? 'flex' : 'block' }}>
+      {useNewShell && (
+        <Sidebar
+          tab={tab}
+          setTab={(t)=>{ setTab(t); setEditingDay(null); setAddingFood(false); setSearch(''); setRegisterMode(false); setAvulso(false) }}
+          onOpenMetas={()=>setShowTargets(true)}
+          darkMode={darkMode}
+          toggleDarkMode={toggleDarkMode}
+          user={user}
+          onLogout={logout}
+          T={T}
+        />
+      )}
+
+      {/* Nova Visão Geral (desktop) */}
+      {useNewShell && tab==='overview' && (
+        <div style={{ flex:1, minWidth:0, height:'100vh', overflowY:'auto', padding:'24px 28px' }}>
+          <VisaoGeral
+            T={T}
+            isWide={isWide}
+            userName={user?.displayName?.split(' ')[0]}
+            weekLabel={overviewWeekOffset===0 ? 'Semana atual' : `${overviewWeekOffset} sem. atrás`}
+            isCurrentWeek={overviewWeekOffset===0}
+            onPrevWeek={()=>setOverviewWeekOffset(o=>o+1)}
+            onNextWeek={()=>setOverviewWeekOffset(o=>Math.max(0,o-1))}
+          />
+        </div>
+      )}
+
+      {/* Conteúdo existente (todas as outras telas) */}
+      <div style={{ display: (useNewShell && tab==='overview') ? 'none' : 'flex', flex: useNewShell ? 1 : undefined, minWidth:0, flexDirection:'column', ...(useNewShell ? { height:'100vh', overflowY:'auto' } : {}) }}>
+      <div style={{ maxWidth:isWide?(tab==='analysis'?1600:1200):480, margin:'0 auto', width:'100%', minHeight:'100vh', display:'flex', flexDirection:'column', transition:'max-width .2s' }}>
 
         {/* ── HEADER ── */}
         <div style={{ background:darkMode?'linear-gradient(180deg,#0f2028 0%,#122028 100%)':C.surface, borderBottom:`1px solid ${C.border}`, padding:'16px 16px 0', flexShrink:0 }}>
@@ -624,7 +662,7 @@ export default function App() {
 
           {/* Nav tabs */}
           <div style={{ display:'flex', marginTop:14, overflowX:'auto' }}>
-            {[{id:'today',label:'Hoje',icon:'🏠'},{id:'treino',label:'Treino',icon:'💪'},{id:'peso',label:'Peso',icon:'⚖️'},{id:'saude',label:'Saúde',icon:'❤️'},{id:'history',label:'Histórico',icon:'📅'},{id:'analysis',label:'Análise',icon:'📊'},{id:'foods',label:'Alimentos',icon:'🥗'}].map(t=>(
+            {[{id:'overview',label:'Visão Geral',icon:'📊'},{id:'today',label:'Hoje',icon:'🏠'},{id:'treino',label:'Treino',icon:'💪'},{id:'peso',label:'Peso',icon:'⚖️'},{id:'saude',label:'Saúde',icon:'❤️'},{id:'history',label:'Histórico',icon:'📅'},{id:'analysis',label:'Análise',icon:'📊'},{id:'foods',label:'Alimentos',icon:'🥗'}].map(t=>(
               <button key={t.id} onClick={()=>{ setTab(t.id); setEditingDay(null); setAddingFood(false); setSearch(''); setRegisterMode(false); setAvulso(false) }}
                 style={{ flex:1, minWidth:52, padding:'8px 0', border:'none', background:'transparent', color:tab===t.id?C.text:C.text2, fontWeight:tab===t.id?700:500, fontSize:10, cursor:'pointer', fontFamily:'inherit', borderBottom:`2px solid ${tab===t.id?C.gold:'transparent'}`, transition:'all .2s', display:'flex', flexDirection:'column', alignItems:'center', gap:2 }}>
                 <span style={{ fontSize:16 }}>{t.icon}</span>
@@ -636,6 +674,17 @@ export default function App() {
 
         {/* ── CONTENT ── */}
         <div style={{ flex:1, padding:isWide?'24px 24px 100px':'16px 16px 100px', overflowY:'auto', background:C.bg }}>
+          {tab==='overview'&&!editingDay&&(
+            <VisaoGeral
+              T={T}
+              isWide={isWide}
+              userName={user?.displayName?.split(' ')[0]}
+              weekLabel={overviewWeekOffset===0 ? 'Semana atual' : `${overviewWeekOffset} sem. atrás`}
+              isCurrentWeek={overviewWeekOffset===0}
+              onPrevWeek={()=>setOverviewWeekOffset(o=>o+1)}
+              onNextWeek={()=>setOverviewWeekOffset(o=>Math.max(0,o-1))}
+            />
+          )}
           {(tab==='today'||editingDay)&&renderDayEditor()}
           {tab==='treino'&&!editingDay&&renderTreino()}
           {tab==='peso'&&!editingDay&&renderPeso()}
@@ -644,6 +693,7 @@ export default function App() {
           {tab==='analysis'&&!editingDay&&renderAnalysis()}
           {tab==='foods'&&!editingDay&&renderFoods()}
         </div>
+      </div>
       </div>
 
       {showTargets&&<TargetsModal targets={targets} targetsHistory={targetsHistory} C={C} onSave={(nt,nth)=>{ updateTargets(nt,nth); setShowTargets(false) }} onClose={()=>setShowTargets(false)}/>}

@@ -30,3 +30,8 @@ input, select, textarea {
   page-break-inside: avoid;
   margin-bottom: 12px;
 }
+
+/* Analysis 3-column layout: independent scroll per column on desktop */
+.evo-col::-webkit-scrollbar { width: 6px; }
+.evo-col::-webkit-scrollbar-thumb { background: rgba(128,128,128,0.3); border-radius: 3px; }
+.evo-col::-webkit-scrollbar-track { background: transparent; }

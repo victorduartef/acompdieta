@@ -4,7 +4,7 @@
   "description": "Dieta · Treino · Peso · Evolução",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0d1a1f",
+  "background_color": "#080D12",
   "theme_color": "#c8873a",
   "orientation": "portrait",
   "icons": [
