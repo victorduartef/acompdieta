@@ -4,6 +4,7 @@ import { db, initAuth, loginWithGoogle, handleRedirectResult, logout } from './f
 import { getEvoTheme } from './theme/evoshapeTheme.js'
 import Sidebar from './components/Sidebar.jsx'
 import VisaoGeral from './screens/VisaoGeral.jsx'
+import { mondayForOffset, weekRangeLabel, elapsedDaysInWeek, isCurrentWeek as isCurWeek, computeWeekKPIs, computeWeekKPIsPartial } from './lib/dashboardMetrics.js'
 
 // ── FOODS DATABASE ──────────────────────────────────────────────────────────
 const DEFAULT_FOODS = [
@@ -550,6 +551,20 @@ export default function App() {
   const calDiff = activeTargets.cal - dayMacros.cal
   const hasData = dayMacros.cal > 0
 
+  // ── Visão Geral: cálculo dos KPIs da semana selecionada (memória, sem Firestore) ──
+  const overviewMonday = mondayForOffset(overviewWeekOffset)
+  const overviewIsCurrent = isCurWeek(overviewMonday)
+  const overviewElapsed = elapsedDaysInWeek(overviewMonday)
+  const overviewPartial = overviewIsCurrent && overviewElapsed < 7
+  const kpiDeps = { days, weights, bodyData, healthData, calcMacros, allFoods, ACTIVITIES }
+  const overviewKpis = computeWeekKPIs(overviewMonday, kpiDeps)
+  const overviewPrevMonday = mondayForOffset(overviewWeekOffset + 1)
+  // Semana parcial compara com os mesmos dias decorridos da semana anterior; completa compara semana cheia
+  const overviewPrevKpis = overviewPartial
+    ? computeWeekKPIsPartial(overviewPrevMonday, overviewElapsed, kpiDeps)
+    : computeWeekKPIs(overviewPrevMonday, kpiDeps)
+  const overviewWeekLabel = weekRangeLabel(overviewMonday)
+
   // No desktop, a Visão Geral e a navegação usam a nova sidebar + tema do redesign.
   const useNewShell = isWide
 
@@ -575,10 +590,15 @@ export default function App() {
             T={T}
             isWide={isWide}
             userName={user?.displayName?.split(' ')[0]}
-            weekLabel={overviewWeekOffset===0 ? 'Semana atual' : `${overviewWeekOffset} sem. atrás`}
-            isCurrentWeek={overviewWeekOffset===0}
+            weekLabel={overviewWeekLabel}
+            isCurrentWeekFlag={overviewIsCurrent}
+            isPartial={overviewPartial}
             onPrevWeek={()=>setOverviewWeekOffset(o=>o+1)}
             onNextWeek={()=>setOverviewWeekOffset(o=>Math.max(0,o-1))}
+            onResetWeek={()=>setOverviewWeekOffset(0)}
+            kpis={overviewKpis}
+            prevKpis={overviewPrevKpis}
+            targets={targets}
           />
         </div>
       )}
@@ -679,10 +699,15 @@ export default function App() {
               T={T}
               isWide={isWide}
               userName={user?.displayName?.split(' ')[0]}
-              weekLabel={overviewWeekOffset===0 ? 'Semana atual' : `${overviewWeekOffset} sem. atrás`}
-              isCurrentWeek={overviewWeekOffset===0}
+              weekLabel={overviewWeekLabel}
+              isCurrentWeekFlag={overviewIsCurrent}
+              isPartial={overviewPartial}
               onPrevWeek={()=>setOverviewWeekOffset(o=>o+1)}
               onNextWeek={()=>setOverviewWeekOffset(o=>Math.max(0,o-1))}
+              onResetWeek={()=>setOverviewWeekOffset(0)}
+              kpis={overviewKpis}
+              prevKpis={overviewPrevKpis}
+              targets={targets}
             />
           )}
           {(tab==='today'||editingDay)&&renderDayEditor()}
