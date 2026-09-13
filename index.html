@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
-    <meta name="theme-color" content="#0d1a1f" />
+    <meta name="theme-color" content="#080D12" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -15,8 +15,15 @@
     <title>EvoShape</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+    <style>
+      /* O app controla as cores via seu próprio toggle de tema.
+         Declarar os dois esquemas evita que o Chrome Android force
+         um "auto dark mode" que reinverteria as cores por conta própria. */
+      :root { color-scheme: light dark; }
+      html, body { forced-color-adjust: none; -webkit-forced-color-adjust: none; }
+    </style>
   </head>
-  <body style="background:#0d1a1f">
+  <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
