@@ -4,7 +4,7 @@ import { db, initAuth, loginWithGoogle, handleRedirectResult, logout } from './f
 import { getEvoTheme } from './theme/evoshapeTheme.js'
 import Sidebar from './components/Sidebar.jsx'
 import VisaoGeral from './screens/VisaoGeral.jsx'
-import { mondayForOffset, weekRangeLabel, elapsedDaysInWeek, isCurrentWeek as isCurWeek, computeWeekKPIs, computeWeekKPIsPartial } from './lib/dashboardMetrics.js'
+import { mondayForOffset, weekRangeLabel, elapsedDaysInWeek, isCurrentWeek as isCurWeek, computeWeekKPIs, computeWeekKPIsPartial, weekWeightSeries, weekCaloriesSeries, weekComparison } from './lib/dashboardMetrics.js'
 
 // ── FOODS DATABASE ──────────────────────────────────────────────────────────
 const DEFAULT_FOODS = [
@@ -565,6 +565,12 @@ export default function App() {
     : computeWeekKPIs(overviewPrevMonday, kpiDeps)
   const overviewWeekLabel = weekRangeLabel(overviewMonday)
 
+  // Painéis: séries por dia da semana selecionada
+  const overviewWeightSeries = weekWeightSeries(overviewMonday, weights)
+  const overviewPrevWeightSeries = weekWeightSeries(overviewPrevMonday, weights)
+  const overviewCaloriesData = weekCaloriesSeries(overviewMonday, { days, calcMacros, allFoods, targets, targetsHistory, getTargetsForDate })
+  const overviewComparison = weekComparison(overviewMonday, { days, weights, bodyData, healthData, calcMacros, allFoods })
+
   // No desktop, a Visão Geral e a navegação usam a nova sidebar + tema do redesign.
   const useNewShell = isWide
 
@@ -599,6 +605,12 @@ export default function App() {
             kpis={overviewKpis}
             prevKpis={overviewPrevKpis}
             targets={targets}
+            weightSeries={overviewWeightSeries}
+            prevWeightMean={overviewPrevWeightSeries.mean}
+            caloriesData={overviewCaloriesData}
+            comparison={overviewComparison}
+            onOpenPeso={()=>{ setTab('peso'); setEditingDay(null) }}
+            onOpenDay={(dateKey)=>{ setEditingDay(dateKey); setTab('today'); setActiveMeal('cafe_manha') }}
           />
         </div>
       )}
@@ -708,6 +720,12 @@ export default function App() {
               kpis={overviewKpis}
               prevKpis={overviewPrevKpis}
               targets={targets}
+              weightSeries={overviewWeightSeries}
+              prevWeightMean={overviewPrevWeightSeries.mean}
+              caloriesData={overviewCaloriesData}
+              comparison={overviewComparison}
+              onOpenPeso={()=>{ setTab('peso'); setEditingDay(null) }}
+              onOpenDay={(dateKey)=>{ setEditingDay(dateKey); setTab('today'); setActiveMeal('cafe_manha') }}
             />
           )}
           {(tab==='today'||editingDay)&&renderDayEditor()}

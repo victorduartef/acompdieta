@@ -35,3 +35,19 @@ input, select, textarea {
 .evo-col::-webkit-scrollbar { width: 6px; }
 .evo-col::-webkit-scrollbar-thumb { background: rgba(128,128,128,0.3); border-radius: 3px; }
 .evo-col::-webkit-scrollbar-track { background: transparent; }
+
+/* ── Visão Geral: grid responsivo dos 12 KPIs ── */
+.evo-kpi-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr)); /* mobile: 2 colunas */
+}
+@media (min-width: 680px) {
+  .evo-kpi-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+@media (min-width: 1024px) {
+  .evo-kpi-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+}
+@media (min-width: 1440px) {
+  .evo-kpi-grid { grid-template-columns: repeat(12, minmax(0, 1fr)); } /* desktop grande: 12 em 1 linha */
+}

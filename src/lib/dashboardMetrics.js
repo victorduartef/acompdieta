@@ -152,3 +152,114 @@ export function formatSleep(hoursDecimal) {
   if (min === 0) return `${h}h`
   return `${h}h ${String(min).padStart(2, '0')}min`
 }
+
+// ── Dados por dia da semana (para os gráficos dos painéis) ──
+
+// Peso por dia da semana: [{ date, weight|null }] + média + nº medições
+export function weekWeightSeries(monday, weights) {
+  const dates = weekDates(monday)
+  const points = dates.map(d => {
+    const raw = weights?.[d]
+    const v = raw == null ? null : (typeof raw === 'number' ? raw : parseFloat(raw))
+    return { date: d, weight: (v != null && !isNaN(v)) ? v : null }
+  })
+  const vals = points.filter(p => p.weight != null).map(p => p.weight)
+  const mean = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null
+  return { points, mean: mean == null ? null : Math.round(mean * 10) / 10, n: vals.length }
+}
+
+// Kcal por dia da semana + meta do dia (getTargetsForDate) + média (só dias com registro)
+// deps: { days, calcMacros, allFoods, targets, targetsHistory, getTargetsForDate }
+export function weekCaloriesSeries(monday, deps) {
+  const { days, calcMacros, allFoods, targets, targetsHistory, getTargetsForDate } = deps
+  const todayStr = ymd(new Date())
+  const dates = weekDates(monday)
+  const bars = dates.map(d => {
+    const day = days?.[d]
+    let kcal = null
+    if (day && day.meals) {
+      const items = Object.values(day.meals).flat()
+      if (items.length > 0) {
+        const m = calcMacros(items, allFoods)
+        if (m.cal > 0) kcal = Math.round(m.cal)
+      }
+    }
+    const dObj = new Date(d + 'T12:00:00')
+    const dow = dObj.getDay() // 0=Dom,6=Sáb
+    const isWeekendDay = dow === 0 || dow === 6
+    const goalT = getTargetsForDate(targets, targetsHistory, d)
+    const goal = goalT?.cal || null
+    const future = d > todayStr
+    return { date: d, kcal, goal, isWeekendDay, future }
+  })
+  const registered = bars.filter(b => b.kcal != null).map(b => b.kcal)
+  const mean = registered.length ? Math.round(registered.reduce((a, b) => a + b, 0) / registered.length) : null
+  // Meta média dos dias com registro
+  const goalsForRegistered = bars.filter(b => b.kcal != null && b.goal != null).map(b => b.goal)
+  const goalMean = goalsForRegistered.length ? Math.round(goalsForRegistered.reduce((a, b) => a + b, 0) / goalsForRegistered.length) : null
+  return { bars, mean, n: registered.length, goalMean }
+}
+
+// ── Comparativo de médias por grupo de dias ──
+// Grupos: geral, úteis (seg-sex), fds (sáb-dom), comTreino, semTreino
+// deps: { days, weights, bodyData, healthData, calcMacros, allFoods }
+export function weekComparison(monday, deps) {
+  const { days, weights, bodyData, healthData, calcMacros, allFoods } = deps
+  const dates = weekDates(monday)
+
+  const isWeekend = (d) => { const w = new Date(d + 'T12:00:00').getDay(); return w === 0 || w === 6 }
+  const hasTraining = (d) => (days?.[d]?.activities || []).length > 0 // mesma regra da aba Análises
+
+  const groups = {
+    geral:      dates,
+    uteis:      dates.filter(d => !isWeekend(d)),
+    fds:        dates.filter(d => isWeekend(d)),
+    comTreino:  dates.filter(d => hasTraining(d)),
+    semTreino:  dates.filter(d => !hasTraining(d)),
+  }
+
+  const avg = (arr) => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null
+
+  // Para cada grupo, calcula médias de cada indicador (só registros existentes)
+  const calcGroup = (groupDates) => {
+    const macroVals = { cal: [], prot: [], carb: [], fat: [] }
+    groupDates.forEach(d => {
+      const day = days?.[d]
+      if (day && day.meals) {
+        const items = Object.values(day.meals).flat()
+        if (items.length > 0) {
+          const m = calcMacros(items, allFoods)
+          if (m.cal > 0) { macroVals.cal.push(m.cal); macroVals.prot.push(m.prot); macroVals.carb.push(m.carb); macroVals.fat.push(m.fat) }
+        }
+      }
+    })
+    const steps = [], sleep = [], score = []
+    groupDates.forEach(d => {
+      const h = healthData?.[d]
+      if (h) {
+        if (h.steps != null && !isNaN(h.steps)) steps.push(h.steps)
+        if (h.sleep != null && !isNaN(h.sleep)) sleep.push(h.sleep)
+        if (h.sleepScore != null && !isNaN(h.sleepScore)) score.push(h.sleepScore)
+      }
+    })
+    const r0v = (v) => v == null ? null : Math.round(v)
+    const r1v = (v) => v == null ? null : Math.round(v * 10) / 10
+    return {
+      cal:   { v: r0v(avg(macroVals.cal)),  n: macroVals.cal.length },
+      prot:  { v: r0v(avg(macroVals.prot)), n: macroVals.prot.length },
+      carb:  { v: r0v(avg(macroVals.carb)), n: macroVals.carb.length },
+      fat:   { v: r0v(avg(macroVals.fat)),  n: macroVals.fat.length },
+      steps: { v: r0v(avg(steps)), n: steps.length },
+      sleep: { v: r1v(avg(sleep)), n: sleep.length },
+      score: { v: r0v(avg(score)), n: score.length },
+    }
+  }
+
+  return {
+    geral:     calcGroup(groups.geral),
+    uteis:     calcGroup(groups.uteis),
+    fds:       calcGroup(groups.fds),
+    comTreino: calcGroup(groups.comTreino),
+    semTreino: calcGroup(groups.semTreino),
+  }
+}

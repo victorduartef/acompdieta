@@ -41,7 +41,7 @@ function NavButton({ item, active, onClick, T }) {
 export default function Sidebar({ tab, setTab, onOpenMetas, darkMode, toggleDarkMode, user, onLogout, T }) {
   return (
     <div style={{
-      width: 198, flexShrink: 0, background: T.sidebarBackground,
+      width: 196, flexShrink: 0, background: T.sidebarBackground,
       borderRight: `1px solid ${T.border}`, height: '100vh', position: 'sticky', top: 0,
       display: 'flex', flexDirection: 'column', padding: '18px 12px',
     }}>

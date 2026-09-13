@@ -1,6 +1,9 @@
 import React, { useState } from 'react'
 import DashboardCard, { StatCard } from '../components/DashboardCard.jsx'
 import { formatSleep } from '../lib/dashboardMetrics.js'
+import WeightChart from '../components/dashboard/WeightChart.jsx'
+import CaloriesChart from '../components/dashboard/CaloriesChart.jsx'
+import ComparisonTable from '../components/dashboard/ComparisonTable.jsx'
 
 // ── Visão Geral (Fase 2) — 12 KPIs conectados + seletor semanal ──
 // Props: T, isWide, userName, weekLabel, isCurrentWeekFlag, isPartial, onPrevWeek, onNextWeek, onResetWeek,
@@ -8,6 +11,8 @@ import { formatSleep } from '../lib/dashboardMetrics.js'
 export default function VisaoGeral({
   T, isWide, userName, weekLabel, isCurrentWeekFlag, isPartial,
   onPrevWeek, onNextWeek, onResetWeek, kpis, prevKpis, targets,
+  weightSeries, prevWeightMean, caloriesData, comparison,
+  onOpenPeso, onOpenDay,
 }) {
   const greeting = (() => {
     const h = new Date().getHours()
@@ -39,7 +44,8 @@ export default function VisaoGeral({
     const prev = prevKpis?.[d.key]?.value
     if (cur == null || prev == null) return { text: null, color: T.textMuted }
     const diff = cur - prev
-    if (Math.abs(diff) < (d.deltaMode === 'raw' && d.decimals === 1 ? 0.05 : 0.5)) return { text: '±0', color: T.textMuted }
+    const zeroThresh = (d.deltaMode === 'raw' && d.decimals === 1) || d.deltaMode === 'pp' ? 0.05 : (d.deltaMode === 'minutes' ? 0.008 : 0.5)
+    if (Math.abs(diff) < zeroThresh) return { text: 'Sem alteração', color: T.textMuted, zero: true }
 
     let text
     if (d.deltaMode === 'pp') text = `${diff > 0 ? '+' : ''}${diff.toFixed(1)} pp`
@@ -58,11 +64,8 @@ export default function VisaoGeral({
     return { text, color }
   }
 
-  const gridCols = (() => {
-    if (!isWide) return 'repeat(2, 1fr)'
-    // 12 numa linha em telas muito largas, 6 em desktop menor
-    return 'repeat(auto-fit, minmax(112px, 1fr))'
-  })()
+  // Grid responsivo dos 12 KPIs — controlado por classe CSS (evo-kpi-grid)
+  // 12 em 1 linha (>=1440px), 6 (>=1024px), 4 (>=680px), 2 (mobile).
 
   const placeholder = 'Painel será conectado na próxima etapa'
 
@@ -102,7 +105,7 @@ export default function VisaoGeral({
       </div>
 
       {/* 12 KPIs */}
-      <div style={{ display: 'grid', gridTemplateColumns: gridCols, gap: 10 }}>
+      <div className="evo-kpi-grid">
         {defs.map((d) => {
           const k = kpis?.[d.key]
           const hasData = k && k.value != null && k.n > 0
@@ -128,16 +131,20 @@ export default function VisaoGeral({
         })}
       </div>
 
+      {/* Painéis analíticos principais (Fase 3) */}
+      <div style={{ display: 'grid', gridTemplateColumns: isWide ? '1.15fr 1.15fr 1fr' : '1fr', gap: 14, alignItems: 'start' }}>
+        <WeightChart series={weightSeries} prevMean={prevWeightMean} T={T} onClick={onOpenPeso} />
+        <CaloriesChart data={caloriesData} T={T} onClick={onOpenDay ? undefined : undefined} onBarClick={onOpenDay} />
+        <ComparisonTable comp={comparison} T={T} />
+      </div>
+
       {/* Blocos inferiores — placeholders (próxima fase) */}
-      <div style={{ display: 'grid', gridTemplateColumns: isWide ? '1.2fr 1.2fr 1fr' : '1fr', gap: 14, alignItems: 'start' }}>
-        <DashboardCard title="Evolução do peso" icon="⚖️" accentColor={T.accentBlue} T={T} empty emptyText={placeholder} style={{ minHeight: 180 }} />
-        <DashboardCard title="Kcal ingeridas" icon="🔥" accentColor={T.accentOrange} T={T} empty emptyText={placeholder} style={{ minHeight: 180 }} />
-        <DashboardCard title="Comparativo de médias" icon="📊" accentColor={T.accentAmber} T={T} empty emptyText={placeholder} style={{ minHeight: 180 }} />
-        <DashboardCard title="Composição corporal" icon="🧬" accentColor={T.accentBlue} T={T} empty emptyText={placeholder} style={{ minHeight: 160 }} />
-        <DashboardCard title="Saúde semanal" icon="❤️" accentColor={T.accentPurple} T={T} empty emptyText={placeholder} style={{ minHeight: 160 }} />
+      <div style={{ display: 'grid', gridTemplateColumns: isWide ? '1.15fr 1.15fr 1fr' : '1fr', gap: 14, alignItems: 'start' }}>
+        <DashboardCard title="Composição corporal" icon="🧬" accentColor={T.accentBlue} T={T} empty emptyText={placeholder} style={{ minHeight: 140 }} />
+        <DashboardCard title="Saúde semanal" icon="❤️" accentColor={T.accentPurple} T={T} empty emptyText={placeholder} style={{ minHeight: 140 }} />
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <DashboardCard title="Treino" icon="💪" accentColor={T.accentTeal} T={T} empty emptyText={placeholder} style={{ minHeight: 72 }} />
-          <DashboardCard title="Insights" icon="💡" accentColor={T.accentAmber} T={T} empty emptyText={placeholder} style={{ minHeight: 72 }} />
+          <DashboardCard title="Treino" icon="💪" accentColor={T.accentTeal} T={T} empty emptyText={placeholder} style={{ minHeight: 62 }} />
+          <DashboardCard title="Insights" icon="💡" accentColor={T.accentAmber} T={T} empty emptyText={placeholder} style={{ minHeight: 62 }} />
         </div>
       </div>
     </div>
