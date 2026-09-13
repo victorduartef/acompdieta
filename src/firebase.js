@@ -1,7 +1,7 @@
 // src/firebase.js
 import { initializeApp } from 'firebase/app'
 import { getFirestore } from 'firebase/firestore'
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth'
+import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged } from 'firebase/auth'
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -28,8 +28,27 @@ export function initAuth(callback) {
 }
 
 export async function loginWithGoogle() {
-  const result = await signInWithPopup(auth, googleProvider)
-  return result.user
+  try {
+    const result = await signInWithPopup(auth, googleProvider)
+    return result.user
+  } catch (e) {
+    // Fallback para redirect se o popup for bloqueado
+    if (e.code === 'auth/popup-blocked' || e.code === 'auth/cancelled-popup-request' || e.code === 'auth/popup-closed-by-user') {
+      await signInWithRedirect(auth, googleProvider)
+      return null
+    }
+    throw e
+  }
+}
+
+export async function handleRedirectResult() {
+  try {
+    const result = await getRedirectResult(auth)
+    return result?.user || null
+  } catch (e) {
+    console.error('handleRedirectResult error:', e)
+    return null
+  }
 }
 
 export async function logout() {
