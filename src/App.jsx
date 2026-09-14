@@ -426,10 +426,13 @@ export default function App() {
   // Peso efetivo para tonelagem: considera barra e peso por lado configurados no exercício
   const effectiveWeight = (exId, registeredWeight) => {
     const e = getExercise(exId)
-    const w = registeredWeight || 0
-    if (!e || !e.usesBar) return w
-    const bar = e.barWeight || 0
-    return e.perSide ? (w * 2 + bar) : (w + bar)
+    let w = registeredWeight || 0
+    if (!e) return w
+    // Peso por lado: multiplica por 2 (independente de barra)
+    if (e.perSide) w = w * 2
+    // Barra livre: soma o peso da barra
+    if (e.usesBar) w = w + (e.barWeight || 0)
+    return w
   }
   const getMuscle = (id) => MUSCLE_GROUPS.find(m => m.id === id) || (id === 'ombro' ? MUSCLE_GROUPS.find(m => m.id === 'ombro_ant') : null)
   const getEquipment = (id) => EQUIPMENTS.find(e => e.id === id)
@@ -1349,7 +1352,7 @@ export default function App() {
                   }
                 }} style={{ background:C.surface, borderRadius:10, padding:'10px 12px', marginBottom:6, border:`0.5px solid ${C.border}`, cursor:'pointer', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
                   <div style={{ flex:1, minWidth:0 }}>
-                    <div style={{ fontSize:13, fontWeight:600, color:C.text }}>{e.name} {isPureCustom&&<span style={{ fontSize:9, color:C.gold }}>•custom</span>}{isLibOverride&&<span style={{ fontSize:9, color:C.teal }}>•editado</span>}{e.usesBar&&<span style={{ fontSize:9, color:C.text3 }}> 🏋️{e.barWeight}kg{e.perSide?'/lado':''}</span>}</div>
+                    <div style={{ fontSize:13, fontWeight:600, color:C.text }}>{e.name} {isPureCustom&&<span style={{ fontSize:9, color:C.gold }}>•custom</span>}{isLibOverride&&<span style={{ fontSize:9, color:C.teal }}>•editado</span>}{e.perSide&&<span style={{ fontSize:9, color:C.text3 }}> ⚖️×2</span>}{e.usesBar&&<span style={{ fontSize:9, color:C.text3 }}> 🏋️{e.barWeight}kg</span>}</div>
                     <div style={{ fontSize:10, color:C.text2, marginTop:2 }}>
                       {eq?.icon} {eq?.label}
                       {(e.secondary||[]).length>0 && <span style={{ color:C.text3 }}> · +{e.secondary.map(s=>getMuscle(s)?.label).filter(Boolean).join(', ')}</span>}
@@ -3612,11 +3615,24 @@ function ExerciseModal({ C, mode, exercise, isEdited, onSave, onDelete, onClose 
           </div>
         </div>
 
-        {/* Configuração de barra (para tonelagem correta) */}
+        {/* Configuração de peso (para tonelagem correta) */}
         <div style={{ background:C.surface2, borderRadius:12, padding:'12px 14px', marginBottom:16, border:`0.5px solid ${C.border}` }}>
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+          <div style={{ fontSize:11, color:C.text2, fontWeight:700, marginBottom:10, fontFamily:'JetBrains Mono,monospace', textTransform:'uppercase', letterSpacing:1 }}>⚖️ Cálculo de tonelagem</div>
+
+          {/* Peso por lado (independente de barra) */}
+          <div style={{ marginBottom:12 }}>
+            <div style={{ fontSize:11, color:C.text2, marginBottom:6 }}>O peso que você registra é...</div>
+            <div style={{ display:'flex', gap:6 }}>
+              <button disabled={isView} onClick={()=>setPerSide(false)} style={{ flex:1, padding:'9px 4px', borderRadius:8, fontSize:11, fontWeight:perSide?400:700, cursor:isView?'default':'pointer', fontFamily:'inherit', border:`1.5px solid ${!perSide?C.gold:C.border}`, background:!perSide?`${C.gold}20`:'transparent', color:!perSide?C.gold:C.text2 }}>Peso total</button>
+              <button disabled={isView} onClick={()=>setPerSide(true)} style={{ flex:1, padding:'9px 4px', borderRadius:8, fontSize:11, fontWeight:perSide?700:400, cursor:isView?'default':'pointer', fontFamily:'inherit', border:`1.5px solid ${perSide?C.gold:C.border}`, background:perSide?`${C.gold}20`:'transparent', color:perSide?C.gold:C.text2 }}>Peso de cada lado (×2)</button>
+            </div>
+            <div style={{ fontSize:9, color:C.text3, marginTop:4 }}>{perSide?'O app multiplica o peso registrado por 2 (anilhas dos dois lados)':'Usa o peso exatamente como registrado'}</div>
+          </div>
+
+          {/* Usa barra */}
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', paddingTop:10, borderTop:`0.5px solid ${C.border}` }}>
             <div>
-              <div style={{ fontSize:12, fontWeight:600, color:C.text }}>Usa barra?</div>
+              <div style={{ fontSize:12, fontWeight:600, color:C.text }}>Usa barra livre?</div>
               <div style={{ fontSize:10, color:C.text2, marginTop:2 }}>Soma o peso da barra na tonelagem</div>
             </div>
             {isView ? (
@@ -3628,26 +3644,23 @@ function ExerciseModal({ C, mode, exercise, isEdited, onSave, onDelete, onClose 
             )}
           </div>
           {usesBar && (
-            <div style={{ marginTop:12, display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
-              <div>
-                <div style={{ fontSize:10, color:C.text2, marginBottom:4 }}>Peso da barra (kg)</div>
-                <input type="number" step="0.5" value={barWeight} disabled={isView} onChange={e=>setBarWeight(e.target.value)} placeholder="20"
-                  style={{ width:'100%', background:C.surface, border:`0.5px solid ${C.border}`, borderRadius:8, padding:'8px 10px', color:C.text, fontSize:13, fontFamily:'JetBrains Mono,monospace' }}/>
-                <div style={{ fontSize:9, color:C.text3, marginTop:3 }}>Olímpica: 20kg</div>
-              </div>
-              <div>
-                <div style={{ fontSize:10, color:C.text2, marginBottom:4 }}>Peso informado é...</div>
-                <div style={{ display:'flex', gap:4 }}>
-                  <button disabled={isView} onClick={()=>setPerSide(false)} style={{ flex:1, padding:'8px 4px', borderRadius:8, fontSize:10, fontWeight:perSide?400:700, cursor:isView?'default':'pointer', fontFamily:'inherit', border:`1.5px solid ${!perSide?C.gold:C.border}`, background:!perSide?`${C.gold}20`:'transparent', color:!perSide?C.gold:C.text2 }}>Total</button>
-                  <button disabled={isView} onClick={()=>setPerSide(true)} style={{ flex:1, padding:'8px 4px', borderRadius:8, fontSize:10, fontWeight:perSide?700:400, cursor:isView?'default':'pointer', fontFamily:'inherit', border:`1.5px solid ${perSide?C.gold:C.border}`, background:perSide?`${C.gold}20`:'transparent', color:perSide?C.gold:C.text2 }}>Por lado</button>
-                </div>
-                <div style={{ fontSize:9, color:C.text3, marginTop:3 }}>{perSide?'×2 + barra':'usa como está'}</div>
-              </div>
+            <div style={{ marginTop:10 }}>
+              <div style={{ fontSize:10, color:C.text2, marginBottom:4 }}>Peso da barra (kg)</div>
+              <input type="number" step="0.5" value={barWeight} disabled={isView} onChange={e=>setBarWeight(e.target.value)} placeholder="20"
+                style={{ width:'100%', background:C.surface, border:`0.5px solid ${C.border}`, borderRadius:8, padding:'8px 10px', color:C.text, fontSize:13, fontFamily:'JetBrains Mono,monospace' }}/>
+              <div style={{ fontSize:9, color:C.text3, marginTop:3 }}>Barra olímpica: 20kg</div>
             </div>
           )}
-          {usesBar && !isView && (
+
+          {/* Exemplo do cálculo */}
+          {!isView && (perSide || usesBar) && (
             <div style={{ marginTop:10, fontSize:10, color:C.text2, background:C.surface, borderRadius:8, padding:'8px 10px', fontFamily:'JetBrains Mono,monospace' }}>
-              Ex: registro 27.5kg {perSide?'por lado':''} → tonelagem = {perSide ? `(27.5×2) + ${barWeight||20} = ${27.5*2+(parseFloat(barWeight)||20)}kg` : `27.5kg`}
+              {(() => {
+                const bar = usesBar ? (parseFloat(barWeight)||20) : 0
+                const eff = perSide ? (27.5*2 + bar) : (27.5 + bar)
+                const parts = perSide ? `27.5×2${usesBar?` + ${bar}`:''}` : (usesBar?`27.5 + ${bar}`:'27.5')
+                return `Ex: registro 27.5kg → tonelagem usa ${parts} = ${eff}kg`
+              })()}
             </div>
           )}
         </div>
