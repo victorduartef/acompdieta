@@ -417,7 +417,11 @@ export default function App() {
     return ov ? ov : f
   }).concat(customFoods.filter(c => !DEFAULT_FOODS.find(f => f.id === c.id)))
 
-  const allExercises = EXERCISE_LIBRARY.concat(customExercises)
+  // Custom overrides têm precedência sobre a biblioteca (mesmo padrão dos alimentos)
+  const allExercises = EXERCISE_LIBRARY.map(e => {
+    const ov = customExercises.find(c => c.id === e.id)
+    return ov ? ov : e
+  }).concat(customExercises.filter(c => !EXERCISE_LIBRARY.find(e => e.id === c.id)))
   const getExercise = (id) => allExercises.find(e => e.id === id)
   // Peso efetivo para tonelagem: considera barra e peso por lado configurados no exercício
   const effectiveWeight = (exId, registeredWeight) => {
@@ -840,6 +844,7 @@ export default function App() {
         C={C}
         mode={editingExercise.mode}
         exercise={editingExercise.exercise}
+        isEdited={editingExercise.exercise ? !!customExercises.find(c=>c.id===editingExercise.exercise.id) : false}
         onSave={(ex)=>{
           const existing = customExercises.find(c=>c.id===ex.id)
           if (existing) updateCustomExercises(customExercises.map(c=>c.id===ex.id?ex:c))
@@ -1327,7 +1332,9 @@ export default function App() {
             <div style={{ fontSize:11, fontWeight:700, color:m.color, marginBottom:8, fontFamily:'JetBrains Mono,monospace', textTransform:'uppercase', letterSpacing:1 }}>{m.label}</div>
             {grouped[m.id].map(e => {
               const eq = getEquipment(e.equipment)
-              const isCustom = customExercises.find(c=>c.id===e.id)
+              const override = customExercises.find(c=>c.id===e.id)
+              const isLibOverride = override && e.id.startsWith('ex_')
+              const isPureCustom = override && e.id.startsWith('cust_')
               return (
                 <div key={e.id} onClick={()=>{
                   if (addingToPlan) {
@@ -1342,7 +1349,7 @@ export default function App() {
                   }
                 }} style={{ background:C.surface, borderRadius:10, padding:'10px 12px', marginBottom:6, border:`0.5px solid ${C.border}`, cursor:'pointer', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
                   <div style={{ flex:1, minWidth:0 }}>
-                    <div style={{ fontSize:13, fontWeight:600, color:C.text }}>{e.name} {isCustom&&<span style={{ fontSize:9, color:C.gold }}>•custom</span>}</div>
+                    <div style={{ fontSize:13, fontWeight:600, color:C.text }}>{e.name} {isPureCustom&&<span style={{ fontSize:9, color:C.gold }}>•custom</span>}{isLibOverride&&<span style={{ fontSize:9, color:C.teal }}>•editado</span>}{e.usesBar&&<span style={{ fontSize:9, color:C.text3 }}> 🏋️{e.barWeight}kg{e.perSide?'/lado':''}</span>}</div>
                     <div style={{ fontSize:10, color:C.text2, marginTop:2 }}>
                       {eq?.icon} {eq?.label}
                       {(e.secondary||[]).length>0 && <span style={{ color:C.text3 }}> · +{e.secondary.map(s=>getMuscle(s)?.label).filter(Boolean).join(', ')}</span>}
@@ -3534,7 +3541,7 @@ function RelaxFitModal({ C, onSave, onClose }) {
   )
 }
 
-function ExerciseModal({ C, mode, exercise, onSave, onDelete, onClose }) {
+function ExerciseModal({ C, mode, exercise, isEdited, onSave, onDelete, onClose }) {
   const [name, setName] = useState(exercise?.name || '')
   const [equipment, setEquipment] = useState(exercise?.equipment || 'barra')
   const [primary, setPrimary] = useState(exercise?.primary || 'peito')
@@ -3542,8 +3549,10 @@ function ExerciseModal({ C, mode, exercise, onSave, onDelete, onClose }) {
   const [usesBar, setUsesBar] = useState(exercise?.usesBar || false)
   const [barWeight, setBarWeight] = useState(exercise?.barWeight != null ? String(exercise.barWeight) : '20')
   const [perSide, setPerSide] = useState(exercise?.perSide || false)
-  const isView = mode === 'view'
+  const [editing, setEditing] = useState(false) // permite editar um exercício aberto em modo view
+  const isView = mode === 'view' && !editing
   const isCustom = exercise?.id?.startsWith('cust_')
+  const isLibrary = exercise?.id?.startsWith('ex_')
 
   const toggleSec = (mid) => {
     setSecondary(prev => prev.includes(mid) ? prev.filter(m=>m!==mid) : [...prev, mid])
@@ -3645,8 +3654,10 @@ function ExerciseModal({ C, mode, exercise, onSave, onDelete, onClose }) {
 
         {isView ? (
           <div style={{ display:'flex', gap:10 }}>
-            {isCustom && <button onClick={()=>{ if(window.confirm('Excluir este exercício?')) onDelete(exercise.id) }} style={{ flex:1, padding:12, background:`${C.red}18`, border:'none', borderRadius:12, color:C.red, cursor:'pointer', fontFamily:'inherit', fontWeight:700 }}>Excluir</button>}
-            <button onClick={onClose} style={{ flex:2, padding:12, background:C.surface2, border:'none', borderRadius:12, color:C.text2, cursor:'pointer', fontFamily:'inherit' }}>Fechar</button>
+            {isCustom && <button onClick={()=>{ if(window.confirm('Excluir este exercício?')) onDelete(exercise.id) }} style={{ flex:1, padding:12, background:`${C.red}18`, border:'none', borderRadius:12, color:C.red, cursor:'pointer', fontFamily:'inherit', fontWeight:700, fontSize:12 }}>Excluir</button>}
+            {isLibrary && isEdited && <button onClick={()=>{ if(window.confirm('Restaurar este exercício ao padrão da biblioteca?')) onDelete(exercise.id) }} style={{ flex:1, padding:12, background:C.surface2, border:'none', borderRadius:12, color:C.text2, cursor:'pointer', fontFamily:'inherit', fontSize:12 }}>↺ Restaurar</button>}
+            <button onClick={onClose} style={{ flex:1, padding:12, background:C.surface2, border:'none', borderRadius:12, color:C.text2, cursor:'pointer', fontFamily:'inherit' }}>Fechar</button>
+            <button onClick={()=>setEditing(true)} style={{ flex:2, padding:12, background:`linear-gradient(135deg,${C.gold},${C.gold2})`, border:'none', borderRadius:12, color:C.btnText, cursor:'pointer', fontFamily:'inherit', fontWeight:700 }}>✎ Editar</button>
           </div>
         ) : (
           <div style={{ display:'flex', gap:10 }}>
