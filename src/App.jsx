@@ -303,7 +303,8 @@ export default function App() {
   const [activePlanId, setActivePlanId] = useState(null)
   const [editingExercise, setEditingExercise] = useState(null)
   const [liveSession, setLiveSession] = useState(null) // { planId, exercises:[{exId, sets:[{weight,reps,done}], skipped}], startTime }
-  const [restTimer, setRestTimer] = useState(null) // { total, remaining }
+  const [restTimer, setRestTimer] = useState(null) // { total, endsAt } — baseado em timestamp
+  const [restNow, setRestNow] = useState(Date.now())
   const [exSearch, setExSearch] = useState('')
   const [exMuscleFilter, setExMuscleFilter] = useState('')
   const [expandedWorkout, setExpandedWorkout] = useState(null)
@@ -340,29 +341,64 @@ export default function App() {
   }, [])
   const isWide = winW >= 900 // desktop breakpoint
 
-  // Rest timer countdown
+  // Rest timer baseado em timestamp (resiste a tela bloqueada / app em background)
   useEffect(() => {
-    if (!restTimer || restTimer.remaining <= 0) return
-    const t = setTimeout(() => {
-      setRestTimer(prev => {
-        if (!prev) return null
-        const rem = prev.remaining - 1
-        if (rem <= 0) {
-          // Play a beep when done
-          try {
-            const ctx = new (window.AudioContext||window.webkitAudioContext)()
-            const osc = ctx.createOscillator(); const gain = ctx.createGain()
-            osc.connect(gain); gain.connect(ctx.destination)
-            osc.frequency.value = 880; gain.gain.value = 0.3
-            osc.start(); osc.stop(ctx.currentTime + 0.3)
-          } catch(e) {}
-          if (navigator.vibrate) navigator.vibrate([200,100,200])
-          return { ...prev, remaining: 0 }
-        }
-        return { ...prev, remaining: rem }
-      })
-    }, 1000)
-    return () => clearTimeout(t)
+    if (!restTimer || !restTimer.endsAt) return
+    let beeped = false
+    const tick = () => {
+      const now = Date.now()
+      setRestNow(now)
+      if (now >= restTimer.endsAt && !beeped) {
+        beeped = true
+        try {
+          const ctx = new (window.AudioContext||window.webkitAudioContext)()
+          const osc = ctx.createOscillator(); const gain = ctx.createGain()
+          osc.connect(gain); gain.connect(ctx.destination)
+          osc.frequency.value = 880; gain.gain.value = 0.3
+          osc.start(); osc.stop(ctx.currentTime + 0.3)
+        } catch(e) {}
+        if (navigator.vibrate) navigator.vibrate([200,100,200])
+      }
+    }
+    const iv = setInterval(tick, 500)
+    // Recalcula ao voltar o foco/visibilidade (desbloqueio de tela)
+    const onVis = () => { if (!document.hidden) tick() }
+    document.addEventListener('visibilitychange', onVis)
+    window.addEventListener('focus', onVis)
+    tick()
+    return () => { clearInterval(iv); document.removeEventListener('visibilitychange', onVis); window.removeEventListener('focus', onVis) }
+  }, [restTimer])
+
+  // ── Persistência do treino em andamento (localStorage) ──
+  // Restaura sessão ao abrir; salva a cada mudança para não perder progresso ao atualizar/fechar.
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('evoshape_live_session')
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        if (parsed && parsed.planId && parsed.exercises) setLiveSession(parsed)
+      }
+      const savedTimer = localStorage.getItem('evoshape_rest_timer')
+      if (savedTimer) {
+        const t = JSON.parse(savedTimer)
+        if (t && t.endsAt && t.endsAt > Date.now()) setRestTimer(t)
+        else localStorage.removeItem('evoshape_rest_timer')
+      }
+    } catch(e) {}
+  }, [])
+
+  useEffect(() => {
+    try {
+      if (liveSession) localStorage.setItem('evoshape_live_session', JSON.stringify(liveSession))
+      else localStorage.removeItem('evoshape_live_session')
+    } catch(e) {}
+  }, [liveSession])
+
+  useEffect(() => {
+    try {
+      if (restTimer && restTimer.endsAt) localStorage.setItem('evoshape_rest_timer', JSON.stringify(restTimer))
+      else localStorage.removeItem('evoshape_rest_timer')
+    } catch(e) {}
   }, [restTimer])
 
 
@@ -383,6 +419,14 @@ export default function App() {
 
   const allExercises = EXERCISE_LIBRARY.concat(customExercises)
   const getExercise = (id) => allExercises.find(e => e.id === id)
+  // Peso efetivo para tonelagem: considera barra e peso por lado configurados no exercício
+  const effectiveWeight = (exId, registeredWeight) => {
+    const e = getExercise(exId)
+    const w = registeredWeight || 0
+    if (!e || !e.usesBar) return w
+    const bar = e.barWeight || 0
+    return e.perSide ? (w * 2 + bar) : (w + bar)
+  }
   const getMuscle = (id) => MUSCLE_GROUPS.find(m => m.id === id) || (id === 'ombro' ? MUSCLE_GROUPS.find(m => m.id === 'ombro_ant') : null)
   const getEquipment = (id) => EQUIPMENTS.find(e => e.id === id)
 
@@ -580,8 +624,8 @@ export default function App() {
   const ovPrevSleep = weekHealthMetric(overviewPrevMonday, healthData, 'sleep')
   const ovPrevScore = weekHealthMetric(overviewPrevMonday, healthData, 'sleepScore')
   const overviewHealthPrevMeans = { steps: ovPrevSteps.mean, sleep: ovPrevSleep.mean, score: ovPrevScore.mean }
-  const overviewTraining = weekTraining(overviewMonday, { days, workoutLogs, ACTIVITIES })
-  const overviewPrevVolume = weekVolume(overviewPrevMonday, workoutLogs)
+  const overviewTraining = weekTraining(overviewMonday, { days, workoutLogs, ACTIVITIES, effectiveWeight })
+  const overviewPrevVolume = weekVolume(overviewPrevMonday, workoutLogs, effectiveWeight)
   const overviewInsights = buildInsights({
     comparison: overviewComparison, kpis: overviewKpis, targets, bodyWeeks: overviewBodyWeeks,
     healthSleep: ovSleep, healthSteps: ovSteps,
@@ -1375,7 +1419,7 @@ export default function App() {
         for (const log of arr) {
           const found = (log.exercises||[]).find(x => x.exerciseId === e.id)
           if (found && found.sets.length) {
-            const volume = found.sets.reduce((a,s)=>a+(s.weight||0)*(s.reps||0),0)
+            const volume = found.sets.reduce((a,s)=>a+effectiveWeight(e.id, s.weight)*(s.reps||0),0)
             const maxW = Math.max(...found.sets.map(s=>s.weight||0))
             sessions.push({ date, sets:found.sets, volume, maxW })
           }
@@ -1403,21 +1447,25 @@ export default function App() {
         </div>
 
         {/* Rest timer (if active) */}
-        {restTimer && restTimer.remaining > 0 && (
+        {restTimer && (() => {
+          const remainingMs = Math.max(0, restTimer.endsAt - restNow)
+          const remaining = Math.ceil(remainingMs / 1000)
+          if (remaining > 0) return (
           <div style={{ background:`linear-gradient(135deg,${C.teal},#0ea5a5)`, borderRadius:14, padding:'16px', marginBottom:16, textAlign:'center' }}>
             <div style={{ fontSize:11, color:'#fff', opacity:0.9, marginBottom:4, fontWeight:600 }}>⏱️ DESCANSO</div>
-            <div style={{ fontSize:40, fontWeight:800, color:'#fff', fontFamily:'JetBrains Mono,monospace' }}>{Math.floor(restTimer.remaining/60)}:{String(restTimer.remaining%60).padStart(2,'0')}</div>
+            <div style={{ fontSize:40, fontWeight:800, color:'#fff', fontFamily:'JetBrains Mono,monospace' }}>{Math.floor(remaining/60)}:{String(remaining%60).padStart(2,'0')}</div>
             <div style={{ display:'flex', gap:8, justifyContent:'center', marginTop:10 }}>
-              <button onClick={()=>setRestTimer(prev=>({...prev, remaining:prev.remaining+30}))} style={{ background:'rgba(255,255,255,0.2)', border:'none', borderRadius:8, padding:'6px 12px', color:'#fff', fontSize:12, cursor:'pointer', fontWeight:700 }}>+30s</button>
+              <button onClick={()=>setRestTimer(prev=>({...prev, endsAt:prev.endsAt+30000}))} style={{ background:'rgba(255,255,255,0.2)', border:'none', borderRadius:8, padding:'6px 12px', color:'#fff', fontSize:12, cursor:'pointer', fontWeight:700 }}>+30s</button>
               <button onClick={()=>setRestTimer(null)} style={{ background:'rgba(255,255,255,0.2)', border:'none', borderRadius:8, padding:'6px 12px', color:'#fff', fontSize:12, cursor:'pointer', fontWeight:700 }}>Pular descanso</button>
             </div>
           </div>
-        )}
-        {restTimer && restTimer.remaining === 0 && (
+          )
+          return (
           <div onClick={()=>setRestTimer(null)} style={{ background:`${C.gold}20`, border:`1px solid ${C.gold}`, borderRadius:14, padding:'14px', marginBottom:16, textAlign:'center', cursor:'pointer' }}>
             <div style={{ fontSize:16, fontWeight:800, color:C.gold }}>✓ Descanso concluído! Toque para continuar</div>
           </div>
-        )}
+          )
+        })()}
 
         {/* Current exercise card */}
         <div style={{ background:C.surface, borderRadius:16, padding:16, marginBottom:14, border:`1px solid ${pm?.color||C.gold}40` }}>
@@ -1490,7 +1538,7 @@ export default function App() {
                 document.getElementById('live-weight').value = ''
                 document.getElementById('live-reps').value = ''
                 // Start rest timer
-                setRestTimer({ total: curEx.restSeconds, remaining: curEx.restSeconds })
+                setRestTimer({ total: curEx.restSeconds, endsAt: Date.now() + curEx.restSeconds * 1000 })
               }} style={{ background:`linear-gradient(135deg,${C.teal},#0ea5a5)`, border:'none', borderRadius:8, padding:'10px 16px', color:'#fff', fontSize:14, cursor:'pointer', fontFamily:'inherit', fontWeight:700, whiteSpace:'nowrap' }}>✓ Série</button>
             </div>
           )}
@@ -1643,7 +1691,7 @@ export default function App() {
         (log.exercises||[]).forEach(ex => {
           if (!ex.sets || ex.sets.length === 0) return
           const maxWeight = Math.max(...ex.sets.map(s=>s.weight||0))
-          const volume = ex.sets.reduce((a,s)=>a+(s.weight||0)*(s.reps||0),0)
+          const volume = ex.sets.reduce((a,s)=>a+effectiveWeight(ex.exerciseId, s.weight)*(s.reps||0),0)
           if (!exerciseHistory[ex.exerciseId]) exerciseHistory[ex.exerciseId] = []
           exerciseHistory[ex.exerciseId].push({ date, sets:ex.sets, maxWeight, volume })
         })
@@ -1853,7 +1901,7 @@ export default function App() {
               const arr = Array.isArray(logs) ? logs : [logs]
               return arr.map((log, li) => {
                 const totalSets = (log.exercises||[]).reduce((a,e)=>a+(e.sets?.length||0),0)
-                const totalVolume = (log.exercises||[]).reduce((a,e)=>a+(e.sets||[]).reduce((s,set)=>s+(set.weight||0)*(set.reps||0),0),0)
+                const totalVolume = (log.exercises||[]).reduce((a,e)=>a+(e.sets||[]).reduce((s,set)=>s+effectiveWeight(e.exerciseId, set.weight)*(set.reps||0),0),0)
                 const durMin = log.endTime&&log.startTime ? Math.round((log.endTime-log.startTime)/60000) : null
                 const wKey = date+'_'+li
                 const isExp = expandedWorkout === wKey
@@ -1874,7 +1922,7 @@ export default function App() {
                       <div style={{ marginTop:10, paddingTop:10, borderTop:`0.5px solid ${C.border}` }}>
                         {(log.exercises||[]).map((ex, ei) => {
                           const e = getExercise(ex.exerciseId)
-                          const vol = (ex.sets||[]).reduce((a,s)=>a+(s.weight||0)*(s.reps||0),0)
+                          const vol = (ex.sets||[]).reduce((a,s)=>a+effectiveWeight(ex.exerciseId, s.weight)*(s.reps||0),0)
                           return (
                             <div key={ei} style={{ marginBottom:8 }}>
                               <div style={{ display:'flex', justifyContent:'space-between', marginBottom:3 }}>
@@ -3491,6 +3539,9 @@ function ExerciseModal({ C, mode, exercise, onSave, onDelete, onClose }) {
   const [equipment, setEquipment] = useState(exercise?.equipment || 'barra')
   const [primary, setPrimary] = useState(exercise?.primary || 'peito')
   const [secondary, setSecondary] = useState(exercise?.secondary || [])
+  const [usesBar, setUsesBar] = useState(exercise?.usesBar || false)
+  const [barWeight, setBarWeight] = useState(exercise?.barWeight != null ? String(exercise.barWeight) : '20')
+  const [perSide, setPerSide] = useState(exercise?.perSide || false)
   const isView = mode === 'view'
   const isCustom = exercise?.id?.startsWith('cust_')
 
@@ -3552,6 +3603,46 @@ function ExerciseModal({ C, mode, exercise, onSave, onDelete, onClose }) {
           </div>
         </div>
 
+        {/* Configuração de barra (para tonelagem correta) */}
+        <div style={{ background:C.surface2, borderRadius:12, padding:'12px 14px', marginBottom:16, border:`0.5px solid ${C.border}` }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+            <div>
+              <div style={{ fontSize:12, fontWeight:600, color:C.text }}>Usa barra?</div>
+              <div style={{ fontSize:10, color:C.text2, marginTop:2 }}>Soma o peso da barra na tonelagem</div>
+            </div>
+            {isView ? (
+              <span style={{ fontSize:12, color:usesBar?C.teal:C.text3, fontWeight:700 }}>{usesBar?'Sim':'Não'}</span>
+            ) : (
+              <div onClick={()=>setUsesBar(v=>!v)} style={{ width:44, height:24, borderRadius:12, background:usesBar?C.gold:C.border, cursor:'pointer', position:'relative', transition:'background .2s', flexShrink:0 }}>
+                <div style={{ position:'absolute', top:3, left:usesBar?22:3, width:18, height:18, borderRadius:'50%', background:C.text, transition:'left .2s' }}/>
+              </div>
+            )}
+          </div>
+          {usesBar && (
+            <div style={{ marginTop:12, display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+              <div>
+                <div style={{ fontSize:10, color:C.text2, marginBottom:4 }}>Peso da barra (kg)</div>
+                <input type="number" step="0.5" value={barWeight} disabled={isView} onChange={e=>setBarWeight(e.target.value)} placeholder="20"
+                  style={{ width:'100%', background:C.surface, border:`0.5px solid ${C.border}`, borderRadius:8, padding:'8px 10px', color:C.text, fontSize:13, fontFamily:'JetBrains Mono,monospace' }}/>
+                <div style={{ fontSize:9, color:C.text3, marginTop:3 }}>Olímpica: 20kg</div>
+              </div>
+              <div>
+                <div style={{ fontSize:10, color:C.text2, marginBottom:4 }}>Peso informado é...</div>
+                <div style={{ display:'flex', gap:4 }}>
+                  <button disabled={isView} onClick={()=>setPerSide(false)} style={{ flex:1, padding:'8px 4px', borderRadius:8, fontSize:10, fontWeight:perSide?400:700, cursor:isView?'default':'pointer', fontFamily:'inherit', border:`1.5px solid ${!perSide?C.gold:C.border}`, background:!perSide?`${C.gold}20`:'transparent', color:!perSide?C.gold:C.text2 }}>Total</button>
+                  <button disabled={isView} onClick={()=>setPerSide(true)} style={{ flex:1, padding:'8px 4px', borderRadius:8, fontSize:10, fontWeight:perSide?700:400, cursor:isView?'default':'pointer', fontFamily:'inherit', border:`1.5px solid ${perSide?C.gold:C.border}`, background:perSide?`${C.gold}20`:'transparent', color:perSide?C.gold:C.text2 }}>Por lado</button>
+                </div>
+                <div style={{ fontSize:9, color:C.text3, marginTop:3 }}>{perSide?'×2 + barra':'usa como está'}</div>
+              </div>
+            </div>
+          )}
+          {usesBar && !isView && (
+            <div style={{ marginTop:10, fontSize:10, color:C.text2, background:C.surface, borderRadius:8, padding:'8px 10px', fontFamily:'JetBrains Mono,monospace' }}>
+              Ex: registro 27.5kg {perSide?'por lado':''} → tonelagem = {perSide ? `(27.5×2) + ${barWeight||20} = ${27.5*2+(parseFloat(barWeight)||20)}kg` : `27.5kg`}
+            </div>
+          )}
+        </div>
+
         {isView ? (
           <div style={{ display:'flex', gap:10 }}>
             {isCustom && <button onClick={()=>{ if(window.confirm('Excluir este exercício?')) onDelete(exercise.id) }} style={{ flex:1, padding:12, background:`${C.red}18`, border:'none', borderRadius:12, color:C.red, cursor:'pointer', fontFamily:'inherit', fontWeight:700 }}>Excluir</button>}
@@ -3563,7 +3654,7 @@ function ExerciseModal({ C, mode, exercise, onSave, onDelete, onClose }) {
             <button onClick={()=>{
               if (!name.trim()) return
               const id = exercise?.id || 'cust_' + Date.now()
-              onSave({ id, name:name.trim(), equipment, primary, secondary })
+              onSave({ id, name:name.trim(), equipment, primary, secondary, usesBar, barWeight: usesBar ? (parseFloat(barWeight)||0) : 0, perSide })
             }} style={{ flex:2, padding:12, background:`linear-gradient(135deg,${C.gold},${C.gold2})`, border:'none', borderRadius:12, color:C.btnText, cursor:'pointer', fontFamily:'inherit', fontWeight:700, fontSize:14 }}>Salvar</button>
           </div>
         )}

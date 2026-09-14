@@ -324,9 +324,10 @@ export function weekHealthMetric(monday, healthData, metric) {
 }
 
 // ── Treino: resumo da semana (sessões, volume, atividades por dia) ──
-// deps: { days, workoutLogs, ACTIVITIES }
+// deps: { days, workoutLogs, ACTIVITIES, effectiveWeight? }
 export function weekTraining(monday, deps) {
-  const { days, workoutLogs, ACTIVITIES } = deps
+  const { days, workoutLogs, ACTIVITIES, effectiveWeight } = deps
+  const ew = effectiveWeight || ((exId, w) => w || 0)
   const dates = weekDates(monday)
   const isType = (a, type) => ACTIVITIES.find(x => x.id === a)?.type === type
 
@@ -351,7 +352,7 @@ export function weekTraining(monday, deps) {
     const arr = Array.isArray(logs) ? logs : [logs]
     arr.forEach(log => {
       (log.exercises || []).forEach(ex => {
-        (ex.sets || []).forEach(s => { volume += (s.weight || 0) * (s.reps || 0) })
+        (ex.sets || []).forEach(s => { volume += ew(ex.exerciseId, s.weight) * (s.reps || 0) })
       })
     })
   })
@@ -360,14 +361,15 @@ export function weekTraining(monday, deps) {
 }
 
 // Volume total de musculação de uma semana (para comparar semanas)
-export function weekVolume(monday, workoutLogs) {
+export function weekVolume(monday, workoutLogs, effectiveWeight) {
+  const ew = effectiveWeight || ((exId, w) => w || 0)
   const dates = weekDates(monday)
   let volume = 0
   dates.forEach(d => {
     const logs = workoutLogs?.[d]
     if (!logs) return
     const arr = Array.isArray(logs) ? logs : [logs]
-    arr.forEach(log => { (log.exercises || []).forEach(ex => { (ex.sets || []).forEach(s => { volume += (s.weight || 0) * (s.reps || 0) }) }) })
+    arr.forEach(log => { (log.exercises || []).forEach(ex => { (ex.sets || []).forEach(s => { volume += ew(ex.exerciseId, s.weight) * (s.reps || 0) }) }) })
   })
   return Math.round(volume)
 }
