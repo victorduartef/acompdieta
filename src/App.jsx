@@ -6,7 +6,8 @@ import Sidebar from './components/Sidebar.jsx'
 import VisaoGeral from './screens/VisaoGeral.jsx'
 import BottomNav from './components/BottomNav.jsx'
 import MoreSheet from './components/MoreSheet.jsx'
-import { mondayForOffset, weekRangeLabel, elapsedDaysInWeek, isCurrentWeek as isCurWeek, computeWeekKPIs, computeWeekKPIsPartial, weekWeightSeries, weekCaloriesSeries, weekComparison, fourWeekBodyComposition, weekHealthMetric, weekTraining, weekVolume, buildInsights } from './lib/dashboardMetrics.js'
+import { mondayForOffset, weekRangeLabel, elapsedDaysInWeek, isCurrentWeek as isCurWeek, computeWeekKPIs, computeWeekKPIsPartial, weekWeightSeries, weekCaloriesSeries, weekComparison, fourWeekBodyComposition, weekHealthMetric, weekTraining, weekVolume, buildInsights, isNutritionDayEligible, DINNER_MEAL_ID } from './lib/dashboardMetrics.js'
+import Alimentacao from './screens/Alimentacao.jsx'
 
 // ── FOODS DATABASE ──────────────────────────────────────────────────────────
 const DEFAULT_FOODS = [
@@ -515,6 +516,16 @@ export default function App() {
 
   const activeKey = editingDay || todayKey()
 
+  // Navegação de data na Alimentação (prev/next/hoje) — usa editingDay, sem novo estado/campo persistido
+  const shiftActiveDay = (deltaDays) => {
+    const d = new Date(activeKey + 'T12:00:00')
+    d.setDate(d.getDate() + deltaDays)
+    const newKey = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+    setEditingDay(newKey === todayKey() ? null : newKey)
+    setActiveMeal('cafe_manha'); setAddingFood(false); setSearch(''); setAvulso(false)
+  }
+  const goToToday = () => { setEditingDay(null); setActiveMeal('cafe_manha'); setAddingFood(false); setSearch(''); setAvulso(false) }
+
   function getDay(key) {
     const d = days[key] || emptyDay()
     if (!d.meals.extra) d.meals.extra = []
@@ -552,6 +563,13 @@ export default function App() {
     const newItems = favs.map(f => ({ id:f.id, qty:f.def }))
     updateDays({ ...days, [activeKey]: { ...day, meals: { ...day.meals, [activeMeal]: [...(day.meals[activeMeal]||[]), ...newItems] } } })
     setAddingFood(false); setSearch('')
+  }
+  function addAvulsoItem() {
+    if (!avulsoData.name && !avulsoData.cal) return
+    const day = getDay(activeKey)
+    const item = { id:'avulso_'+Date.now(), qty:1, avulso:true, name:avulsoData.name||'Entrada avulsa', cal:parseFloat(avulsoData.cal)||0, prot:parseFloat(avulsoData.prot)||0, carb:parseFloat(avulsoData.carb)||0, fat:parseFloat(avulsoData.fat)||0 }
+    updateDays({ ...days, [activeKey]: { ...day, meals: { ...day.meals, [activeMeal]: [...(day.meals[activeMeal]||[]), item] } } })
+    setAvulsoData({ name:'', cal:'', prot:'', carb:'', fat:'' }); setAvulso(false); setAddingFood(false)
   }
   function removeFood(mealId, idx) {
     const day = days[activeKey]; if (!day) return
@@ -709,8 +727,8 @@ export default function App() {
       <div style={{ display: (useNewShell && tab==='overview') ? 'none' : 'flex', flex: useNewShell ? 1 : undefined, minWidth:0, flexDirection:'column', ...(useNewShell ? { height:'100vh', overflowY:'auto' } : {}) }}>
       <div style={{ maxWidth:isWide?(tab==='analysis'?1600:1200):480, margin:'0 auto', width:'100%', minHeight:'100vh', display:'flex', flexDirection:'column', transition:'max-width .2s' }}>
 
-        {/* ── HEADER ── (oculto no overview mobile — VisaoGeral tem cabeçalho próprio) */}
-        {!(isMobile && tab==='overview') && <div style={{ background:darkMode?'linear-gradient(180deg,#0f2028 0%,#122028 100%)':C.surface, borderBottom:`1px solid ${C.border}`, padding:'16px 16px 0', flexShrink:0 }}>
+        {/* ── HEADER ── (oculto no overview e em Alimentação — têm cabeçalho próprio) */}
+        {!(tab==='overview' || tab==='today') && <div style={{ background:darkMode?'linear-gradient(180deg,#0f2028 0%,#122028 100%)':C.surface, borderBottom:`1px solid ${C.border}`, padding:'16px 16px 0', flexShrink:0 }}>
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:8 }}>
             <div>
               <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:2 }}>
@@ -795,7 +813,7 @@ export default function App() {
         </div>}
 
         {/* ── CONTENT ── */}
-        <div style={{ flex:1, padding:isWide?'24px 24px 100px':(isMobile?'12px 12px 84px':'16px 16px 100px'), overflowY:'auto', background:isMobile?T.appBackground:C.bg }}>
+        <div style={{ flex:1, padding:isWide?'24px 24px 100px':(isMobile?'12px 12px 84px':'16px 16px 100px'), overflowY:'auto', background:(isMobile||tab==='today')?T.appBackground:C.bg }}>
           {tab==='overview'&&!editingDay&&(
             <VisaoGeral
               T={T}
@@ -899,154 +917,23 @@ export default function App() {
 
   // ── DAY EDITOR ──────────────────────────────────────────────────────────────
   function renderDayEditor() {
-    const meal = MEALS.find(m=>m.id===activeMeal)
-    const items = currentDay.meals[activeMeal]||[]
-    const mealMacros = calcMacros(items, allFoods)
-    const favFoods = allFoods.filter(f=>f.fav&&f.fav.includes(activeMeal))
-    const otherFoods = allFoods.filter(f=>!f.fav||!f.fav.includes(activeMeal))
-    const filtered = search ? allFoods.filter(f=>f.name.toLowerCase().includes(search.toLowerCase())) : null
     return (
-      <div>
-        {isEditing&&<button onClick={()=>{ setEditingDay(null); setTab('history') }} style={{ display:'flex', alignItems:'center', gap:6, background:'none', border:'none', color:C.text2, fontSize:13, cursor:'pointer', fontFamily:'inherit', padding:0, marginBottom:14 }}>← Voltar</button>}
-        {/* Meal pills */}
-        <div style={{ display:'flex', gap:6, marginBottom:16, overflowX:'auto', paddingBottom:4 }}>
-          {MEALS.map(m=>{
-            const mac=calcMacros(currentDay.meals[m.id]||[],allFoods)
-            const active=activeMeal===m.id
-            return <button key={m.id} onClick={()=>{ setActiveMeal(m.id); setAddingFood(false); setSearch(''); setAvulso(false) }}
-              style={{ flexShrink:0, minWidth:68, padding:'8px 6px', border:`2px solid ${active?m.color:C.border}`, borderRadius:12, background:active?m.color+'18':C.surface, cursor:'pointer', textAlign:'center', fontFamily:'inherit' }}>
-              <div style={{ fontSize:16 }}>{m.icon}</div>
-              <div style={{ fontSize:9, fontWeight:700, marginTop:2, color:active?m.color:C.text2 }}>{m.short}</div>
-              <div style={{ fontSize:10, color:C.text3, fontFamily:'JetBrains Mono,monospace' }}>{r0(mac.cal)}</div>
-            </button>
-          })}
-        </div>
-        {/* Meal header */}
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
-          <div style={{ fontSize:15, fontWeight:700, color:meal.color }}>{meal.icon} {meal.label}</div>
-          <div style={{ fontSize:10, color:C.text2, fontFamily:'JetBrains Mono,monospace' }}>{r0(mealMacros.cal)} kcal · P:{r(mealMacros.prot)} · C:{r(mealMacros.carb)} · G:{r(mealMacros.fat)}</div>
-        </div>
-        {/* Food items */}
-        {items.length===0&&!addingFood&&<div style={{ textAlign:'center', padding:'20px 0', color:C.text3, fontSize:13 }}>Nenhum alimento registrado</div>}
-        {items.map((it,idx)=>{
-          // Avulso item
-          if (it.avulso) return (
-            <div key={idx} style={{ background:C.surface, borderRadius:12, padding:'10px 12px', marginBottom:7, display:'flex', alignItems:'center', gap:8, border:`1px solid ${C.gold}30` }}>
-              <div style={{ flex:1, minWidth:0 }}>
-                <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                  <span style={{ fontSize:10, background:`${C.gold}20`, color:C.gold, padding:'1px 6px', borderRadius:8, fontWeight:700, flexShrink:0 }}>avulso</span>
-                  <div style={{ fontSize:13, fontWeight:600, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{it.name}</div>
-                </div>
-                <div style={{ fontSize:11, color:C.text2, fontFamily:'JetBrains Mono,monospace', marginTop:2 }}>{r0(it.cal)} kcal · P:{r(it.prot)}g · C:{r(it.carb)}g · G:{r(it.fat)}g</div>
-              </div>
-              <button onClick={()=>removeFood(activeMeal,idx)} style={{ background:`${C.red}20`, border:'none', borderRadius:8, width:28, height:28, color:C.red, cursor:'pointer', fontSize:16, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>×</button>
-            </div>
-          )
-          // Regular item
-          const f = allFoods.find(x=>x.id===it.id)
-          if (!f) return null
-          const fixed = ['unid','dose','porção'].includes(f.unit)
-          const m = fixed ? it.qty : it.qty/100
-          return (
-            <div key={idx} style={{ background:C.surface, borderRadius:12, padding:'10px 12px', marginBottom:7, display:'flex', alignItems:'center', gap:8, border:`0.5px solid ${C.border}` }}>
-              <div style={{ flex:1, minWidth:0 }}>
-                <div style={{ fontSize:13, fontWeight:600, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', color:C.text }}>{f.name}</div>
-                <div style={{ fontSize:11, color:C.text2, fontFamily:'JetBrains Mono,monospace', marginTop:2 }}>{r0(f.cal*m)} kcal · P:{r(f.prot*m)}g · C:{r(f.carb*m)}g · G:{r(f.fat*m)}g</div>
-              </div>
-              <input type="number" value={it.qty} onChange={e=>updateQty(activeMeal,idx,e.target.value)}
-                style={{ width:52, textAlign:'center', fontFamily:'JetBrains Mono,monospace', fontSize:12, padding:'5px 4px', border:`0.5px solid ${C.border}`, borderRadius:8, background:C.surface2, color:C.text }}/>
-              <span style={{ fontSize:10, color:C.text2, minWidth:26 }}>{f.unit}</span>
-              <button onClick={()=>removeFood(activeMeal,idx)} style={{ background:`${C.red}20`, border:'none', borderRadius:8, width:28, height:28, color:C.red, cursor:'pointer', fontSize:16, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>×</button>
-            </div>
-          )
-        })}
-        {/* Add food */}
-        {!addingFood
-          ? <div style={{ marginTop:4 }}>
-              {allFoods.filter(f=>f.fav&&f.fav.includes(activeMeal)).length>0 && (
-                <button onClick={addFavoriteMeal} style={{ width:'100%', padding:12, border:'none', borderRadius:12, background:`linear-gradient(135deg,${C.gold},${C.gold2})`, color:C.btnText, fontSize:13, cursor:'pointer', fontFamily:'inherit', fontWeight:700, marginBottom:8, display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
-                  ⭐ Add refeição favorita ({allFoods.filter(f=>f.fav&&f.fav.includes(activeMeal)).length} itens)
-                </button>
-              )}
-              <button onClick={()=>setAddingFood(true)} style={{ width:'100%', padding:12, border:`1.5px dashed ${C.border}`, borderRadius:12, background:'transparent', color:C.text2, fontSize:13, cursor:'pointer', fontFamily:'inherit' }}>+ Adicionar alimento</button>
-            </div>
-          : <div style={{ background:C.surface, borderRadius:14, padding:14, border:`0.5px solid ${C.border}`, marginTop:8 }}>
-              <div style={{ display:'flex', gap:8, marginBottom:10 }}>
-                <input autoFocus value={search} onChange={e=>{ setSearch(e.target.value); setAvulso(false) }} placeholder="Buscar alimento..."
-                  style={{ flex:1, background:C.surface2, border:`0.5px solid ${C.border}`, borderRadius:10, padding:'10px 12px', color:C.text, fontSize:14, fontFamily:'inherit' }}/>
-                <button onClick={()=>{ setAddingFood(false); setSearch(''); setAvulso(false) }} style={{ background:C.surface2, border:'none', borderRadius:10, padding:'0 12px', color:C.text2, cursor:'pointer', fontSize:18 }}>✕</button>
-              </div>
-              {/* Avulso button */}
-              {!avulso&&<button onClick={()=>{ setAvulso(true); setSearch('') }}
-                style={{ width:'100%', padding:'9px', border:`1px dashed ${C.gold}60`, borderRadius:10, background:`${C.gold}08`, color:C.gold, fontSize:12, cursor:'pointer', fontFamily:'inherit', fontWeight:600, marginBottom:10, display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
-                ⚡ Entrada avulsa (evento, estimativa...)
-              </button>}
-              {/* Avulso form */}
-              {avulso&&<div style={{ background:C.surface2, borderRadius:12, padding:12, marginBottom:10, border:`1px solid ${C.gold}40` }}>
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
-                  <span style={{ fontSize:12, fontWeight:700, color:C.gold }}>⚡ Entrada avulsa</span>
-                  <button onClick={()=>setAvulso(false)} style={{ background:'none', border:'none', color:C.text2, cursor:'pointer', fontSize:16 }}>×</button>
-                </div>
-                <input placeholder="Nome (ex: Churrasco, Evento...)" value={avulsoData.name} onChange={e=>setAvulsoData(p=>({...p,name:e.target.value}))}
-                  style={{ width:'100%', background:C.surface, border:`0.5px solid ${C.border}`, borderRadius:8, padding:'8px 10px', color:C.text, fontSize:13, fontFamily:'inherit', marginBottom:8 }}/>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, marginBottom:10 }}>
-                  {[{key:'cal',label:'Kcal',color:C.gold},{key:'prot',label:'Proteína (g)',color:C.teal},{key:'carb',label:'Carb (g)',color:C.gold2},{key:'fat',label:'Gordura (g)',color:C.terra}].map(f=>(
-                    <div key={f.key}>
-                      <div style={{ fontSize:10, color:f.color, marginBottom:3, fontFamily:'JetBrains Mono,monospace' }}>{f.label}</div>
-                      <input type="number" placeholder="0" value={avulsoData[f.key]} onChange={e=>setAvulsoData(p=>({...p,[f.key]:e.target.value}))}
-                        style={{ width:'100%', background:C.surface, border:`0.5px solid ${C.border}`, borderRadius:8, padding:'7px 8px', color:C.text, fontSize:13, fontFamily:'JetBrains Mono,monospace' }}/>
-                    </div>
-                  ))}
-                </div>
-                <button onClick={()=>{
-                  if (!avulsoData.name&&!avulsoData.cal) return
-                  const day=getDay(activeKey)
-                  const item={ id:'avulso_'+Date.now(), qty:1, avulso:true, name:avulsoData.name||'Entrada avulsa', cal:parseFloat(avulsoData.cal)||0, prot:parseFloat(avulsoData.prot)||0, carb:parseFloat(avulsoData.carb)||0, fat:parseFloat(avulsoData.fat)||0 }
-                  updateDays({...days,[activeKey]:{...day,meals:{...day.meals,[activeMeal]:[...(day.meals[activeMeal]||[]),item]}}})
-                  setAvulsoData({name:'',cal:'',prot:'',carb:'',fat:''}); setAvulso(false); setAddingFood(false)
-                }} style={{ width:'100%', padding:'10px', background:`linear-gradient(135deg,${C.gold},${C.gold2})`, border:'none', borderRadius:10, color:C.btnText, fontSize:13, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>
-                  Adicionar à refeição
-                </button>
-              </div>}
-              {/* Food list */}
-              {!avulso&&<div style={{ maxHeight:280, overflowY:'auto' }}>
-                {!search&&favFoods.length>0&&(<>
-                  <div style={{ fontSize:10, fontWeight:700, color:C.text2, textTransform:'uppercase', letterSpacing:1, margin:'4px 0 8px', fontFamily:'JetBrains Mono,monospace' }}>⭐ Favoritos</div>
-                  {favFoods.map(f=><FoodRow key={f.id} food={f} onAdd={addFoodToMeal} mealId={activeMeal} C={C} onToggleFav={toggleMealFav}/>)}
-                  <div style={{ fontSize:10, fontWeight:700, color:C.text2, textTransform:'uppercase', letterSpacing:1, margin:'12px 0 8px', fontFamily:'JetBrains Mono,monospace' }}>Todos</div>
-                  {otherFoods.map(f=><FoodRow key={f.id} food={f} onAdd={addFoodToMeal} mealId={activeMeal} C={C} onToggleFav={toggleMealFav}/>)}
-                </>)}
-                {!search&&favFoods.length===0&&allFoods.map(f=><FoodRow key={f.id} food={f} onAdd={addFoodToMeal} mealId={activeMeal} C={C} onToggleFav={toggleMealFav}/>)}
-                {search&&(filtered.length>0?filtered.map(f=><FoodRow key={f.id} food={f} onAdd={addFoodToMeal} mealId={activeMeal} C={C} onToggleFav={toggleMealFav}/>):<div style={{ padding:'20px', textAlign:'center', color:C.text3, fontSize:13 }}>Nenhum resultado</div>)}
-              </div>}
-            </div>
-        }
-        {/* Activities */}
-        <div style={{ marginTop:16, background:C.surface, borderRadius:14, padding:14, border:`0.5px solid ${C.border}` }}>
-          <div style={{ fontSize:13, fontWeight:700, marginBottom:10, color:C.gold }}>💪 Atividades do dia</div>
-          {(currentDay.activities||[]).length===0&&<div style={{ fontSize:12, color:C.text3, marginBottom:10 }}>Nenhuma atividade registrada</div>}
-          {(currentDay.activities||[]).length>0&&<div style={{ display:'flex', flexWrap:'wrap', gap:6, marginBottom:10 }}>
-            {(currentDay.activities||[]).map(actId=>{
-              const act=ACTIVITIES.find(a=>a.id===actId); if(!act) return null
-              return <div key={actId} style={{ display:'flex', alignItems:'center', gap:5, background:act.color+'20', border:`1px solid ${act.color}40`, borderRadius:20, padding:'5px 10px' }}>
-                <span style={{ fontSize:13 }}>{act.icon}</span>
-                <span style={{ fontSize:11, color:act.color, fontWeight:600 }}>{act.label}</span>
-                <button onClick={()=>removeActivityFromDay(actId)} style={{ background:'none', border:'none', color:act.color, cursor:'pointer', fontSize:14, padding:0 }}>×</button>
-              </div>
-            })}
-          </div>}
-          <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
-            {ACTIVITIES.map(act=>{
-              const done=(currentDay.activities||[]).includes(act.id)
-              return <button key={act.id} onClick={()=>addActivityToDay(act.id)} disabled={done}
-                style={{ display:'flex', alignItems:'center', gap:4, padding:'5px 10px', border:`1px solid ${done?act.color:C.border}`, borderRadius:20, background:done?act.color+'20':'transparent', cursor:done?'default':'pointer', fontFamily:'inherit' }}>
-                <span style={{ fontSize:12 }}>{act.icon}</span>
-                <span style={{ fontSize:10, color:done?act.color:C.text2, fontWeight:done?700:400 }}>{act.label}</span>
-              </button>
-            })}
-          </div>
-        </div>
-      </div>
+      <Alimentacao
+        T={T} C={C} isMobile={isMobile} isWide={isWide}
+        activeKey={activeKey} today={today} isToday={activeKey===today}
+        currentDay={currentDay} dayMacros={dayMacros} activeTargets={activeTargets} hasData={hasData}
+        MEALS={MEALS} ACTIVITIES={ACTIVITIES} allFoods={allFoods}
+        activeMeal={activeMeal} setActiveMeal={setActiveMeal}
+        addingFood={addingFood} setAddingFood={setAddingFood}
+        search={search} setSearch={setSearch}
+        avulso={avulso} setAvulso={setAvulso}
+        avulsoData={avulsoData} setAvulsoData={setAvulsoData}
+        addFoodToMeal={addFoodToMeal} addFavoriteMeal={addFavoriteMeal} toggleMealFav={toggleMealFav}
+        updateQty={updateQty} removeFood={removeFood} addAvulsoItem={addAvulsoItem}
+        addActivityToDay={addActivityToDay} removeActivityFromDay={removeActivityFromDay}
+        farolProt={farolProt} farolFat={farolFat} farolCarb={farolCarb} FoodRow={FoodRow}
+        onPrevDay={()=>shiftActiveDay(-1)} onNextDay={()=>shiftActiveDay(1)} onGoToday={goToToday}
+      />
     )
   }
 
