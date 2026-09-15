@@ -43,7 +43,18 @@ export default function CaloriesChart({ data, T, onClick, onBarClick }) {
         {/* barras */}
         {bars.map((b, i) => {
           if (b.kcal == null) {
-            // dia sem registro (ou futuro): marca discreta na base
+            // dia sem registro, futuro, ou hoje aguardando jantar
+            if (b.pendingDinner) {
+              // hoje com comida mas sem jantar: contorno tracejado (não é total definitivo)
+              const ph = (H - PT - PB) * 0.35
+              return (
+                <g key={i} onMouseEnter={() => setHover(i)}>
+                  <rect x={bx(i)} y={baseY - ph} width={barW} height={ph} rx="3" fill="none" stroke={T.accentOrange} strokeWidth="1" strokeDasharray="3,2" opacity="0.6" />
+                  <text x={bx(i) + barW / 2} y={baseY - ph - 3} fontSize="8" fill={T.accentOrange} textAnchor="middle">⏳</text>
+                  <text x={bx(i) + barW / 2} y={baseY + 14} fontSize="7.5" fill={T.accentOrange} textAnchor="middle" fontFamily="JetBrains Mono, monospace">{dias[i]}</text>
+                </g>
+              )
+            }
             return (
               <g key={i}>
                 <text x={bx(i) + barW / 2} y={baseY + 14} fontSize="7.5" fill={T.textMuted} textAnchor="middle" fontFamily="JetBrains Mono, monospace">{dias[i]}</text>
@@ -71,6 +82,13 @@ export default function CaloriesChart({ data, T, onClick, onBarClick }) {
           </g>
         )}
 
+        {/* tooltip pending dinner */}
+        {hover != null && bars[hover].pendingDinner && (
+          <g>
+            <rect x={Math.min(bx(hover) - 40, W - 150)} y={PT} width="148" height="16" rx="4" fill={T.surfaceElevated} stroke={T.border} strokeWidth="0.5" />
+            <text x={Math.min(bx(hover) - 34, W - 144)} y={PT + 11} fontSize="7" fill={T.accentOrange} fontFamily="JetBrains Mono, monospace">Aguardando registro do jantar</text>
+          </g>
+        )}
         {/* tooltip */}
         {hover != null && bars[hover].kcal != null && (
           <g>
@@ -93,6 +111,11 @@ export default function CaloriesChart({ data, T, onClick, onBarClick }) {
           </span>
         )}
       </div>
+      {bars.some(b => b.pendingDinner) && (
+        <div style={{ fontSize: 9.5, color: T.accentOrange, marginTop: 6, fontFamily: 'JetBrains Mono, monospace' }}>
+          ⏳ Hoje ainda não incluído — aguardando registro do jantar
+        </div>
+      )}
     </div>
   )
 }

@@ -78,10 +78,12 @@ function avgOverDates(dataObj, dates, keyFn) {
   return { mean: avg(vals), n: vals.length }
 }
 
-function avgMacrosOverDates(days, dates, calcMacros, allFoods) {
+function avgMacrosOverDates(days, dates, calcMacros, allFoods, currentDateKey) {
   const totals = { cal: [], prot: [], carb: [], fat: [] }
   dates.forEach(d => {
     const day = days?.[d]
+    // Regra do dia alimentar encerrado (só aplica quando currentDateKey é informado)
+    if (currentDateKey && !isNutritionDayEligible({ dateKey: d, dayData: day, currentDateKey })) return
     if (!day || !day.meals) return
     const items = Object.values(day.meals).flat()
     if (items.length === 0) return
@@ -107,14 +109,14 @@ function countSessions(days, dates, ACTIVITIES) {
 }
 
 function kpisFromDates(dates, deps) {
-  const { days, weights, bodyData, healthData, calcMacros, allFoods, ACTIVITIES } = deps
+  const { days, weights, bodyData, healthData, calcMacros, allFoods, ACTIVITIES, currentDateKey } = deps
   const weightAgg = avgOverDates(weights, dates, (v) => (typeof v === 'number' ? v : parseFloat(v)))
   const fatAgg = avgOverDates(bodyData, dates, (b) => b.bodyFat)
   const leanAgg = avgOverDates(bodyData, dates, (b) => b.leanMass)
   const stepsAgg = avgOverDates(healthData, dates, (h) => h.steps)
   const sleepAgg = avgOverDates(healthData, dates, (h) => h.sleep)
   const scoreAgg = avgOverDates(healthData, dates, (h) => h.sleepScore)
-  const macros = avgMacrosOverDates(days, dates, calcMacros, allFoods)
+  const macros = avgMacrosOverDates(days, dates, calcMacros, allFoods, currentDateKey)
   const sessions = countSessions(days, dates, ACTIVITIES)
   return {
     weight:     { value: r1(weightAgg.mean), n: weightAgg.n },
@@ -171,30 +173,35 @@ export function weekWeightSeries(monday, weights) {
 // Kcal por dia da semana + meta do dia (getTargetsForDate) + média (só dias com registro)
 // deps: { days, calcMacros, allFoods, targets, targetsHistory, getTargetsForDate }
 export function weekCaloriesSeries(monday, deps) {
-  const { days, calcMacros, allFoods, targets, targetsHistory, getTargetsForDate } = deps
-  const todayStr = ymd(new Date())
+  const { days, calcMacros, allFoods, targets, targetsHistory, getTargetsForDate, currentDateKey } = deps
+  const todayStr = currentDateKey || ymd(new Date())
   const dates = weekDates(monday)
   const bars = dates.map(d => {
     const day = days?.[d]
+    const eligible = isNutritionDayEligible({ dateKey: d, dayData: day, currentDateKey: todayStr })
     let kcal = null
+    let pendingDinner = false // hoje com comida mas sem jantar → aguardando
     if (day && day.meals) {
       const items = Object.values(day.meals).flat()
       if (items.length > 0) {
-        const m = calcMacros(items, allFoods)
-        if (m.cal > 0) kcal = Math.round(m.cal)
+        if (eligible) {
+          const m = calcMacros(items, allFoods)
+          if (m.cal > 0) kcal = Math.round(m.cal)
+        } else if (d === todayStr) {
+          pendingDinner = true // tem comida hoje mas jantar ainda não registrado
+        }
       }
     }
     const dObj = new Date(d + 'T12:00:00')
-    const dow = dObj.getDay() // 0=Dom,6=Sáb
+    const dow = dObj.getDay()
     const isWeekendDay = dow === 0 || dow === 6
     const goalT = getTargetsForDate(targets, targetsHistory, d)
     const goal = goalT?.cal || null
     const future = d > todayStr
-    return { date: d, kcal, goal, isWeekendDay, future }
+    return { date: d, kcal, goal, isWeekendDay, future, pendingDinner }
   })
   const registered = bars.filter(b => b.kcal != null).map(b => b.kcal)
   const mean = registered.length ? Math.round(registered.reduce((a, b) => a + b, 0) / registered.length) : null
-  // Meta média dos dias com registro
   const goalsForRegistered = bars.filter(b => b.kcal != null && b.goal != null).map(b => b.goal)
   const goalMean = goalsForRegistered.length ? Math.round(goalsForRegistered.reduce((a, b) => a + b, 0) / goalsForRegistered.length) : null
   return { bars, mean, n: registered.length, goalMean }
@@ -204,7 +211,7 @@ export function weekCaloriesSeries(monday, deps) {
 // Grupos: geral, úteis (seg-sex), fds (sáb-dom), comTreino, semTreino
 // deps: { days, weights, bodyData, healthData, calcMacros, allFoods }
 export function weekComparison(monday, deps) {
-  const { days, weights, bodyData, healthData, calcMacros, allFoods } = deps
+  const { days, weights, bodyData, healthData, calcMacros, allFoods, currentDateKey } = deps
   const dates = weekDates(monday)
 
   const isWeekend = (d) => { const w = new Date(d + 'T12:00:00').getDay(); return w === 0 || w === 6 }
@@ -225,6 +232,8 @@ export function weekComparison(monday, deps) {
     const macroVals = { cal: [], prot: [], carb: [], fat: [] }
     groupDates.forEach(d => {
       const day = days?.[d]
+      // Regra do dia alimentar encerrado (só macros; passos/sono não usam)
+      if (currentDateKey && !isNutritionDayEligible({ dateKey: d, dayData: day, currentDateKey })) return
       if (day && day.meals) {
         const items = Object.values(day.meals).flat()
         if (items.length > 0) {
@@ -479,4 +488,32 @@ export function buildInsights(deps) {
   const order = { atencao: 0, progresso: 1, associacao: 2, qualidade: 3 }
   insights.sort((a, b) => order[a.cat] - order[b.cat])
   return insights.slice(0, 4)
+}
+
+// ── Regra do "dia alimentar encerrado" ──
+// Dia atual só entra nas análises nutricionais depois de ter ao menos 1 item no Jantar (id 'janta').
+// Dias passados entram se tiverem qualquer alimentação. Futuro nunca entra.
+export const DINNER_MEAL_ID = 'janta'
+
+function hasAnyFoodRegistered(dayData) {
+  if (!dayData || !dayData.meals) return false
+  return Object.values(dayData.meals).some(arr => Array.isArray(arr) && arr.length > 0)
+}
+
+function hasValidDinnerItem(dayData, dinnerMealId) {
+  if (!dayData || !dayData.meals) return false
+  const dinner = dayData.meals[dinnerMealId]
+  return Array.isArray(dinner) && dinner.length > 0
+}
+
+// Retorna true se o dia é elegível para as métricas NUTRICIONAIS da Visão Geral
+export function isNutritionDayEligible({ dateKey, dayData, currentDateKey, dinnerMealId = DINNER_MEAL_ID }) {
+  if (dateKey > currentDateKey) return false            // futuro nunca entra
+  if (dateKey < currentDateKey) return hasAnyFoodRegistered(dayData) // passado: qualquer alimentação
+  return hasValidDinnerItem(dayData, dinnerMealId)      // hoje: só com jantar
+}
+
+// Filtra uma lista de datas retornando apenas as elegíveis para nutrição
+export function eligibleNutritionDates(dates, days, currentDateKey, dinnerMealId = DINNER_MEAL_ID) {
+  return dates.filter(d => isNutritionDayEligible({ dateKey: d, dayData: days?.[d], currentDateKey, dinnerMealId }))
 }

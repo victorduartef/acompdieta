@@ -607,7 +607,8 @@ export default function App() {
   const overviewIsCurrent = isCurWeek(overviewMonday)
   const overviewElapsed = elapsedDaysInWeek(overviewMonday)
   const overviewPartial = overviewIsCurrent && overviewElapsed < 7
-  const kpiDeps = { days, weights, bodyData, healthData, calcMacros, allFoods, ACTIVITIES }
+  const overviewToday = todayKey()
+  const kpiDeps = { days, weights, bodyData, healthData, calcMacros, allFoods, ACTIVITIES, currentDateKey: overviewToday }
   const overviewKpis = computeWeekKPIs(overviewMonday, kpiDeps)
   const overviewPrevMonday = mondayForOffset(overviewWeekOffset + 1)
   // Semana parcial compara com os mesmos dias decorridos da semana anterior; completa compara semana cheia
@@ -619,8 +620,8 @@ export default function App() {
   // Painéis: séries por dia da semana selecionada
   const overviewWeightSeries = weekWeightSeries(overviewMonday, weights)
   const overviewPrevWeightSeries = weekWeightSeries(overviewPrevMonday, weights)
-  const overviewCaloriesData = weekCaloriesSeries(overviewMonday, { days, calcMacros, allFoods, targets, targetsHistory, getTargetsForDate })
-  const overviewComparison = weekComparison(overviewMonday, { days, weights, bodyData, healthData, calcMacros, allFoods })
+  const overviewCaloriesData = weekCaloriesSeries(overviewMonday, { days, calcMacros, allFoods, targets, targetsHistory, getTargetsForDate, currentDateKey: overviewToday })
+  const overviewComparison = weekComparison(overviewMonday, { days, weights, bodyData, healthData, calcMacros, allFoods, currentDateKey: overviewToday })
 
   // Blocos inferiores (Fase 4)
   const overviewBodyWeeks = fourWeekBodyComposition(overviewMonday, { bodyData, weights })
