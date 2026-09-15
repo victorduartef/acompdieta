@@ -48,7 +48,7 @@ export default function CaloriesChart({ data, T, onClick, onBarClick }) {
               // hoje com comida mas sem jantar: contorno tracejado (não é total definitivo)
               const ph = (H - PT - PB) * 0.35
               return (
-                <g key={i} onMouseEnter={() => setHover(i)}>
+                <g key={i} onMouseEnter={() => setHover(i)} onClick={() => setHover(h => h === i ? null : i)} style={{ cursor: 'pointer' }}>
                   <rect x={bx(i)} y={baseY - ph} width={barW} height={ph} rx="3" fill="none" stroke={T.accentOrange} strokeWidth="1" strokeDasharray="3,2" opacity="0.6" />
                   <text x={bx(i) + barW / 2} y={baseY - ph - 3} fontSize="8" fill={T.accentOrange} textAnchor="middle">⏳</text>
                   <text x={bx(i) + barW / 2} y={baseY + 14} fontSize="7.5" fill={T.accentOrange} textAnchor="middle" fontFamily="JetBrains Mono, monospace">{dias[i]}</text>
@@ -65,8 +65,8 @@ export default function CaloriesChart({ data, T, onClick, onBarClick }) {
           const color = b.isWeekendDay ? T.accentRed : T.accentBlue
           const h = baseY - by(b.kcal)
           return (
-            <g key={i} onMouseEnter={() => setHover(i)} style={{ cursor: onBarClick ? 'pointer' : 'default' }}
-              onClick={(e) => { if (onBarClick) { e.stopPropagation(); onBarClick(b.date) } }}>
+            <g key={i} onMouseEnter={() => setHover(i)} style={{ cursor: 'pointer' }}
+              onClick={(e) => { e.stopPropagation(); setHover(h => h === i ? null : i); if (onBarClick) onBarClick(b.date) }}>
               <rect x={bx(i)} y={by(b.kcal)} width={barW} height={Math.max(1, h)} rx="3"
                 fill={color} opacity={hover === i ? 1 : 0.85} />
               <text x={bx(i) + barW / 2} y={baseY + 14} fontSize="7.5" fill={b.isWeekendDay ? T.accentRed : T.textMuted} textAnchor="middle" fontFamily="JetBrains Mono, monospace" opacity={b.isWeekendDay ? 0.9 : 1}>{dias[i]}</text>

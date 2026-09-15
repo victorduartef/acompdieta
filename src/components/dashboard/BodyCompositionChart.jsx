@@ -56,7 +56,7 @@ export default function BodyCompositionChart({ weeks, T, onClick }) {
         ))}
         {/* barras massa magra + gordura */}
         {weeks.map((w, i) => (
-          <g key={i} onMouseEnter={() => setHover(i)} style={{ cursor: 'pointer' }}>
+          <g key={i} onMouseEnter={() => setHover(i)} onClick={() => setHover(h => h === i ? null : i)} style={{ cursor: 'pointer' }}>
             {w.leanMass != null && (
               <rect x={gx(i)} y={byKg(w.leanMass)} width={barW} height={Math.max(1, baseY - byKg(w.leanMass))} rx="2" fill={T.accentTeal} opacity={hover === i ? 1 : 0.85} />
             )}

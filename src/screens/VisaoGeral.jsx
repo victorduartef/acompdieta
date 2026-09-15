@@ -13,7 +13,7 @@ import InsightsPanel from '../components/dashboard/InsightsPanel.jsx'
 // Props: T, isWide, userName, weekLabel, isCurrentWeekFlag, isPartial, onPrevWeek, onNextWeek, onResetWeek,
 //        kpis (semana selecionada), prevKpis (semana anterior p/ comparação), targets
 export default function VisaoGeral({
-  T, isWide, userName, weekLabel, isCurrentWeekFlag, isPartial,
+  T, isWide, isMobile, userName, weekLabel, isCurrentWeekFlag, isPartial,
   onPrevWeek, onNextWeek, onResetWeek, kpis, prevKpis, targets,
   weightSeries, prevWeightMean, caloriesData, comparison,
   bodyWeeks, healthSteps, healthSleep, healthScore, healthPrevMeans, training, prevVolume, insights,
@@ -77,20 +77,20 @@ export default function VisaoGeral({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {/* Cabeçalho */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', flexWrap: 'wrap', gap: isMobile ? 8 : 12, flexDirection: isMobile ? 'column' : 'row' }}>
         <div>
-          <div style={{ fontSize: 18, fontWeight: 800, color: T.textPrimary }}>
+          <div style={{ fontSize: isMobile ? 16 : 18, fontWeight: 800, color: T.textPrimary, whiteSpace: 'nowrap' }}>
             {greeting}{userName ? `, ${userName}` : ''} 👋
           </div>
-          <div style={{ fontSize: 12, color: T.textSecondary, marginTop: 2 }}>Disciplina hoje. Um você mais forte amanhã.</div>
+          {!isMobile && <div style={{ fontSize: 12, color: T.textSecondary, marginTop: 2 }}>Disciplina hoje. Um você mais forte amanhã.</div>}
         </div>
 
         {/* Seletor de semana */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: isMobile ? '100%' : 'auto' }}>
           <button onClick={onPrevWeek} style={navBtn(T)} title="Semana anterior">‹</button>
           <div style={{
             display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', borderRadius: 10,
-            background: T.surfaceElevated, border: `1px solid ${T.border}`, minWidth: 150, justifyContent: 'center',
+            background: T.surfaceElevated, border: `1px solid ${T.border}`, minWidth: 130, flex: isMobile ? 1 : 'none', justifyContent: 'center',
           }}>
             <span style={{ fontSize: 12 }}>🗓️</span>
             <span style={{ fontSize: 12, color: T.textPrimary, fontWeight: 600, fontFamily: 'JetBrains Mono, monospace', fontVariantNumeric: 'tabular-nums' }}>{weekLabel}</span>
@@ -109,8 +109,9 @@ export default function VisaoGeral({
         </div>
       </div>
 
-      {/* 12 KPIs */}
-      <div className="evo-kpi-grid">
+      {/* 12 KPIs — carrossel no mobile, grid no desktop */}
+      <div className={isMobile ? 'evo-kpi-wrap' : ''} style={isMobile ? { '--evo-fade': T.appBackground } : undefined}>
+      <div className={isMobile ? 'evo-kpi-carousel' : 'evo-kpi-grid'}>
         {defs.map((d) => {
           const k = kpis?.[d.key]
           const hasData = k && k.value != null && k.n > 0
@@ -135,16 +136,17 @@ export default function VisaoGeral({
           )
         })}
       </div>
+      </div>
 
       {/* Painéis analíticos principais (Fase 3) */}
-      <div style={{ display: 'grid', gridTemplateColumns: isWide ? '1.15fr 1.15fr 1fr' : '1fr', gap: 14, alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isWide ? '1.15fr 1.15fr 1fr' : (isMobile ? '1fr' : '1fr 1fr'), gap: 14, alignItems: 'start' }}>
         <WeightChart series={weightSeries} prevMean={prevWeightMean} T={T} onClick={onOpenPeso} />
         <CaloriesChart data={caloriesData} T={T} onClick={onOpenDay ? undefined : undefined} onBarClick={onOpenDay} />
         <ComparisonTable comp={comparison} T={T} />
       </div>
 
       {/* Blocos inferiores (Fase 4) */}
-      <div style={{ display: 'grid', gridTemplateColumns: isWide ? '1.15fr 1.15fr 1fr' : '1fr', gap: 14, alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isWide ? '1.15fr 1.15fr 1fr' : (isMobile ? '1fr' : '1fr 1fr'), gap: 14, alignItems: 'start' }}>
         <BodyCompositionChart weeks={bodyWeeks} T={T} onClick={onOpenPeso} />
         <WeeklyHealth steps={healthSteps} sleep={healthSleep} score={healthScore} prevMeans={healthPrevMeans} targets={targets} T={T} onClick={onOpenSaude} />
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>

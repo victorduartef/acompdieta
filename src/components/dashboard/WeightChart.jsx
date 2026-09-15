@@ -73,7 +73,7 @@ export default function WeightChart({ series, prevMean, T, onClick }) {
           <g key={i}>
             {p.weight != null && (
               <circle cx={cx(i)} cy={cy(p.weight)} r={hover === i ? 4.5 : 3.5} fill={T.accentBlue}
-                onMouseEnter={() => setHover(i)} style={{ cursor: 'pointer' }} />
+                onMouseEnter={() => setHover(i)} onClick={() => setHover(h => h === i ? null : i)} style={{ cursor: 'pointer' }} />
             )}
             <text x={cx(i)} y={H - 8} fontSize="7.5" fill={T.textMuted} textAnchor="middle" fontFamily="JetBrains Mono, monospace">{dias[i]}</text>
           </g>

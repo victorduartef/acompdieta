@@ -35,10 +35,11 @@ export default function ComparisonTable({ comp, T }) {
         <span style={{ fontSize: 13, fontWeight: 600, color: T.textPrimary }}>Comparativo de médias</span>
       </div>
 
+      <div className="evo-cmp-scroll">
       <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: 'JetBrains Mono, monospace', fontVariantNumeric: 'tabular-nums' }}>
         <thead>
           <tr>
-            <th style={{ textAlign: 'left', fontSize: 9.5, color: T.textMuted, fontWeight: 600, padding: '4px 6px', borderBottom: `1px solid ${T.border}` }}>Indicador</th>
+            <th style={{ textAlign: 'left', fontSize: 9.5, color: T.textMuted, fontWeight: 600, padding: '4px 6px', borderBottom: `1px solid ${T.border}`, background: T.surfacePrimary, position: 'sticky', left: 0 }}>Indicador</th>
             {cols.map(c => (
               <th key={c.key} title={`Média de ${c.label.toLowerCase()} (só dias com registro)`} style={{ textAlign: 'right', fontSize: 9.5, color: T.textMuted, fontWeight: 600, padding: '4px 6px', borderBottom: `1px solid ${T.border}`, whiteSpace: 'nowrap' }}>{c.label}</th>
             ))}
@@ -47,7 +48,7 @@ export default function ComparisonTable({ comp, T }) {
         <tbody>
           {rows.map((row, ri) => (
             <tr key={row.key} style={{ borderBottom: ri < rows.length - 1 ? `0.5px solid ${T.borderSoft}` : 'none' }}>
-              <td style={{ textAlign: 'left', fontSize: 11, color: T.textSecondary, fontWeight: 500, padding: '6px', fontFamily: "'Syne', sans-serif" }}>{row.label}</td>
+              <td style={{ textAlign: 'left', fontSize: 11, color: T.textSecondary, fontWeight: 500, padding: '6px', fontFamily: "'Syne', sans-serif", background: T.surfacePrimary, position: 'sticky', left: 0 }}>{row.label}</td>
               {cols.map(c => {
                 const cl = cell(c.key, row)
                 return (
@@ -62,6 +63,7 @@ export default function ComparisonTable({ comp, T }) {
           ))}
         </tbody>
       </table>
+      </div>
       <div style={{ fontSize: 9, color: T.textMuted, marginTop: 8, fontFamily: 'JetBrains Mono, monospace' }}>
         Médias só de dias com registro · <span style={{ color: T.accentAmber }}>•</span> amostra pequena (≤1)
       </div>
