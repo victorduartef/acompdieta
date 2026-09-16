@@ -517,3 +517,21 @@ export function isNutritionDayEligible({ dateKey, dayData, currentDateKey, dinne
 export function eligibleNutritionDates(dates, days, currentDateKey, dinnerMealId = DINNER_MEAL_ID) {
   return dates.filter(d => isNutritionDayEligible({ dateKey: d, dayData: days?.[d], currentDateKey, dinnerMealId }))
 }
+
+// ── Duração total de treino na semana (só soma logs com start+end válidos) ──
+export function weekWorkoutDuration(monday, workoutLogs) {
+  const dates = weekDates(monday)
+  let totalMs = 0, n = 0
+  dates.forEach(d => {
+    const logs = workoutLogs?.[d]
+    if (!logs) return
+    const arr = Array.isArray(logs) ? logs : [logs]
+    arr.forEach(log => {
+      if (log.startTime && log.endTime && log.endTime > log.startTime) {
+        totalMs += (log.endTime - log.startTime)
+        n++
+      }
+    })
+  })
+  return { totalMinutes: n > 0 ? Math.round(totalMs / 60000) : null, n }
+}

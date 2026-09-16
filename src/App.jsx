@@ -6,8 +6,11 @@ import Sidebar from './components/Sidebar.jsx'
 import VisaoGeral from './screens/VisaoGeral.jsx'
 import BottomNav from './components/BottomNav.jsx'
 import MoreSheet from './components/MoreSheet.jsx'
-import { mondayForOffset, weekRangeLabel, elapsedDaysInWeek, isCurrentWeek as isCurWeek, computeWeekKPIs, computeWeekKPIsPartial, weekWeightSeries, weekCaloriesSeries, weekComparison, fourWeekBodyComposition, weekHealthMetric, weekTraining, weekVolume, buildInsights, isNutritionDayEligible, DINNER_MEAL_ID } from './lib/dashboardMetrics.js'
+import { mondayForOffset, weekRangeLabel, elapsedDaysInWeek, isCurrentWeek as isCurWeek, computeWeekKPIs, computeWeekKPIsPartial, weekWeightSeries, weekCaloriesSeries, weekComparison, fourWeekBodyComposition, weekHealthMetric, weekTraining, weekVolume, weekWorkoutDuration, buildInsights, isNutritionDayEligible, DINNER_MEAL_ID } from './lib/dashboardMetrics.js'
 import Alimentacao from './screens/Alimentacao.jsx'
+import TreinoResumo from './screens/TreinoResumo.jsx'
+import TrainingNavigation from './components/training/TrainingNavigation.jsx'
+import WorkoutPlanCard from './components/training/WorkoutPlanCard.jsx'
 
 // ── FOODS DATABASE ──────────────────────────────────────────────────────────
 const DEFAULT_FOODS = [
@@ -302,7 +305,10 @@ export default function App() {
   const [workoutPlans, setWorkoutPlans] = useState([]) // fichas de treino do usuário
   const [customExercises, setCustomExercises] = useState([]) // exercícios criados pelo usuário
   const [workoutLogs, setWorkoutLogs] = useState({}) // registros de treino por data
-  const [treinoView, setTreinoView] = useState('resumo') // resumo | fichas | ficha | live | exercicios
+  const [treinoView, setTreinoView] = useState('resumo') // resumo | fichas | ficha | live | exercicios | evolucao | mapa
+  // Navegação-só (não é dado de treino): permite "espiar" Resumo/Fichas com uma sessão ativa,
+  // sem tocar na lógica do treino ao vivo (liveSession/restTimer intocados).
+  const [treinoPeek, setTreinoPeek] = useState(false)
   const [activePlanId, setActivePlanId] = useState(null)
   const [editingExercise, setEditingExercise] = useState(null)
   const [liveSession, setLiveSession] = useState(null) // { planId, exercises:[{exId, sets:[{weight,reps,done}], skipped}], startTime }
@@ -377,6 +383,9 @@ export default function App() {
     return () => { clearInterval(iv); document.removeEventListener('visibilitychange', onVis); window.removeEventListener('focus', onVis) }
   }, [restTimer])
 
+  // Ao sair da aba Treino, volta a mostrar o treino ao vivo (se houver) da próxima vez que entrar
+  useEffect(() => { if (tab !== 'treino') setTreinoPeek(false) }, [tab])
+
   // ── Persistência do treino em andamento (localStorage) ──
   // Restaura sessão ao abrir; salva a cada mudança para não perder progresso ao atualizar/fechar.
   useEffect(() => {
@@ -441,6 +450,66 @@ export default function App() {
     // Barra livre: soma o peso da barra
     if (e.usesBar) w = w + (e.barWeight || 0)
     return w
+  }
+
+  // Inicia uma sessão de treino ao vivo para uma ficha (mesma lógica usada nas fichas — centralizada aqui
+  // para não duplicar a construção da sessão em vários lugares). Não altera o formato de liveSession.
+  function startPlanSession(plan) {
+    if (!plan || plan.exercises.length === 0) { alert('Adicione exercícios à ficha primeiro!'); return }
+    const session = {
+      planId: plan.id,
+      startTime: Date.now(),
+      exercises: plan.exercises.map(ex => ({
+        exerciseId: ex.exerciseId,
+        targetSets: ex.targetSets || 3,
+        targetReps: ex.targetReps || '10',
+        restSeconds: ex.restSeconds || 90,
+        sets: [],
+        skipped: false,
+      })),
+      currentIdx: 0,
+    }
+    setLiveSession(session)
+    setTreinoPeek(false)
+  }
+
+  function createNewFicha() {
+    const id = 'plan_' + Date.now()
+    const newPlan = { id, name:'Nova Ficha', exercises:[] }
+    updateWorkoutPlans([...workoutPlans, newPlan])
+    setActivePlanId(id); setTreinoView('fichas')
+  }
+
+  // Última treinada / sugestão de próxima (rotação) / última execução por ficha — mesma regra de sempre,
+  // só centralizada para ser usada tanto no Resumo quanto na lista de Fichas (evita divergência).
+  function computePlanInsights() {
+    const planHistory = []
+    Object.entries(workoutLogs).sort(([a],[b])=>b.localeCompare(a)).forEach(([date, logs]) => {
+      const arr = Array.isArray(logs) ? logs : [logs]
+      arr.forEach(log => { if (log.planId) planHistory.push({ date, planId:log.planId, planName:log.planName, log }) })
+    })
+    const lastTrained = planHistory[0] || null
+    const lastByPlan = {}
+    const lastExecByPlan = {}
+    planHistory.forEach(h => { if (!lastByPlan[h.planId]) { lastByPlan[h.planId] = h.date; lastExecByPlan[h.planId] = h } })
+    const suggestNext = (() => {
+      if (workoutPlans.length === 0) return null
+      const sorted = [...workoutPlans].sort((a,b) => {
+        const da = lastByPlan[a.id] || '0000-00-00'
+        const db = lastByPlan[b.id] || '0000-00-00'
+        return da.localeCompare(db)
+      })
+      return sorted[0]
+    })()
+    const getLastExecution = (planId) => {
+      const h = lastExecByPlan[planId]
+      if (!h) return null
+      const log = h.log
+      const volume = (log.exercises||[]).reduce((a,e)=>a+(e.sets||[]).reduce((s,set)=>s+effectiveWeight(e.exerciseId,set.weight)*(set.reps||0),0),0)
+      const durationMin = log.startTime&&log.endTime ? Math.round((log.endTime-log.startTime)/60000) : null
+      return { date: h.date, volume, durationMin }
+    }
+    return { lastTrained, suggestNext, getLastExecution }
   }
   const getMuscle = (id) => MUSCLE_GROUPS.find(m => m.id === id) || (id === 'ombro' ? MUSCLE_GROUPS.find(m => m.id === 'ombro_ant') : null)
   const getEquipment = (id) => EQUIPMENTS.find(e => e.id === id)
@@ -997,30 +1066,46 @@ export default function App() {
   // ── TREINO ──────────────────────────────────────────────────────────────────
   // ── TREINO ROUTER ──
   function renderTreino() {
-    if (liveSession) return renderLive()
+    // Sessão ativa domina a tela por padrão (como sempre), mas "treinoPeek" (navegação, não persistido)
+    // permite dar uma olhada no Resumo/Fichas/etc sem encerrar o treino ao vivo.
+    if (liveSession && !treinoPeek) return renderLive()
+    const hasPlans = workoutPlans.length > 0
+    const planInsightsHdr = hasPlans ? computePlanInsights() : null
     return (
       <div>
-        {/* Sub-navegação */}
-        <div style={{ display:'flex', gap:6, marginBottom:16, overflowX:'auto' }}>
-          {[
-            { id:'resumo', label:'📊 Resumo' },
-            { id:'fichas', label:'📋 Fichas' },
-            { id:'evolucao', label:'📈 Evolução' },
-            { id:'exercicios', label:'🏋️ Exercícios' },
-          ].map(v => (
-            <button key={v.id} onClick={()=>{ setTreinoView(v.id); setActivePlanId(null); setEditingExercise(null) }}
-              style={{ flex:isWide?'0 0 auto':1, minWidth:100, padding:'9px 14px', border:'none', borderRadius:10, fontSize:12, fontWeight:treinoView===v.id?700:400, cursor:'pointer', fontFamily:'inherit',
-                background: treinoView===v.id ? `linear-gradient(135deg,${C.gold},${C.gold2})` : C.surface2,
-                color: treinoView===v.id ? C.btnText : C.text2 }}>
-              {v.label}
-            </button>
-          ))}
+        {/* Cabeçalho do módulo */}
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:isMobile?'flex-start':'center', flexDirection:isMobile?'column':'row', gap:10, marginBottom:14 }}>
+          <div>
+            <div style={{ fontSize:isMobile?17:19, fontWeight:800, color:T.textPrimary }}>Treino</div>
+            <div style={{ fontSize:12, color:T.textSecondary, marginTop:1 }}>
+              {liveSession ? 'Você tem um treino em andamento.' : hasPlans ? 'Pronto para o próximo treino?' : 'Crie sua primeira ficha para começar.'}
+            </div>
+          </div>
+          <div style={{ display:'flex', gap:8, width:isMobile?'100%':'auto' }}>
+            {liveSession ? (
+              <button onClick={()=>setTreinoPeek(false)} style={{ flex:1, padding:'11px 16px', minHeight:44, background:`linear-gradient(135deg,${T.accentPurple},${T.accentPurple}cc)`, border:'none', borderRadius:10, color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>▶ Continuar treino</button>
+            ) : hasPlans ? (
+              <>
+                <button onClick={()=>startPlanSession(planInsightsHdr.suggestNext || workoutPlans[0])} style={{ flex:isMobile?1:'0 0 auto', padding:'11px 16px', minHeight:44, background:`linear-gradient(135deg,${T.accentTeal},#0ea5a5)`, border:'none', borderRadius:10, color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>▶ Iniciar treino</button>
+                <button onClick={createNewFicha} style={{ padding:'11px 14px', minHeight:44, background:T.surfaceElevated, border:`1px solid ${T.border}`, borderRadius:10, color:T.textSecondary, fontSize:12.5, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>+ Nova ficha</button>
+              </>
+            ) : (
+              <button onClick={createNewFicha} style={{ flex:isMobile?1:'0 0 auto', padding:'11px 16px', minHeight:44, background:`linear-gradient(135deg,${T.accentPurple},${T.accentPurple}cc)`, border:'none', borderRadius:10, color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>+ Nova ficha</button>
+            )}
+          </div>
         </div>
+
+        <TrainingNavigation
+          active={treinoView}
+          onChange={(id)=>{ setTreinoView(id); setActivePlanId(null); setEditingExercise(null); setTreinoPeek(true) }}
+          T={T} isMobile={isMobile}
+        />
 
         {treinoView==='resumo' && renderTreinoResumo()}
         {treinoView==='fichas' && !activePlanId && renderFichas()}
         {treinoView==='fichas' && activePlanId && renderFichaEditor()}
         {treinoView==='evolucao' && renderEvolucao()}
+        {treinoView==='mapa' && renderEvolucao()}
         {treinoView==='exercicios' && renderExerciciosLib()}
       </div>
     )
@@ -1028,137 +1113,48 @@ export default function App() {
 
   // ── FICHAS (lista) ──
   function renderFichas() {
-    // Build history of which plan was trained on each date (most recent first)
-    const planHistory = []
-    Object.entries(workoutLogs).sort(([a],[b])=>b.localeCompare(a)).forEach(([date, logs]) => {
-      const arr = Array.isArray(logs) ? logs : [logs]
-      arr.forEach(log => { if (log.planId) planHistory.push({ date, planId:log.planId, planName:log.planName }) })
-    })
-    const lastTrained = planHistory[0] || null
-    // Suggest next plan: the one trained longest ago (or never), following rotation
-    const suggestNext = (() => {
-      if (workoutPlans.length === 0) return null
-      // For each plan, find its last trained date
-      const lastByPlan = {}
-      planHistory.forEach(h => { if (!lastByPlan[h.planId]) lastByPlan[h.planId] = h.date })
-      // Plan never trained comes first, else the oldest
-      const sorted = [...workoutPlans].sort((a,b) => {
-        const da = lastByPlan[a.id] || '0000-00-00'
-        const db = lastByPlan[b.id] || '0000-00-00'
-        return da.localeCompare(db)
-      })
-      return sorted[0]
-    })()
+    const twoCol = isDesktop || isTablet
+    const planInsights = computePlanInsights()
 
     return (
       <div>
-        {/* Última ficha treinada + sugestão */}
-        {lastTrained && (() => {
-          const lastPlan = workoutPlans.find(p=>p.id===lastTrained.planId)
-          return (
-            <div style={{ background:C.surface, borderRadius:14, padding:14, marginBottom:14, border:`0.5px solid ${C.border}` }}>
-              <div style={{ display:'flex', gap:12, alignItems:'stretch' }}>
-                <div style={{ flex:1, background:C.bg, borderRadius:10, padding:'10px 12px' }}>
-                  <div style={{ fontSize:9, color:C.text2, marginBottom:4, fontFamily:'JetBrains Mono,monospace', textTransform:'uppercase', letterSpacing:1 }}>Última treinada</div>
-                  <div style={{ fontSize:15, fontWeight:800, color:C.text }}>{lastPlan?.name || lastTrained.planName || '—'}</div>
-                  <div style={{ fontSize:10, color:C.text3, marginTop:2, fontFamily:'JetBrains Mono,monospace' }}>{formatDateFull(lastTrained.date)}</div>
-                </div>
-                {suggestNext && (
-                  <div style={{ flex:1, background:`${C.teal}12`, borderRadius:10, padding:'10px 12px', border:`1px solid ${C.teal}40` }}>
-                    <div style={{ fontSize:9, color:C.teal, marginBottom:4, fontFamily:'JetBrains Mono,monospace', textTransform:'uppercase', letterSpacing:1 }}>Sugestão de hoje</div>
-                    <div style={{ fontSize:15, fontWeight:800, color:C.text }}>{suggestNext.name}</div>
-                    <button onClick={()=>{
-                      if (suggestNext.exercises.length === 0) { alert('Adicione exercícios à ficha primeiro!'); return }
-                      const session = {
-                        planId: suggestNext.id, startTime: Date.now(),
-                        exercises: suggestNext.exercises.map(ex => ({ exerciseId:ex.exerciseId, targetSets:ex.targetSets||3, targetReps:ex.targetReps||'10', restSeconds:ex.restSeconds||90, sets:[], skipped:false })),
-                        currentIdx: 0,
-                      }
-                      setLiveSession(session)
-                    }} style={{ marginTop:6, background:`linear-gradient(135deg,${C.teal},#0ea5a5)`, border:'none', borderRadius:8, padding:'6px 12px', color:'#fff', fontSize:11, cursor:'pointer', fontFamily:'inherit', fontWeight:700 }}>▶ Iniciar esta</button>
-                  </div>
-                )}
-              </div>
-            </div>
-          )
-        })()}
-
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
-          <div style={{ fontSize:15, fontWeight:700, color:C.text }}>Minhas Fichas</div>
-          <button onClick={()=>{
-            const id = 'plan_' + Date.now()
-            const newPlan = { id, name:'Nova Ficha', exercises:[] }
-            updateWorkoutPlans([...workoutPlans, newPlan])
-            setActivePlanId(id)
-          }} style={{ background:`linear-gradient(135deg,${C.gold},${C.gold2})`, border:'none', borderRadius:10, padding:'8px 14px', color:C.btnText, fontSize:12, cursor:'pointer', fontFamily:'inherit', fontWeight:700 }}>+ Nova Ficha</button>
+          <div style={{ fontSize:15, fontWeight:700, color:T.textPrimary }}>Minhas Fichas</div>
+          <button onClick={createNewFicha} style={{ background:`linear-gradient(135deg,${T.accentPurple},${T.accentPurple}cc)`, border:'none', borderRadius:10, padding:'8px 14px', minHeight:44, color:'#fff', fontSize:12, cursor:'pointer', fontFamily:'inherit', fontWeight:700 }}>+ Nova Ficha</button>
         </div>
 
         {workoutPlans.length === 0 && (
-          <div style={{ textAlign:'center', padding:'40px 20px', color:C.text3 }}>
+          <div style={{ textAlign:'center', padding:'40px 20px', color:T.textMuted }}>
             <div style={{ fontSize:36, marginBottom:12 }}>📋</div>
-            <div style={{ fontSize:14, marginBottom:6, color:C.text2 }}>Nenhuma ficha ainda</div>
+            <div style={{ fontSize:14, marginBottom:6, color:T.textSecondary }}>Nenhuma ficha ainda</div>
             <div style={{ fontSize:12 }}>Crie sua primeira ficha de treino (A, B, C...)</div>
           </div>
         )}
 
-        <div style={isWide?{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:12 }:{}}>
-        {workoutPlans.map(plan => {
-          // Muscle summary for this plan
-          const muscles = {}
-          plan.exercises.forEach(ex => {
-            const e = getExercise(ex.exerciseId)
-            if (e) muscles[e.primary] = (muscles[e.primary]||0) + 1
-          })
-          const planLast = planHistory.find(h => h.planId === plan.id)
-          const topMuscles = Object.entries(muscles).sort((a,b)=>b[1]-a[1]).slice(0,3)
-          return (
-            <div key={plan.id} style={{ background:C.surface, borderRadius:14, padding:14, marginBottom:isWide?0:10, border:`0.5px solid ${C.border}` }}>
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:10 }}>
-                <div onClick={()=>setActivePlanId(plan.id)} style={{ flex:1, cursor:'pointer' }}>
-                  <div style={{ fontSize:15, fontWeight:700, color:C.text }}>{plan.name}</div>
-                  <div style={{ fontSize:11, color:C.text2, marginTop:2 }}>{plan.exercises.length} exercício(s)</div>
-                  {planLast ? <div style={{ fontSize:10, color:C.teal, marginTop:2, fontFamily:'JetBrains Mono,monospace' }}>última: {formatDateFull(planLast.date)}</div> : <div style={{ fontSize:10, color:C.text3, marginTop:2, fontFamily:'JetBrains Mono,monospace' }}>nunca treinada</div>}
-                </div>
-              </div>
-              {topMuscles.length > 0 && (
-                <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginBottom:12 }}>
-                  {topMuscles.map(([mid, count]) => {
-                    const m = getMuscle(mid)
-                    return <span key={mid} style={{ fontSize:9, padding:'2px 8px', borderRadius:10, background:`${m?.color||C.gold}20`, color:m?.color||C.gold, fontWeight:600 }}>{m?.label||mid} ({count})</span>
-                  })}
-                </div>
-              )}
-              <div style={{ display:'flex', gap:6 }}>
-                <button onClick={()=>{
-                  if (plan.exercises.length === 0) { alert('Adicione exercícios à ficha primeiro!'); return }
-                  const session = {
-                    planId: plan.id,
-                    startTime: Date.now(),
-                    exercises: plan.exercises.map(ex => ({
-                      exerciseId: ex.exerciseId,
-                      targetSets: ex.targetSets || 3,
-                      targetReps: ex.targetReps || '10',
-                      restSeconds: ex.restSeconds || 90,
-                      sets: [],
-                      skipped: false,
-                    })),
-                    currentIdx: 0,
-                  }
-                  setLiveSession(session)
-                }} style={{ flex:1, background:`linear-gradient(135deg,${C.teal},#0ea5a5)`, border:'none', borderRadius:10, padding:'9px', color:'#fff', fontSize:12, cursor:'pointer', fontFamily:'inherit', fontWeight:700 }}>▶ Iniciar</button>
-                <button onClick={()=>setActivePlanId(plan.id)} style={{ background:C.surface2, border:`1px solid ${C.border}`, borderRadius:10, padding:'9px 12px', color:C.text2, fontSize:12, cursor:'pointer', fontFamily:'inherit' }}>✎</button>
-                <button onClick={()=>{ if(window.confirm(`Excluir ficha "${plan.name}"?`)) updateWorkoutPlans(workoutPlans.filter(p=>p.id!==plan.id)) }} style={{ background:`${C.red}18`, border:'none', borderRadius:10, padding:'9px 12px', color:C.red, fontSize:14, cursor:'pointer' }}>×</button>
-              </div>
-            </div>
-          )
-        })}
+        <div style={twoCol?{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:12 }:{}}>
+          {workoutPlans.map(plan => (
+            <WorkoutPlanCard
+              key={plan.id}
+              plan={plan}
+              getExercise={getExercise}
+              getMuscle={getMuscle}
+              formatDateFull={formatDateFull}
+              lastExecution={planInsights.getLastExecution(plan.id)}
+              isLastTrained={planInsights.lastTrained?.planId === plan.id}
+              isSuggestedNext={planInsights.suggestNext?.id === plan.id}
+              onStart={()=>startPlanSession(plan)}
+              onEdit={()=>setActivePlanId(plan.id)}
+              onDelete={()=>{ if(window.confirm(`Excluir ficha "${plan.name}"?`)) updateWorkoutPlans(workoutPlans.filter(p=>p.id!==plan.id)) }}
+              onAddExercises={()=>setActivePlanId(plan.id)}
+              T={T} isMobile={isMobile}
+            />
+          ))}
         </div>
       </div>
     )
   }
 
-  // ── EDITOR DE FICHA ──
-  function renderFichaEditor() {
+function renderFichaEditor() {
     const plan = workoutPlans.find(p => p.id === activePlanId)
     if (!plan) { setActivePlanId(null); return null }
     const updatePlan = (updated) => updateWorkoutPlans(workoutPlans.map(p => p.id === plan.id ? updated : p))
@@ -1775,113 +1771,42 @@ export default function App() {
   }
 
   function renderTreinoResumo() {
-    const todayActivities=currentDay.activities||[]
-    const d=new Date(); const dow=d.getDay(); const diff=dow===0?-6:1-dow
-    const monday=new Date(d); monday.setDate(d.getDate()+diff)
-    const weekDays=[]
-    for(let i=0;i<7;i++){ const wd=new Date(monday); wd.setDate(monday.getDate()+i); weekDays.push(`${wd.getFullYear()}-${String(wd.getMonth()+1).padStart(2,'0')}-${String(wd.getDate()).padStart(2,'0')}`) }
-    const weekStrength=weekDays.filter(wd=>(days[wd]?.activities||[]).some(a=>ACTIVITIES.find(x=>x.id===a)?.type==='strength')).length
-    const weekCardio=weekDays.filter(wd=>(days[wd]?.activities||[]).some(a=>ACTIVITIES.find(x=>x.id===a)?.type==='cardio')).length
-    const sf=weekStrength>=4?C.teal:weekStrength===3?C.gold:C.red
-    const cf=weekCardio>=1?C.teal:C.red
-    return (
-      <div>
-        <div style={{ background:C.surface, borderRadius:14, padding:14, marginBottom:14, border:`0.5px solid ${C.border}` }}>
-          <div style={{ fontSize:13, fontWeight:700, marginBottom:12, color:C.text }}>📅 Semana atual</div>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
-            {[{label:'Musculação',val:weekStrength,meta:'4x',farol:sf,msg:weekStrength>=4?'Meta atingida! ✓':weekStrength===3?'Quase lá!':'Abaixo da meta'},{label:'Cardio',val:weekCardio,meta:'1x',farol:cf,msg:weekCardio>=1?'Meta atingida! ✓':'Sem cardio essa semana'}].map(s=>(
-              <div key={s.label} style={{ background:C.bg, borderRadius:10, padding:'10px 12px' }}>
-                <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:4 }}>
-                  <span style={{ width:8, height:8, borderRadius:'50%', background:s.farol, display:'inline-block' }}/>
-                  <span style={{ fontSize:11, color:C.text2 }}>{s.label}</span>
-                </div>
-                <div style={{ fontSize:22, fontWeight:800, color:s.farol, fontFamily:'JetBrains Mono,monospace' }}>{s.val}<span style={{ fontSize:12, color:C.text2, fontWeight:400 }}>/{s.meta}</span></div>
-                <div style={{ fontSize:10, color:C.text2, marginTop:2 }}>{s.msg}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-        <div style={{ background:C.surface, borderRadius:14, padding:14, border:`0.5px solid ${C.border}` }}>
-          <div style={{ fontSize:13, fontWeight:700, marginBottom:10, color:C.text }}>🏋️ Atividades de hoje</div>
-          {todayActivities.length===0&&<div style={{ fontSize:12, color:C.text3, marginBottom:10 }}>Nenhuma atividade registrada</div>}
-          {todayActivities.length>0&&<div style={{ display:'flex', flexWrap:'wrap', gap:6, marginBottom:10 }}>
-            {todayActivities.map(actId=>{
-              const act=ACTIVITIES.find(a=>a.id===actId); if(!act) return null
-              return <div key={actId} style={{ display:'flex', alignItems:'center', gap:6, background:act.color+'20', border:`1px solid ${act.color}40`, borderRadius:20, padding:'6px 12px' }}>
-                <span style={{ fontSize:14 }}>{act.icon}</span>
-                <span style={{ fontSize:12, color:act.color, fontWeight:600 }}>{act.label}</span>
-                <button onClick={()=>removeActivityFromDay(actId)} style={{ background:'none', border:'none', color:act.color, cursor:'pointer', fontSize:14, padding:0 }}>×</button>
-              </div>
-            })}
-          </div>}
-          <div style={{ fontSize:11, color:C.text2, marginBottom:8, fontWeight:600 }}>Adicionar:</div>
-          <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
-            {ACTIVITIES.map(act=>{
-              const done=todayActivities.includes(act.id)
-              return <button key={act.id} onClick={()=>addActivityToDay(act.id)} disabled={done}
-                style={{ display:'flex', alignItems:'center', gap:5, padding:'6px 12px', border:`1px solid ${done?act.color:C.border}`, borderRadius:20, background:done?act.color+'20':'transparent', cursor:done?'default':'pointer', fontFamily:'inherit' }}>
-                <span style={{ fontSize:13 }}>{act.icon}</span>
-                <span style={{ fontSize:11, color:done?act.color:C.text2, fontWeight:done?700:400 }}>{act.label}</span>
-              </button>
-            })}
-          </div>
-        </div>
+    const twoCol = isDesktop || isTablet // Treino permite 2 colunas também no tablet
+    const monday = mondayForOffset(0)
+    const prevMonday = mondayForOffset(1)
+    const trainDeps = { days, workoutLogs, ACTIVITIES, effectiveWeight }
+    const training = weekTraining(monday, trainDeps)
+    const prevTraining = weekTraining(prevMonday, trainDeps)
+    const duration = weekWorkoutDuration(monday, workoutLogs)
+    const planInsights = computePlanInsights()
+    const activePlanName = liveSession ? workoutPlans.find(p=>p.id===liveSession.planId)?.name : null
 
-        {/* Treinos recentes */}
-        {Object.keys(workoutLogs).length > 0 && (
-          <div style={{ background:C.surface, borderRadius:14, padding:14, marginTop:12, border:`0.5px solid ${C.border}` }}>
-            <div style={{ fontSize:13, fontWeight:700, marginBottom:12, color:C.text }}>🏋️ Treinos Recentes</div>
-            {Object.entries(workoutLogs).sort(([a],[b])=>b.localeCompare(a)).slice(0,8).map(([date, logs]) => {
-              const arr = Array.isArray(logs) ? logs : [logs]
-              return arr.map((log, li) => {
-                const totalSets = (log.exercises||[]).reduce((a,e)=>a+(e.sets?.length||0),0)
-                const totalVolume = (log.exercises||[]).reduce((a,e)=>a+(e.sets||[]).reduce((s,set)=>s+effectiveWeight(e.exerciseId, set.weight)*(set.reps||0),0),0)
-                const durMin = log.endTime&&log.startTime ? Math.round((log.endTime-log.startTime)/60000) : null
-                const wKey = date+'_'+li
-                const isExp = expandedWorkout === wKey
-                return (
-                  <div key={date+li} style={{ background:C.bg, borderRadius:10, padding:'10px 12px', marginBottom:8, cursor:'pointer' }} onClick={()=>setExpandedWorkout(isExp?null:wKey)}>
-                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4 }}>
-                      <span style={{ fontSize:13, fontWeight:700, color:C.text }}>{log.planName||'Treino'}</span>
-                      <span style={{ fontSize:11, color:C.text2, fontFamily:'JetBrains Mono,monospace' }}>{formatDateFull(date)}</span>
-                    </div>
-                    <div style={{ display:'flex', gap:12, fontSize:10, color:C.text2, fontFamily:'JetBrains Mono,monospace', alignItems:'center' }}>
-                      <span>{(log.exercises||[]).length} exercícios</span>
-                      <span>{totalSets} séries</span>
-                      <span style={{ color:C.gold }}>{Math.round(totalVolume).toLocaleString()} kg vol</span>
-                      {durMin && <span>{durMin} min</span>}
-                      <span style={{ marginLeft:'auto', color:C.text3 }}>{isExp?'▲':'▼ ver'}</span>
-                    </div>
-                    {isExp && (
-                      <div style={{ marginTop:10, paddingTop:10, borderTop:`0.5px solid ${C.border}` }}>
-                        {(log.exercises||[]).map((ex, ei) => {
-                          const e = getExercise(ex.exerciseId)
-                          const vol = (ex.sets||[]).reduce((a,s)=>a+effectiveWeight(ex.exerciseId, s.weight)*(s.reps||0),0)
-                          return (
-                            <div key={ei} style={{ marginBottom:8 }}>
-                              <div style={{ display:'flex', justifyContent:'space-between', marginBottom:3 }}>
-                                <span style={{ fontSize:12, fontWeight:600, color:C.text }}>{e?.name||ex.exerciseId}</span>
-                                <span style={{ fontSize:10, color:C.gold, fontFamily:'JetBrains Mono,monospace' }}>{Math.round(vol)}kg</span>
-                              </div>
-                              <div style={{ display:'flex', flexWrap:'wrap', gap:5 }}>
-                                {(ex.sets||[]).map((set, si) => (
-                                  <span key={si} style={{ fontSize:11, background:C.surface2, borderRadius:6, padding:'3px 8px', color:C.text2, fontFamily:'JetBrains Mono,monospace' }}>{set.weight}×{set.reps}</span>
-                                ))}
-                              </div>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    )}
-                  </div>
-                )
-              })
-            })}
-          </div>
-        )}
-      </div>
+    // Últimas 5 execuções (ordem decrescente)
+    const recentEntries = []
+    Object.entries(workoutLogs).sort(([a],[b])=>b.localeCompare(a)).forEach(([date, logs]) => {
+      const arr = Array.isArray(logs) ? logs : [logs]
+      arr.forEach((log, li) => recentEntries.push({ key: date+'_'+li, date, log }))
+    })
+    recentEntries.sort((a,b)=>b.date.localeCompare(a.date))
+    const top5 = recentEntries.slice(0, 5)
+
+    return (
+      <TreinoResumo
+        T={T} isMobile={isMobile} twoCol={twoCol}
+        liveSession={liveSession} activePlanName={activePlanName} onContinueLive={()=>setTreinoPeek(false)}
+        workoutPlans={workoutPlans} planInsights={planInsights} getExercise={getExercise} getMuscle={getMuscle} formatDateFull={formatDateFull}
+        training={training} prevTraining={prevTraining} duration={duration}
+        recentEntries={top5} expandedKey={expandedWorkout} onToggleExpand={setExpandedWorkout} effectiveWeight={effectiveWeight}
+        onStartPlan={(plan)=>startPlanSession(plan)}
+        onEditPlan={(planId)=>{ setActivePlanId(planId); setTreinoView('fichas') }}
+        onDeletePlan={(plan)=>{ if(window.confirm(`Excluir ficha "${plan.name}"?`)) updateWorkoutPlans(workoutPlans.filter(p=>p.id!==plan.id)) }}
+        onAddExercisesToPlan={(planId)=>{ setActivePlanId(planId); setTreinoView('fichas') }}
+        onNewFicha={createNewFicha}
+      />
     )
-  }// ── PESO ────────────────────────────────────────────────────────────────────
+  }
+
+// ── PESO ────────────────────────────────────────────────────────────────────
   function renderSaude() {
     const hEntries = Object.entries(healthData).filter(([,d])=>d.steps||d.sleep||d.sleepScore).sort(([a],[b])=>b.localeCompare(a))
     return (
