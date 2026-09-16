@@ -3,7 +3,7 @@ import React from 'react'
 // ── Últimas 5 execuções (ordem decrescente) — reaproveita a mesma expansão/detalhe já existente ──
 // Props: entries [{key,date,log}] (já ordenados/limitados pelo chamador), getExercise, effectiveWeight,
 //        formatDateFull, expandedKey, onToggleExpand, T, isMobile
-export default function RecentWorkoutList({ entries, getExercise, effectiveWeight, formatDateFull, expandedKey, onToggleExpand, T, isMobile }) {
+export default function RecentWorkoutList({ entries, getExercise, effectiveWeight, formatDateFull, expandedKey, onToggleExpand, onEdit, T, isMobile }) {
   if (entries.length === 0) {
     return (
       <div style={{ background: T.surfacePrimary, border: `1px solid ${T.border}`, borderRadius: 12, padding: 20, textAlign: 'center' }}>
@@ -17,7 +17,7 @@ export default function RecentWorkoutList({ entries, getExercise, effectiveWeigh
     <div style={{ background: T.surfacePrimary, border: `1px solid ${T.border}`, borderRadius: 12, padding: isMobile ? 13 : 15 }}>
       <div style={{ fontSize: 12, fontWeight: 700, color: T.textSecondary, marginBottom: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>Treinos recentes</div>
 
-      {entries.map(({ key, date, log }) => {
+      {entries.map(({ key, date, index, log }) => {
         const totalSets = (log.exercises || []).reduce((a, e) => a + (e.sets?.length || 0), 0)
         const totalVolume = (log.exercises || []).reduce((a, e) => a + (e.sets || []).reduce((s, set) => s + effectiveWeight(e.exerciseId, set.weight) * (set.reps || 0), 0), 0)
         const durMin = log.endTime && log.startTime ? Math.round((log.endTime - log.startTime) / 60000) : null
@@ -29,6 +29,10 @@ export default function RecentWorkoutList({ entries, getExercise, effectiveWeigh
             style={{ background: T.surfaceElevated, borderRadius: 10, padding: '11px 12px', marginBottom: 8, cursor: 'pointer', minHeight: 44 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
               <span style={{ fontSize: 13, fontWeight: 700, color: T.textPrimary }}>{formatDateFull(date)} · {log.planName || 'Treino'}</span>
+              {onEdit && (
+                <button onClick={(e) => { e.stopPropagation(); onEdit({ date, index, log }) }} aria-label="Editar este treino"
+                  style={{ background: T.surfacePrimary, border: `1px solid ${T.border}`, borderRadius: 7, minWidth: 30, minHeight: 30, color: T.textSecondary, fontSize: 12, cursor: 'pointer', flexShrink: 0 }}>✎</button>
+              )}
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, fontSize: 10.5, color: T.textSecondary, fontFamily: 'JetBrains Mono, monospace', alignItems: 'center' }}>
               <span>{(log.exercises || []).length} exercícios</span>

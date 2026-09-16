@@ -11,6 +11,7 @@ import Alimentacao from './screens/Alimentacao.jsx'
 import TreinoResumo from './screens/TreinoResumo.jsx'
 import TrainingNavigation from './components/training/TrainingNavigation.jsx'
 import WorkoutPlanCard from './components/training/WorkoutPlanCard.jsx'
+import WorkoutLogEditModal from './components/training/WorkoutLogEditModal.jsx'
 
 // ── FOODS DATABASE ──────────────────────────────────────────────────────────
 const DEFAULT_FOODS = [
@@ -317,6 +318,7 @@ export default function App() {
   const [exSearch, setExSearch] = useState('')
   const [exMuscleFilter, setExMuscleFilter] = useState('')
   const [expandedWorkout, setExpandedWorkout] = useState(null)
+  const [editingWorkoutLog, setEditingWorkoutLog] = useState(null) // {date, index, log}
   const [pesoPeriod, setPesoPeriod] = useState('90d') // 30d | 90d | 180d | all
   const [insightPeriod, setInsightPeriod] = useState('last') // 'last' | '7d' | '30d'
   const [loaded, setLoaded] = useState(false)
@@ -581,6 +583,34 @@ export default function App() {
   const updateWorkoutPlans = (plans) => { setWorkoutPlans(plans); saveWorkoutState(plans, customExercises, workoutLogs) }
   const updateCustomExercises = (ex) => { setCustomExercises(ex); saveWorkoutState(workoutPlans, ex, workoutLogs) }
   const updateWorkoutLogs = (logs) => { setWorkoutLogs(logs); saveWorkoutState(workoutPlans, customExercises, logs) }
+
+  // Exclui um treino registrado (date + índice no array daquele dia)
+  function deleteWorkoutLog(date, index) {
+    const arr = Array.isArray(workoutLogs[date]) ? workoutLogs[date] : (workoutLogs[date] ? [workoutLogs[date]] : [])
+    const next = arr.filter((_, i) => i !== index)
+    const newLogs = { ...workoutLogs }
+    if (next.length > 0) newLogs[date] = next
+    else delete newLogs[date]
+    updateWorkoutLogs(newLogs)
+  }
+
+  // Edita um treino registrado: pode mudar a data (move para outro dia), os sets de cada exercício, ou remover um exercício inteiro
+  function editWorkoutLog(date, index, updatedLog, newDate) {
+    const targetDate = newDate || date
+    const arr = Array.isArray(workoutLogs[date]) ? workoutLogs[date] : (workoutLogs[date] ? [workoutLogs[date]] : [])
+    const newLogs = { ...workoutLogs }
+    if (targetDate === date) {
+      newLogs[date] = arr.map((l, i) => i === index ? updatedLog : l)
+    } else {
+      // Move para outra data
+      const remaining = arr.filter((_, i) => i !== index)
+      if (remaining.length > 0) newLogs[date] = remaining
+      else delete newLogs[date]
+      const destArr = Array.isArray(newLogs[targetDate]) ? newLogs[targetDate] : (newLogs[targetDate] ? [newLogs[targetDate]] : [])
+      newLogs[targetDate] = [...destArr, updatedLog]
+    }
+    updateWorkoutLogs(newLogs)
+  }
   const toggleDarkMode = () => { const nm = !darkMode; setDarkMode(nm); persist(days, targets, targetsHistory, customFoods, weights, nm) }
 
   const activeKey = editingDay || todayKey()
@@ -957,6 +987,16 @@ export default function App() {
         onDelete={(id)=>{ updateCustomExercises(customExercises.filter(c=>c.id!==id)); setEditingExercise(null) }}
         onClose={()=>setEditingExercise(null)}
       />}
+      {editingWorkoutLog&&<WorkoutLogEditModal
+        T={T}
+        date={editingWorkoutLog.date}
+        index={editingWorkoutLog.index}
+        log={editingWorkoutLog.log}
+        getExercise={getExercise}
+        onSave={(updatedLog, newDate)=>{ editWorkoutLog(editingWorkoutLog.date, editingWorkoutLog.index, updatedLog, newDate); setEditingWorkoutLog(null) }}
+        onDelete={()=>{ deleteWorkoutLog(editingWorkoutLog.date, editingWorkoutLog.index); setEditingWorkoutLog(null) }}
+        onClose={()=>setEditingWorkoutLog(null)}
+      />}
 
       {/* Navegação mobile (bottom nav + bottom sheet "Mais") */}
       {isMobile && (
@@ -1300,8 +1340,10 @@ function renderFichaEditor() {
     const doneEx = exList.filter(x => x.sets.length > 0 || x.skipped).length
 
     const finishLive = () => {
-      // Save to workoutLogs
-      const dateKey = todayKey()
+      // Save to workoutLogs — usa a data em que o treino foi INICIADO, não a data de hoje
+      // (corrige o caso de finalizar um treino depois da meia-noite ou dias depois)
+      const startDate = new Date(s.startTime)
+      const dateKey = `${startDate.getFullYear()}-${String(startDate.getMonth()+1).padStart(2,'0')}-${String(startDate.getDate()).padStart(2,'0')}`
       const log = {
         planId: s.planId,
         planName: plan?.name || 'Treino',
@@ -1785,7 +1827,7 @@ function renderFichaEditor() {
     const recentEntries = []
     Object.entries(workoutLogs).sort(([a],[b])=>b.localeCompare(a)).forEach(([date, logs]) => {
       const arr = Array.isArray(logs) ? logs : [logs]
-      arr.forEach((log, li) => recentEntries.push({ key: date+'_'+li, date, log }))
+      arr.forEach((log, li) => recentEntries.push({ key: date+'_'+li, date, index: li, log }))
     })
     recentEntries.sort((a,b)=>b.date.localeCompare(a.date))
     const top5 = recentEntries.slice(0, 5)
@@ -1802,6 +1844,7 @@ function renderFichaEditor() {
         onDeletePlan={(plan)=>{ if(window.confirm(`Excluir ficha "${plan.name}"?`)) updateWorkoutPlans(workoutPlans.filter(p=>p.id!==plan.id)) }}
         onAddExercisesToPlan={(planId)=>{ setActivePlanId(planId); setTreinoView('fichas') }}
         onNewFicha={createNewFicha}
+        onEditWorkout={(entry)=>setEditingWorkoutLog(entry)}
       />
     )
   }

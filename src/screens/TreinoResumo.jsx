@@ -12,7 +12,7 @@ export default function TreinoResumo({
   workoutPlans, planInsights, getExercise, getMuscle, formatDateFull,
   training, prevTraining, duration,
   recentEntries, expandedKey, onToggleExpand, effectiveWeight,
-  onStartPlan, onEditPlan, onDeletePlan, onAddExercisesToPlan, onNewFicha,
+  onStartPlan, onEditPlan, onDeletePlan, onAddExercisesToPlan, onNewFicha, onEditWorkout,
 }) {
   const fichasGrid = (
     <div>
@@ -59,6 +59,7 @@ export default function TreinoResumo({
       formatDateFull={formatDateFull}
       expandedKey={expandedKey}
       onToggleExpand={onToggleExpand}
+      onEdit={onEditWorkout}
       T={T} isMobile={isMobile}
     />
   )
