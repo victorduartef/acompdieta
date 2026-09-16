@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import NutritionDayStatus from '../components/nutrition/NutritionDayStatus.jsx'
 import DailyNutritionSummary from '../components/nutrition/DailyNutritionSummary.jsx'
 import MealCard from '../components/nutrition/MealCard.jsx'
@@ -8,7 +8,7 @@ import MealCard from '../components/nutrition/MealCard.jsx'
 export default function Alimentacao({
   T, C, isMobile, isWide,
   activeKey, today, isToday, currentDay, dayMacros, activeTargets, hasData,
-  MEALS, ACTIVITIES, allFoods,
+  MEALS, ACTIVITIES, allFoods, calcMacros,
   activeMeal, setActiveMeal, addingFood, setAddingFood, search, setSearch,
   avulso, setAvulso, avulsoData, setAvulsoData,
   addFoodToMeal, addFavoriteMeal, toggleMealFav, updateQty, removeFood, addAvulsoItem,
@@ -16,12 +16,47 @@ export default function Alimentacao({
   farolProt, farolFat, farolCarb, FoodRow,
   onPrevDay, onNextDay, onGoToday,
 }) {
+  // ── Accordion (estado só local — nunca persistido) ──
+  // Desktop (2 colunas, isWide): várias abertas ao mesmo tempo, refeições com alimentos já abrem.
+  // Mobile/tablet 1 coluna (!isWide): apenas uma aberta por vez, tudo começa recolhido.
+  const computeInitialExpanded = () => {
+    if (isWide) {
+      const s = new Set()
+      MEALS.forEach(m => { if ((currentDay.meals[m.id] || []).length > 0) s.add(m.id) })
+      return s
+    }
+    return new Set()
+  }
+  const [expandedMeals, setExpandedMeals] = useState(computeInitialExpanded)
+
+  // Recalcula o estado inicial ao trocar de data (ou voltar para hoje)
+  useEffect(() => {
+    setExpandedMeals(computeInitialExpanded())
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeKey])
+
+  const toggleMealExpanded = (mealId) => {
+    setExpandedMeals(prev => {
+      const next = new Set(prev)
+      if (next.has(mealId)) {
+        next.delete(mealId)
+      } else {
+        if (!isWide) next.clear() // accordion verdadeiro: só uma aberta em 1 coluna
+        next.add(mealId)
+      }
+      return next
+    })
+  }
+
   const dt = new Date(activeKey + 'T12:00:00')
   const wd = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado']
   const mo = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez']
   const fullDate = `${wd[dt.getDay()]}, ${dt.getDate()} de ${mo[dt.getMonth()]}`
 
-  const openAddFor = (mealId) => { setActiveMeal(mealId); setAddingFood(true); setSearch(''); setAvulso(false) }
+  const openAddFor = (mealId) => {
+    setActiveMeal(mealId); setAddingFood(true); setSearch(''); setAvulso(false)
+    setExpandedMeals(prev => { const next = new Set(isWide ? prev : []); next.add(mealId); return next })
+  }
   const closeAdd = () => { setAddingFood(false); setSearch(''); setAvulso(false) }
 
   const activitiesPanel = (
@@ -63,10 +98,13 @@ export default function Alimentacao({
       meal={meal}
       items={currentDay.meals[meal.id] || []}
       allFoods={allFoods}
+      calcMacros={calcMacros}
       isMobile={isMobile}
       isToday={isToday}
       isDinner={meal.id === 'janta'}
       C={C} T={T}
+      expanded={expandedMeals.has(meal.id)}
+      onToggleExpand={() => toggleMealExpanded(meal.id)}
       isActive={activeMeal === meal.id && addingFood}
       onOpenAdd={() => openAddFor(meal.id)}
       onCloseAdd={closeAdd}

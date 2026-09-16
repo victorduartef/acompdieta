@@ -922,7 +922,7 @@ export default function App() {
         T={T} C={C} isMobile={isMobile} isWide={isWide}
         activeKey={activeKey} today={today} isToday={activeKey===today}
         currentDay={currentDay} dayMacros={dayMacros} activeTargets={activeTargets} hasData={hasData}
-        MEALS={MEALS} ACTIVITIES={ACTIVITIES} allFoods={allFoods}
+        MEALS={MEALS} ACTIVITIES={ACTIVITIES} allFoods={allFoods} calcMacros={calcMacros}
         activeMeal={activeMeal} setActiveMeal={setActiveMeal}
         addingFood={addingFood} setAddingFood={setAddingFood}
         search={search} setSearch={setSearch}
