@@ -350,7 +350,7 @@ export function weekTraining(monday, deps) {
     if (hasStrength) strengthDays++
     if (hasCardio) cardioDays++
     const labels = acts.map(a => ACTIVITIES.find(x => x.id === a)?.label).filter(Boolean)
-    return { date: d, active: acts.length > 0, hasStrength, hasCardio, hasOther, labels }
+    return { date: d, active: acts.length > 0, hasStrength, hasCardio, hasOther, labels, activityIds: acts }
   })
 
   // Volume de musculação: soma dos logs concluídos (séries válidas) da semana

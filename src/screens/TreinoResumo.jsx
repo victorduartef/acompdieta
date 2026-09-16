@@ -13,6 +13,7 @@ export default function TreinoResumo({
   training, prevTraining, duration,
   recentEntries, expandedKey, onToggleExpand, effectiveWeight,
   onStartPlan, onEditPlan, onDeletePlan, onAddExercisesToPlan, onNewFicha, onEditWorkout,
+  getActivity, onRemoveActivity, onAddPastWorkout,
 }) {
   const fichasGrid = (
     <div>
@@ -52,16 +53,23 @@ export default function TreinoResumo({
   )
 
   const recentList = (
-    <RecentWorkoutList
-      entries={recentEntries}
-      getExercise={getExercise}
-      effectiveWeight={effectiveWeight}
-      formatDateFull={formatDateFull}
-      expandedKey={expandedKey}
-      onToggleExpand={onToggleExpand}
-      onEdit={onEditWorkout}
-      T={T} isMobile={isMobile}
-    />
+    <div>
+      <RecentWorkoutList
+        entries={recentEntries}
+        getExercise={getExercise}
+        effectiveWeight={effectiveWeight}
+        formatDateFull={formatDateFull}
+        expandedKey={expandedKey}
+        onToggleExpand={onToggleExpand}
+        onEdit={onEditWorkout}
+        T={T} isMobile={isMobile}
+      />
+      {onAddPastWorkout && (
+        <button onClick={onAddPastWorkout} style={{ width: '100%', padding: 11, minHeight: 44, marginTop: 10, border: `1px dashed ${T.border}`, borderRadius: 10, background: 'transparent', color: T.textSecondary, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}>
+          📅 Registrar treino de um dia anterior
+        </button>
+      )}
+    </div>
   )
 
   return (
@@ -70,7 +78,7 @@ export default function TreinoResumo({
         <ActiveWorkoutCard liveSession={liveSession} planName={activePlanName} getExercise={getExercise} onContinue={onContinueLive} T={T} />
       )}
 
-      <TrainingWeeklySummary training={training} prevTraining={prevTraining} duration={duration} T={T} isMobile={isMobile} />
+      <TrainingWeeklySummary training={training} prevTraining={prevTraining} duration={duration} T={T} isMobile={isMobile} getActivity={getActivity} onRemoveActivity={onRemoveActivity} />
 
       {twoCol ? (
         <div style={{ display: 'grid', gridTemplateColumns: '65% 1fr', gap: 16, alignItems: 'start' }}>

@@ -12,6 +12,7 @@ import TreinoResumo from './screens/TreinoResumo.jsx'
 import TrainingNavigation from './components/training/TrainingNavigation.jsx'
 import WorkoutPlanCard from './components/training/WorkoutPlanCard.jsx'
 import WorkoutLogEditModal from './components/training/WorkoutLogEditModal.jsx'
+import AddPastWorkoutModal from './components/training/AddPastWorkoutModal.jsx'
 
 // ── FOODS DATABASE ──────────────────────────────────────────────────────────
 const DEFAULT_FOODS = [
@@ -319,6 +320,7 @@ export default function App() {
   const [exMuscleFilter, setExMuscleFilter] = useState('')
   const [expandedWorkout, setExpandedWorkout] = useState(null)
   const [editingWorkoutLog, setEditingWorkoutLog] = useState(null) // {date, index, log}
+  const [showAddPastWorkout, setShowAddPastWorkout] = useState(false)
   const [pesoPeriod, setPesoPeriod] = useState('90d') // 30d | 90d | 180d | all
   const [insightPeriod, setInsightPeriod] = useState('last') // 'last' | '7d' | '30d'
   const [loaded, setLoaded] = useState(false)
@@ -594,6 +596,26 @@ export default function App() {
     updateWorkoutLogs(newLogs)
   }
 
+  // Registra manualmente um treino de um dia anterior (ex: esqueceu de usar o modo Live).
+  // Usa o MESMO padrão de gravação atômica do finishLive (evita a condição de corrida corrigida antes).
+  function addManualWorkoutLog(dateKey, log) {
+    const existing = workoutLogs[dateKey] ? (Array.isArray(workoutLogs[dateKey]) ? workoutLogs[dateKey] : [workoutLogs[dateKey]]) : []
+    const newWorkoutLogs = { ...workoutLogs, [dateKey]: [...existing, log] }
+    const day = getDay(dateKey)
+    const needsActivity = !(day.activities||[]).includes('musculacao')
+    const newDays = needsActivity
+      ? { ...days, [dateKey]: { ...day, activities:[...(day.activities||[]), 'musculacao'] } }
+      : days
+    setWorkoutLogs(newWorkoutLogs)
+    setDays(newDays)
+    if (uid) {
+      saveToFirebase(uid, {
+        days: newDays, targets, targetsHistory, customFoods, weights, darkMode, bodyData, healthData,
+        workoutPlans, customExercises, workoutLogs: newWorkoutLogs,
+      }, true)
+    }
+  }
+
   // Edita um treino registrado: pode mudar a data (move para outro dia), os sets de cada exercício, ou remover um exercício inteiro
   function editWorkoutLog(date, index, updatedLog, newDate) {
     const targetDate = newDate || date
@@ -686,6 +708,13 @@ export default function App() {
   function removeActivityFromDay(activityId) {
     const day = days[activeKey]; if (!day) return
     updateDays({ ...days, [activeKey]: { ...day, activities: (day.activities||[]).filter(a=>a!==activityId) } })
+  }
+
+  // Versão genérica: remove uma atividade de uma data QUALQUER (não só a data ativa/editingDay).
+  // Usada no Resumo do Treino, para corrigir dias marcados como "treinados" incorretamente.
+  function removeActivityFromDate(dateKey, activityId) {
+    const day = days[dateKey]; if (!day) return
+    updateDays({ ...days, [dateKey]: { ...day, activities: (day.activities||[]).filter(a=>a!==activityId) } })
   }
   function saveWeight(dateKey, value) {
     updateWeights({ ...weights, [dateKey]: parseFloat(value) })
@@ -996,6 +1025,15 @@ export default function App() {
         onSave={(updatedLog, newDate)=>{ editWorkoutLog(editingWorkoutLog.date, editingWorkoutLog.index, updatedLog, newDate); setEditingWorkoutLog(null) }}
         onDelete={()=>{ deleteWorkoutLog(editingWorkoutLog.date, editingWorkoutLog.index); setEditingWorkoutLog(null) }}
         onClose={()=>setEditingWorkoutLog(null)}
+      />}
+      {showAddPastWorkout&&<AddPastWorkoutModal
+        T={T}
+        workoutPlans={workoutPlans}
+        allExercises={allExercises}
+        getExercise={getExercise}
+        todayKey={todayKey()}
+        onSave={(dateKey, log)=>{ addManualWorkoutLog(dateKey, log); setShowAddPastWorkout(false) }}
+        onClose={()=>setShowAddPastWorkout(false)}
       />}
 
       {/* Navegação mobile (bottom nav + bottom sheet "Mais") */}
@@ -1862,6 +1900,9 @@ function renderFichaEditor() {
         onAddExercisesToPlan={(planId)=>{ setActivePlanId(planId); setTreinoView('fichas') }}
         onNewFicha={createNewFicha}
         onEditWorkout={(entry)=>setEditingWorkoutLog(entry)}
+        getActivity={(id)=>ACTIVITIES.find(a=>a.id===id)}
+        onRemoveActivity={removeActivityFromDate}
+        onAddPastWorkout={()=>setShowAddPastWorkout(true)}
       />
     )
   }

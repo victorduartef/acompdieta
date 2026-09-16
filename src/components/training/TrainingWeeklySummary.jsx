@@ -3,7 +3,7 @@ import React, { useState } from 'react'
 // ── Resumo semanal: sessões, volume, duração, cardio + dias da semana ──
 // Todos os valores vêm já calculados (dashboardMetrics.js) — nenhum cálculo paralelo aqui.
 // Props: training {strengthDays,cardioDays,volume,dayChips}, prevTraining, duration {totalMinutes,n}, T, isMobile
-export default function TrainingWeeklySummary({ training, prevTraining, duration, T, isMobile }) {
+export default function TrainingWeeklySummary({ training, prevTraining, duration, T, isMobile, getActivity, onRemoveActivity }) {
   const [tapDay, setTapDay] = useState(null)
   const dias = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom']
 
@@ -65,8 +65,22 @@ export default function TrainingWeeklySummary({ training, prevTraining, duration
         })}
       </div>
       {tapDay != null && training.dayChips[tapDay].active && (
-        <div style={{ fontSize: 10.5, color: T.textSecondary, marginTop: 8, background: T.surfaceElevated, borderRadius: 8, padding: '6px 10px' }}>
-          {dias[tapDay]}: {training.dayChips[tapDay].labels.join(', ') || 'atividade registrada'}
+        <div style={{ marginTop: 8, background: T.surfaceElevated, borderRadius: 8, padding: '8px 10px' }}>
+          <div style={{ fontSize: 10, color: T.textMuted, marginBottom: 6, fontFamily: 'JetBrains Mono, monospace' }}>{dias[tapDay]}, {training.dayChips[tapDay].date.slice(5).split('-').reverse().join('/')}</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {training.dayChips[tapDay].activityIds.map(actId => {
+              const act = getActivity ? getActivity(actId) : null
+              return (
+                <div key={actId} style={{ display: 'flex', alignItems: 'center', gap: 5, background: T.surfacePrimary, border: `1px solid ${T.border}`, borderRadius: 20, padding: '4px 6px 4px 10px' }}>
+                  <span style={{ fontSize: 11, color: T.textSecondary }}>{act ? `${act.icon} ${act.label}` : actId}</span>
+                  {onRemoveActivity && (
+                    <button onClick={() => onRemoveActivity(training.dayChips[tapDay].date, actId)} aria-label={`Remover ${act?.label || actId} de ${dias[tapDay]}`}
+                      style={{ background: T.negativeBackground, border: 'none', borderRadius: '50%', width: 20, height: 20, color: T.accentRed, cursor: 'pointer', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}>×</button>
+                  )}
+                </div>
+              )
+            })}
+          </div>
         </div>
       )}
     </div>
