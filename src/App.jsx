@@ -1352,12 +1352,29 @@ function renderFichaEditor() {
         exercises: exList.filter(x => x.sets.length > 0).map(x => ({ exerciseId: x.exerciseId, sets: x.sets })),
       }
       const existing = workoutLogs[dateKey] ? (Array.isArray(workoutLogs[dateKey]) ? workoutLogs[dateKey] : [workoutLogs[dateKey]]) : []
-      updateWorkoutLogs({ ...workoutLogs, [dateKey]: [...existing, log] })
-      // Also register musculação activity for the day
+      const newWorkoutLogs = { ...workoutLogs, [dateKey]: [...existing, log] }
+
+      // Registrar atividade de musculação no dia (se ainda não estiver lá)
       const day = getDay(dateKey)
-      if (!(day.activities||[]).includes('musculacao')) {
-        updateDays({ ...days, [dateKey]: { ...day, activities:[...(day.activities||[]), 'musculacao'] } })
+      const needsActivity = !(day.activities||[]).includes('musculacao')
+      const newDays = needsActivity
+        ? { ...days, [dateKey]: { ...day, activities:[...(day.activities||[]), 'musculacao'] } }
+        : days
+
+      // IMPORTANTE: salvar workoutLogs e days em UMA ÚNICA gravação (fullReplace) —
+      // chamar updateWorkoutLogs() e depois updateDays() separadamente causava uma condição de corrida:
+      // o segundo save (persist) lia "workoutLogs" de um closure desatualizado (antes do primeiro
+      // setWorkoutLogs ter sido processado) e sobrescrevia o treino recém-salvo com o valor antigo,
+      // apagando o treino silenciosamente. Mesmo padrão já usado em saveWeightAndBody.
+      setWorkoutLogs(newWorkoutLogs)
+      setDays(newDays)
+      if (uid) {
+        saveToFirebase(uid, {
+          days: newDays, targets, targetsHistory, customFoods, weights, darkMode, bodyData, healthData,
+          workoutPlans, customExercises, workoutLogs: newWorkoutLogs,
+        }, true)
       }
+
       setLiveSession(null)
       setRestTimer(null)
       setTreinoView('resumo')
