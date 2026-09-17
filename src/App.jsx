@@ -11,6 +11,7 @@ import Alimentacao from './screens/Alimentacao.jsx'
 import TreinoResumo from './screens/TreinoResumo.jsx'
 import TrainingNavigation from './components/training/TrainingNavigation.jsx'
 import WorkoutPlanCard from './components/training/WorkoutPlanCard.jsx'
+import WorkoutPlanEditor from './components/training/WorkoutPlanEditor.jsx'
 import WorkoutLogEditModal from './components/training/WorkoutLogEditModal.jsx'
 import AddPastWorkoutModal from './components/training/AddPastWorkoutModal.jsx'
 
@@ -851,12 +852,19 @@ export default function App() {
         </div>
       )}
 
+      {/* Novo Treino (desktop/tablet) — mesmo padrão da Visão Geral, sem o cabeçalho legado */}
+      {useNewShell && tab==='treino' && !editingDay && (
+        <div style={{ flex:1, minWidth:0, height:'100vh', overflowY:'auto', padding:'24px 28px' }}>
+          {renderTreino()}
+        </div>
+      )}
+
       {/* Conteúdo existente (todas as outras telas) */}
-      <div style={{ display: (useNewShell && tab==='overview') ? 'none' : 'flex', flex: useNewShell ? 1 : undefined, minWidth:0, flexDirection:'column', ...(useNewShell ? { height:'100vh', overflowY:'auto' } : {}) }}>
+      <div style={{ display: (useNewShell && (tab==='overview' || tab==='treino')) ? 'none' : 'flex', flex: useNewShell ? 1 : undefined, minWidth:0, flexDirection:'column', ...(useNewShell ? { height:'100vh', overflowY:'auto' } : {}) }}>
       <div style={{ maxWidth:isWide?(tab==='analysis'?1600:1200):480, margin:'0 auto', width:'100%', minHeight:'100vh', display:'flex', flexDirection:'column', transition:'max-width .2s' }}>
 
-        {/* ── HEADER ── (oculto no overview e em Alimentação — têm cabeçalho próprio) */}
-        {!(tab==='overview' || tab==='today') && <div style={{ background:darkMode?'linear-gradient(180deg,#0f2028 0%,#122028 100%)':C.surface, borderBottom:`1px solid ${C.border}`, padding:'16px 16px 0', flexShrink:0 }}>
+        {/* ── HEADER ── (oculto no overview, Alimentação e Treino — têm cabeçalho próprio) */}
+        {!(tab==='overview' || tab==='today' || tab==='treino') && <div style={{ background:darkMode?'linear-gradient(180deg,#0f2028 0%,#122028 100%)':C.surface, borderBottom:`1px solid ${C.border}`, padding:'16px 16px 0', flexShrink:0 }}>
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:8 }}>
             <div>
               <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:2 }}>
@@ -941,7 +949,7 @@ export default function App() {
         </div>}
 
         {/* ── CONTENT ── */}
-        <div style={{ flex:1, padding:isWide?'24px 24px 100px':(isMobile?'12px 12px 84px':'16px 16px 100px'), overflowY:'auto', background:(isMobile||tab==='today')?T.appBackground:C.bg }}>
+        <div style={{ flex:1, padding:isWide?'24px 24px 100px':(isMobile?'12px 12px 84px':'16px 16px 100px'), overflowY:'auto', background:(isMobile||tab==='today'||tab==='treino')?T.appBackground:C.bg }}>
           {tab==='overview'&&!editingDay&&(
             <VisaoGeral
               T={T}
@@ -1236,59 +1244,36 @@ function renderFichaEditor() {
     const plan = workoutPlans.find(p => p.id === activePlanId)
     if (!plan) { setActivePlanId(null); return null }
     const updatePlan = (updated) => updateWorkoutPlans(workoutPlans.map(p => p.id === plan.id ? updated : p))
+    const twoCol = isDesktop || isTablet
 
     return (
-      <div>
-        <button onClick={()=>setActivePlanId(null)} style={{ background:'none', border:'none', color:C.gold, fontSize:13, cursor:'pointer', fontFamily:'inherit', marginBottom:12, padding:0 }}>‹ Voltar às fichas</button>
-
-        <input value={plan.name} onChange={e=>updatePlan({ ...plan, name:e.target.value })}
-          style={{ width:'100%', background:C.surface, border:`0.5px solid ${C.border}`, borderRadius:10, padding:'12px 14px', color:C.text, fontSize:16, fontWeight:700, fontFamily:'inherit', marginBottom:14 }}/>
-
-        {plan.exercises.map((ex, idx) => {
-          const e = getExercise(ex.exerciseId)
-          if (!e) return null
-          const eq = getEquipment(e.equipment)
-          const pm = getMuscle(e.primary)
-          return (
-            <div key={idx} style={{ background:C.surface, borderRadius:12, padding:12, marginBottom:8, border:`0.5px solid ${C.border}` }}>
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:8 }}>
-                <div style={{ flex:1 }}>
-                  <div style={{ fontSize:14, fontWeight:700, color:C.text }}>{e.name}</div>
-                  <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginTop:4 }}>
-                    <span style={{ fontSize:9, padding:'2px 7px', borderRadius:8, background:C.surface2, color:C.text2 }}>{eq?.icon} {eq?.label}</span>
-                    <span style={{ fontSize:9, padding:'2px 7px', borderRadius:8, background:`${pm?.color||C.gold}20`, color:pm?.color||C.gold, fontWeight:600 }}>{pm?.label}</span>
-                    {(e.secondary||[]).map(sid => { const sm=getMuscle(sid); return <span key={sid} style={{ fontSize:9, padding:'2px 7px', borderRadius:8, background:C.surface2, color:C.text3 }}>{sm?.label}</span> })}
-                  </div>
-                </div>
-                <div style={{ display:'flex', gap:4 }}>
-                  {idx>0 && <button onClick={()=>{ const arr=[...plan.exercises]; [arr[idx-1],arr[idx]]=[arr[idx],arr[idx-1]]; updatePlan({...plan,exercises:arr}) }} style={{ background:C.surface2, border:'none', borderRadius:6, width:26, height:26, color:C.text2, cursor:'pointer', fontSize:12 }}>↑</button>}
-                  {idx<plan.exercises.length-1 && <button onClick={()=>{ const arr=[...plan.exercises]; [arr[idx+1],arr[idx]]=[arr[idx],arr[idx+1]]; updatePlan({...plan,exercises:arr}) }} style={{ background:C.surface2, border:'none', borderRadius:6, width:26, height:26, color:C.text2, cursor:'pointer', fontSize:12 }}>↓</button>}
-                  <button onClick={()=>updatePlan({ ...plan, exercises:plan.exercises.filter((_,i)=>i!==idx) })} style={{ background:`${C.red}18`, border:'none', borderRadius:6, width:26, height:26, color:C.red, cursor:'pointer', fontSize:14 }}>×</button>
-                </div>
-              </div>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6 }}>
-                <div>
-                  <div style={{ fontSize:9, color:C.text2, marginBottom:3 }}>Séries</div>
-                  <input type="number" value={ex.targetSets||''} onChange={ev=>{ const arr=[...plan.exercises]; arr[idx]={...ex,targetSets:parseInt(ev.target.value)||0}; updatePlan({...plan,exercises:arr}) }} placeholder="4" style={{ width:'100%', background:C.surface2, border:`0.5px solid ${C.border}`, borderRadius:6, padding:'6px 8px', color:C.text, fontSize:13, fontFamily:'JetBrains Mono,monospace' }}/>
-                </div>
-                <div>
-                  <div style={{ fontSize:9, color:C.text2, marginBottom:3 }}>Reps</div>
-                  <input value={ex.targetReps||''} onChange={ev=>{ const arr=[...plan.exercises]; arr[idx]={...ex,targetReps:ev.target.value}; updatePlan({...plan,exercises:arr}) }} placeholder="8-12" style={{ width:'100%', background:C.surface2, border:`0.5px solid ${C.border}`, borderRadius:6, padding:'6px 8px', color:C.text, fontSize:13, fontFamily:'JetBrains Mono,monospace' }}/>
-                </div>
-                <div>
-                  <div style={{ fontSize:9, color:C.text2, marginBottom:3 }}>Descanso(s)</div>
-                  <input type="number" value={ex.restSeconds||''} onChange={ev=>{ const arr=[...plan.exercises]; arr[idx]={...ex,restSeconds:parseInt(ev.target.value)||0}; updatePlan({...plan,exercises:arr}) }} placeholder="90" style={{ width:'100%', background:C.surface2, border:`0.5px solid ${C.border}`, borderRadius:6, padding:'6px 8px', color:C.text, fontSize:13, fontFamily:'JetBrains Mono,monospace' }}/>
-                </div>
-              </div>
-            </div>
-          )
-        })}
-
-        <button onClick={()=>{ setEditingExercise({ mode:'addToPlan', planId:plan.id }); setTreinoView('exercicios') }}
-          style={{ width:'100%', padding:12, border:`1.5px dashed ${C.gold}60`, borderRadius:12, background:`${C.gold}08`, color:C.gold, fontSize:13, cursor:'pointer', fontFamily:'inherit', fontWeight:600, marginTop:4 }}>
-          + Adicionar exercício
-        </button>
-      </div>
+      <WorkoutPlanEditor
+        plan={plan}
+        getExercise={getExercise}
+        getMuscle={getMuscle}
+        getEquipment={getEquipment}
+        isMobile={isMobile}
+        twoCol={twoCol}
+        T={T}
+        onBack={()=>setActivePlanId(null)}
+        onRename={(name)=>updatePlan({ ...plan, name })}
+        onMoveExercise={(idx, dir)=>{
+          const arr=[...plan.exercises]
+          const j = idx + dir
+          if (j < 0 || j >= arr.length) return
+          ;[arr[idx],arr[j]]=[arr[j],arr[idx]]
+          updatePlan({...plan,exercises:arr})
+        }}
+        onRemoveExercise={(idx)=>updatePlan({ ...plan, exercises:plan.exercises.filter((_,i)=>i!==idx) })}
+        onChangeExercise={(idx, field, value)=>{
+          const arr=[...plan.exercises]
+          const ex = arr[idx]
+          if (field==='targetReps') arr[idx] = { ...ex, targetReps: value }
+          else arr[idx] = { ...ex, [field]: parseInt(value)||0 }
+          updatePlan({...plan,exercises:arr})
+        }}
+        onAddExercise={()=>{ setEditingExercise({ mode:'addToPlan', planId:plan.id }); setTreinoView('exercicios') }}
+      />
     )
   }
 
