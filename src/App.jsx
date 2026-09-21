@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { doc, getDoc, setDoc } from 'firebase/firestore'
+import { doc, getDoc, setDoc, deleteField } from 'firebase/firestore'
 import { db, initAuth, loginWithGoogle, handleRedirectResult, logout } from './firebase.js'
 import { getEvoTheme } from './theme/evoshapeTheme.js'
 import Sidebar from './components/Sidebar.jsx'
@@ -278,6 +278,27 @@ async function saveToFirebase(uid, data, fullReplace) {
   } catch(e) { console.error(e) }
 }
 
+// ── Gravação segura por chave dentro de um mapa (days, weights, bodyData, healthData, workoutLogs) ──
+// Em vez de reescrever o campo inteiro (fullReplace), grava só as chaves (datas) que realmente mudaram,
+// usando caminhos com ponto ("campo.chave") + merge:true. Isso evita que uma aba/dispositivo com dados
+// desatualizados em memória apague, ao salvar, o que outra aba/dispositivo acabou de gravar em OUTRA data —
+// e usa deleteField() para remover corretamente uma chave excluída (merge:true sozinho não remove chaves
+// ausentes de um mapa aninhado).
+async function saveMapFieldDiff(uid, fieldName, oldMap, newMap) {
+  if (!uid) return
+  const updates = {}
+  const allKeys = new Set([...Object.keys(oldMap||{}), ...Object.keys(newMap||{})])
+  allKeys.forEach(k => {
+    const oldV = oldMap?.[k], newV = newMap?.[k]
+    if (JSON.stringify(oldV) === JSON.stringify(newV)) return
+    updates[`${fieldName}.${k}`] = newV === undefined ? deleteField() : newV
+  })
+  if (Object.keys(updates).length === 0) return
+  try {
+    await setDoc(doc(db,'users',uid), updates, { merge: true })
+  } catch(e) { console.error(e) }
+}
+
 // ── THEME ────────────────────────────────────────────────────────────────────
 const DARK = {
   bg:'#0d1a1f', surface:'#122028', surface2:'#1a2d35', border:'#1e3540',
@@ -545,26 +566,18 @@ export default function App() {
     })
   }, [])
 
-  const persist = useCallback((nd, nt, nth, ncf, nw, ndm, nbd) => {
+  // Grava SÓ targets/targetsHistory/customFoods/darkMode (merge:true — nunca toca em days/weights/
+  // bodyData/healthData/workoutPlans/etc). Esses 4 campos não são mapas por data, então merge:true
+  // já os substitui corretamente por inteiro sem risco de "esquecer" uma chave excluída.
+  const persist = useCallback((nd, nt, nth, ncf, nw, ndm) => {
     if (!uid) return
-    const payload = {
-      days: nd,
-      targets: nt,
-      targetsHistory: nth,
-      customFoods: ncf,
-      weights: nw,
-      darkMode: ndm,
-      bodyData: nbd !== undefined ? nbd : bodyData,
-      healthData,
-      workoutPlans,
-      customExercises,
-      workoutLogs,
-    }
-    // fullReplace=true ensures deleted keys (e.g. removed weight entries) are actually removed
-    saveToFirebase(uid, payload, true)
-  }, [uid, bodyData, healthData, workoutPlans, customExercises, workoutLogs])
+    saveToFirebase(uid, { targets: nt, targetsHistory: nth, customFoods: ncf, darkMode: ndm }, false)
+  }, [uid])
 
-  const updateDays = (nd) => { setDays(nd); persist(nd, targets, targetsHistory, customFoods, weights, darkMode) }
+  // days/weights/bodyData/healthData/workoutLogs são mapas por data: toda gravação usa saveMapFieldDiff
+  // (grava só a(s) data(s) que mudou, com merge:true) — nunca reescreve o mapa inteiro. Isso evita que uma
+  // aba/dispositivo com estado desatualizado apague, ao salvar, o que outra aba salvou em outra data.
+  const updateDays = (nd) => { saveMapFieldDiff(uid, 'days', days, nd); setDays(nd) }
   const updateTargets = (nt, nth) => {
     setTargets(nt)
     const newHist = nth || targetsHistory
@@ -572,16 +585,17 @@ export default function App() {
     persist(days, nt, newHist, customFoods, weights, darkMode)
   }
   const updateCustomFoods = (cf) => { setCustomFoods(cf); persist(days, targets, targetsHistory, cf, weights, darkMode) }
-  const updateWeights = (w) => { setWeights(w); persist(days, targets, targetsHistory, customFoods, w, darkMode) }
-  const updateBodyData = (bd) => { setBodyData(bd); persist(days, targets, targetsHistory, customFoods, weights, darkMode, bd) }
-  const updateHealthData = (hd) => {
-    setHealthData(hd)
-    if (!uid) return
-    saveToFirebase(uid, { days, targets, targetsHistory, customFoods, weights, darkMode, bodyData, healthData: hd, workoutPlans, customExercises, workoutLogs }, true)
-  }
+  const updateWeights = (w) => { saveMapFieldDiff(uid, 'weights', weights, w); setWeights(w) }
+  const updateBodyData = (bd) => { saveMapFieldDiff(uid, 'bodyData', bodyData, bd); setBodyData(bd) }
+  const updateHealthData = (hd) => { saveMapFieldDiff(uid, 'healthData', healthData, hd); setHealthData(hd) }
+
+  // workoutPlans/customExercises são arrays completos (não mapas por data) — merge:true já os
+  // substitui corretamente por inteiro, tocando SÓ esses 2 campos (nunca days/weights/etc).
+  // workoutLogs é um mapa por data: usa saveMapFieldDiff para gravar só a(s) data(s) alterada(s).
   const saveWorkoutState = (plans, exercises, logs) => {
     if (!uid) return
-    saveToFirebase(uid, { days, targets, targetsHistory, customFoods, weights, darkMode, bodyData, healthData, workoutPlans:plans, customExercises:exercises, workoutLogs:logs }, true)
+    saveToFirebase(uid, { workoutPlans: plans, customExercises: exercises }, false)
+    saveMapFieldDiff(uid, 'workoutLogs', workoutLogs, logs)
   }
   const updateWorkoutPlans = (plans) => { setWorkoutPlans(plans); saveWorkoutState(plans, customExercises, workoutLogs) }
   const updateCustomExercises = (ex) => { setCustomExercises(ex); saveWorkoutState(workoutPlans, ex, workoutLogs) }
@@ -610,10 +624,9 @@ export default function App() {
     setWorkoutLogs(newWorkoutLogs)
     setDays(newDays)
     if (uid) {
-      saveToFirebase(uid, {
-        days: newDays, targets, targetsHistory, customFoods, weights, darkMode, bodyData, healthData,
-        workoutPlans, customExercises, workoutLogs: newWorkoutLogs,
-      }, true)
+      const updates = { [`workoutLogs.${dateKey}`]: newWorkoutLogs[dateKey] }
+      if (needsActivity) updates[`days.${dateKey}`] = newDays[dateKey]
+      saveToFirebase(uid, updates, false)
     }
   }
 
@@ -725,9 +738,10 @@ export default function App() {
   function saveWeightAndBody(dateKey, bodyObj) {
     const newWeights = { ...weights, [dateKey]: parseFloat(bodyObj.weight) }
     const newBodyData = { ...bodyData, [dateKey]: bodyObj }
+    saveMapFieldDiff(uid, 'weights', weights, newWeights)
+    saveMapFieldDiff(uid, 'bodyData', bodyData, newBodyData)
     setWeights(newWeights)
     setBodyData(newBodyData)
-    persist(days, targets, targetsHistory, customFoods, newWeights, darkMode, newBodyData)
   }
 
   if (!loaded) return (
@@ -1384,18 +1398,16 @@ function renderFichaEditor() {
         ? { ...days, [dateKey]: { ...day, activities:[...(day.activities||[]), 'musculacao'] } }
         : days
 
-      // IMPORTANTE: salvar workoutLogs e days em UMA ÚNICA gravação (fullReplace) —
-      // chamar updateWorkoutLogs() e depois updateDays() separadamente causava uma condição de corrida:
-      // o segundo save (persist) lia "workoutLogs" de um closure desatualizado (antes do primeiro
-      // setWorkoutLogs ter sido processado) e sobrescrevia o treino recém-salvo com o valor antigo,
-      // apagando o treino silenciosamente. Mesmo padrão já usado em saveWeightAndBody.
+      // Grava SÓ os campos "days.<data>" e "workoutLogs.<data>" (merge:true, caminho com ponto) —
+      // nunca o documento inteiro. Isso é seguro mesmo se outra aba/dispositivo tiver salvado dados de
+      // OUTRA data nesse meio tempo (não são tocados), e resolve de vez a antiga condição de corrida
+      // entre updateWorkoutLogs()+updateDays() sem depender de ler closures desatualizados.
       setWorkoutLogs(newWorkoutLogs)
       setDays(newDays)
       if (uid) {
-        saveToFirebase(uid, {
-          days: newDays, targets, targetsHistory, customFoods, weights, darkMode, bodyData, healthData,
-          workoutPlans, customExercises, workoutLogs: newWorkoutLogs,
-        }, true)
+        const updates = { [`workoutLogs.${dateKey}`]: newWorkoutLogs[dateKey] }
+        if (needsActivity) updates[`days.${dateKey}`] = newDays[dateKey]
+        saveToFirebase(uid, updates, false)
       }
 
       setLiveSession(null)
