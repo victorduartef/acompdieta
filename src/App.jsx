@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { doc, getDoc, setDoc, deleteField } from 'firebase/firestore'
+import { doc, getDoc, setDoc, updateDoc, deleteField } from 'firebase/firestore'
 import { db, initAuth, loginWithGoogle, handleRedirectResult, logout } from './firebase.js'
 import { getEvoTheme } from './theme/evoshapeTheme.js'
 import Sidebar from './components/Sidebar.jsx'
@@ -294,9 +294,19 @@ async function saveMapFieldDiff(uid, fieldName, oldMap, newMap) {
     updates[`${fieldName}.${k}`] = newV === undefined ? deleteField() : newV
   })
   if (Object.keys(updates).length === 0) return
+  const ref = doc(db,'users',uid)
   try {
-    await setDoc(doc(db,'users',uid), updates, { merge: true })
-  } catch(e) { console.error(e) }
+    // updateDoc() é a API corretamente documentada para caminhos com ponto (ex: "days.2026-09-21") —
+    // setDoc(...,{merge:true}) faz merge raso e NÃO tem esse comportamento garantido/documentado.
+    await updateDoc(ref, updates)
+  } catch(e) {
+    // Documento ainda não existe (usuário novo, primeiro save) — cria com o mapa completo para este campo
+    if (e?.code === 'not-found') {
+      try { await setDoc(ref, { [fieldName]: newMap }, { merge: true }) } catch(e2) { console.error(e2) }
+    } else {
+      console.error(e)
+    }
+  }
 }
 
 // ── THEME ────────────────────────────────────────────────────────────────────
@@ -621,13 +631,10 @@ export default function App() {
     const newDays = needsActivity
       ? { ...days, [dateKey]: { ...day, activities:[...(day.activities||[]), 'musculacao'] } }
       : days
+    saveMapFieldDiff(uid, 'workoutLogs', workoutLogs, newWorkoutLogs)
+    if (needsActivity) saveMapFieldDiff(uid, 'days', days, newDays)
     setWorkoutLogs(newWorkoutLogs)
     setDays(newDays)
-    if (uid) {
-      const updates = { [`workoutLogs.${dateKey}`]: newWorkoutLogs[dateKey] }
-      if (needsActivity) updates[`days.${dateKey}`] = newDays[dateKey]
-      saveToFirebase(uid, updates, false)
-    }
   }
 
   // Edita um treino registrado: pode mudar a data (move para outro dia), os sets de cada exercício, ou remover um exercício inteiro
@@ -1398,17 +1405,14 @@ function renderFichaEditor() {
         ? { ...days, [dateKey]: { ...day, activities:[...(day.activities||[]), 'musculacao'] } }
         : days
 
-      // Grava SÓ os campos "days.<data>" e "workoutLogs.<data>" (merge:true, caminho com ponto) —
-      // nunca o documento inteiro. Isso é seguro mesmo se outra aba/dispositivo tiver salvado dados de
-      // OUTRA data nesse meio tempo (não são tocados), e resolve de vez a antiga condição de corrida
-      // entre updateWorkoutLogs()+updateDays() sem depender de ler closures desatualizados.
+      // Grava SÓ as datas "days.<data>" e "workoutLogs.<data>" que mudaram (via saveMapFieldDiff,
+      // que usa updateDoc — API documentada para caminhos com ponto). Nunca o documento inteiro.
+      // Isso é seguro mesmo se outra aba/dispositivo tiver salvado dados de OUTRA data nesse meio tempo,
+      // e resolve a antiga condição de corrida entre updateWorkoutLogs()+updateDays().
+      saveMapFieldDiff(uid, 'workoutLogs', workoutLogs, newWorkoutLogs)
+      if (needsActivity) saveMapFieldDiff(uid, 'days', days, newDays)
       setWorkoutLogs(newWorkoutLogs)
       setDays(newDays)
-      if (uid) {
-        const updates = { [`workoutLogs.${dateKey}`]: newWorkoutLogs[dateKey] }
-        if (needsActivity) updates[`days.${dateKey}`] = newDays[dateKey]
-        saveToFirebase(uid, updates, false)
-      }
 
       setLiveSession(null)
       setRestTimer(null)
